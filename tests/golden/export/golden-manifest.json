@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-08-26",
+  "results": {
+    "empty-document": {
+      "error": "EXPORT_EMPTY_DOCUMENT"
+    },
+    "two-linked-nodes": {
+      "svgSha256": "3a7487a9c25056b828532ced55f49cea7d325fd14f476382d949ea4156e71256",
+      "width": 407,
+      "height": 197,
+      "pngSha256": "aaecd6772b1eae619c1c802a08175f4665e177231a96c78ac1c44e676ef890ac",
+      "pngWidth": 814,
+      "pngHeight": 394,
+      "pdfSha256": "48326461e9766af1f72eacd90ed3c833a6ce0b0084c44617c0530cc2b5e96aad"
+    },
+    "negative-coordinates": {
+      "svgSha256": "24cb8636e47cfc1e380a49937a8ca58e33aea05942da6feb116aba0cf0fab0d0",
+      "width": 756,
+      "height": 497,
+      "pngSha256": "0779145879e87df6e5626c61655dcf8f559c6e2ca66a9cca121b69cb94cabcbf",
+      "pngWidth": 1512,
+      "pngHeight": 994,
+      "pdfSha256": "77b346532289f637c5865db78fc3b9ab167c72c57a73cd961d457c8f88136a6c"
+    },
+    "chinese-multiline": {
+      "svgSha256": "26fd9895684b4cb34191c68f733df628f13cce9658c4df34658717296fac6b81",
+      "width": 591,
+      "height": 258,
+      "pngSha256": "52d4499016223bb2b9f8ad200ba03ece83573f9216c8d562c2974e305d786832",
+      "pngWidth": 1182,
+      "pngHeight": 516,
+      "pdfSha256": "0d62bb14632e58b85325c7121757d60681f800196b5295a56f28fd0f1b378a50"
+    },
+    "dark-theme": {
+      "svgSha256": "9e07753780d530940afe574ce93f3033444825475eff68995d1690a6737cb308",
+      "width": 410,
+      "height": 217,
+      "pngSha256": "d3ee9fccb8a4b65712a96092564c2e50f494d81d909d930d43fe1ccd8855cc50",
+      "pngWidth": 820,
+      "pngHeight": 434,
+      "pdfSha256": "a19b278f406184d5b09fa41cbc429cbf216371b0f82e175789a48f59acdcdfb0"
+    },
+    "frames-hidden": {
+      "svgSha256": "5bdd426bd706112456434b71f088ee955c989e21e7445f9d6d57f8e172dd0b36",
+      "width": 402,
+      "height": 157,
+      "pngSha256": "67d3689033853894a368564ecee0596bb7e75e982180df519047b7a76f62c6de",
+      "pngWidth": 804,
+      "pngHeight": 314,
+      "pdfSha256": "7c346d3158d7e0410b470522f794de2f5b527772286c9130ace0241e06f94b84"
+    },
+    "ellipse-shape": {
+      "svgSha256": "5fce5d9ed21d3035c8d269112391d1f2082a16280ca65f17c13f08407998f29f",
+      "width": 396,
+      "height": 217,
+      "pngSha256": "3747368b50741fcbecd9f82e6530827107c013d90000978af847144ead08d675",
+      "pngWidth": 792,
+      "pngHeight": 434,
+      "pdfSha256": "d4a6a185eeb3516d1a9d53b8388d6a1a36adaa316de3a0073420156719f066ce"
+    },
+    "lxgw-font": {
+      "svgSha256": "f9649bccec145ef2491cba7e6bdb22d5c103b1fc6678af6673e8f28697c4d498",
+      "width": 217,
+      "height": 117,
+      "pngSha256": "5f11a5c7325dc5e1873ec7c0212e7093403b5e3d02b3401827751038f0e35af9",
+      "pngWidth": 434,
+      "pngHeight": 234,
+      "pdfSha256": "6359b4e0c18fbd470b80f932566f7f6e0e6dd3e43c441f9c6b1ef48248dfb767"
+    },
+    "missing-glyph": {
+      "svgSha256": "9a130a62262770e6837fa8e96824a9189ef57793a3a1b12441fe8b5507977004",
+      "width": 170,
+      "height": 117,
+      "pngSha256": "3d79f645d9d93c2a136667e20c28d1f863ed7714c2830767af7990d5aff6397c",
+      "pngWidth": 340,
+      "pngHeight": 234,
+      "pdfSha256": "5271e7aef6f7d7c7fdc96cf214419aff344f80a9f08129ec13b371037f19a59e"
+    },
+    "dense-300-450": {
+      "svgSha256": "31c2744cea60173794d7cbafa34e266fa113e12b520ed3e787eed02b8e245cf3",
+      "width": 4393,
+      "height": 2113,
+      "pngSha256": "fff985f9dad02ff652c2a4c3f736e8f71c62ae9ad7fa62f73121fa8416566bca",
+      "pngWidth": 8786,
+      "pngHeight": 4226,
+      "pdfSha256": "1d75820aeaf140a625be4f587a1fb53a730ea0334a30f0883910e2ce4da68e7c"
+    },
+    "large-bounds": {
+      "svgSha256": "61892b9159c1b3adaa6826fa007c65cb2961c7a74b01ce4bb8a366a9e132771b",
+      "width": 40200,
+      "height": 16124,
+      "pngError": "EXPORT_SIZE_LIMIT",
+      "pdfSha256": "ba2cff258aab7f713dd8920c91c205809c1c745ce62b1c4dbfffabed66337126"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-1",
+        "text": "标题：创意与“结构”\n第二行 <标签> & 引用——",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 177.5,
+          "height": 70
+        },
+        "runs": [
+          {
+            "start": 0,
+            "end": 2,
+            "bold": true
+          },
+          {
+            "start": 3,
+            "end": 5,
+            "fontSize": 22
+          },
+          {
+            "start": 15,
+            "end": 18,
+            "underline": true
+          }
+        ]
+      },
+      {
+        "id": "n-2",
+        "text": "line1: mixed 中英 EN\nline2: 标点，、；：？！",
+        "position": {
+          "x": 340,
+          "y": 120
+        },
+        "size": {
+          "width": 170.92,
+          "height": 58
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "sourceNodeId": "n-1",
+        "targetNodeId": "n-2"
+      }
+    ]
+  }
+}

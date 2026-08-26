@@ -27,7 +27,10 @@ const PATTERNS = [
   { re: /fetch\s*\(/, label: "fetch(" },
   { re: /XMLHttpRequest/, label: "XMLHttpRequest" },
   { re: /new\s+WebSocket/, label: "WebSocket" },
-  { re: /https?:\/\/(?!localhost|127\.0\.0\.1|schema\.tauri\.app)/, label: "http(s) URL" },
+  {
+    re: /https?:\/\/(?!localhost|127\.0\.0\.1|schema\.tauri\.app|www\.w3\.org)/,
+    label: "http(s) URL",
+  }, // w3.org = SVG/XML 命名空间 URI，非网络请求
   { re: /reqwest::/, label: "reqwest (rust)" },
   { re: /TcpListener|UdpSocket/, label: "network listener (rust)" },
 ];

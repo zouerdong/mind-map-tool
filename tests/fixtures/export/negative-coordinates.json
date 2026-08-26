@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-1",
+        "text": "左上",
+        "position": {
+          "x": -480,
+          "y": -320
+        },
+        "size": {
+          "width": 48,
+          "height": 37
+        }
+      },
+      {
+        "id": "n-2",
+        "text": "原点右下",
+        "position": {
+          "x": 120,
+          "y": 60
+        },
+        "size": {
+          "width": 76,
+          "height": 37
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "sourceNodeId": "n-1",
+        "targetNodeId": "n-2"
+      }
+    ]
+  }
+}

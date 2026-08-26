@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-1",
+        "text": "远左",
+        "position": {
+          "x": -20000,
+          "y": -8000
+        },
+        "size": {
+          "width": 120,
+          "height": 44
+        }
+      },
+      {
+        "id": "n-2",
+        "text": "远右",
+        "position": {
+          "x": 20000,
+          "y": 8000
+        },
+        "size": {
+          "width": 120,
+          "height": 44
+        }
+      },
+      {
+        "id": "n-3",
+        "text": "中",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 44
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "sourceNodeId": "n-1",
+        "targetNodeId": "n-3"
+      },
+      {
+        "id": "e-2",
+        "sourceNodeId": "n-3",
+        "targetNodeId": "n-2"
+      }
+    ]
+  }
+}

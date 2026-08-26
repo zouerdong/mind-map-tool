@@ -8,6 +8,18 @@
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mindmap/core": "workspace:*",
+    "fontkit": "^2.0.4",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "pdf-lib": "^1.17.1",
+    "@pdf-lib/fontkit": "^1.1.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8",
+    "@types/node": "^24.0.0"
   }
 }

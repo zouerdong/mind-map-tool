@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "document": {
+    "theme": "light",
+    "font": "lxgw-wenkai",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-1",
+        "text": "文楷手写·文楷手写",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 136.9,
+          "height": 37
+        },
+        "runs": [
+          {
+            "start": 0,
+            "end": 4,
+            "bold": true
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

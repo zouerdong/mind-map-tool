@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "ellipse",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-1",
+        "text": "椭圆默认",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 76,
+          "height": 37
+        }
+      },
+      {
+        "id": "n-2",
+        "text": "单点卡片",
+        "position": {
+          "x": 240,
+          "y": 100
+        },
+        "size": {
+          "width": 76,
+          "height": 37
+        },
+        "shape": "card"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "sourceNodeId": "n-1",
+        "targetNodeId": "n-2"
+      }
+    ]
+  }
+}
