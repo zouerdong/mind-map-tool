@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "project": "minimal-mind-map-tool",
+  "status": "recommendation-ready",
+  "updatedAt": "2026-08-26",
+  "tracks": {
+    "desktopHost": {
+      "status": "recommendation-ready",
+      "recommended": "tauri",
+      "candidates": [
+        {
+          "id": "tauri",
+          "result": "pass",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/tauri-metrics.json",
+              "sha256": "a3146df4b1b0d7310f4bcbff595d885cd0967f8af1489d6e529557f7c099215d"
+            }
+          ],
+          "blockedReasons": []
+        },
+        {
+          "id": "electron",
+          "result": "pass",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/electron-metrics.json",
+              "sha256": "c5daef0b214a19fab13714119d0224adf2ec8f363e15dc0bf2fcd62465258b84"
+            }
+          ],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": []
+    },
+    "canvasView": {
+      "status": "recommendation-ready",
+      "recommended": "react-flow",
+      "candidates": [
+        {
+          "id": "react-flow",
+          "result": "pass",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/canvas/canvas-metrics.json",
+              "sha256": "75b19a8d9ec5d9c0233779a0c0d13cef4cdfd26194a2c7338840262a9b644ce6"
+            }
+          ],
+          "blockedReasons": []
+        },
+        {
+          "id": "custom-react-view",
+          "result": "not-tested",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/canvas/canvas-metrics.json",
+              "sha256": "75b19a8d9ec5d9c0233779a0c0d13cef4cdfd26194a2c7338840262a9b644ce6"
+            }
+          ],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": []
+    },
+    "exportRenderer": {
+      "status": "recommendation-ready",
+      "recommended": "web-ts-wasm",
+      "candidates": [
+        {
+          "id": "web-ts-wasm",
+          "result": "pass",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/export/export-metrics.json",
+              "sha256": "946775a87b34ab78355bf8ccc3d5c1e4aa818e3a8221007c36991fb28c6f79c3"
+            }
+          ],
+          "blockedReasons": []
+        },
+        {
+          "id": "native-host",
+          "result": "not-tested",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/tauri-metrics.json",
+              "sha256": "a3146df4b1b0d7310f4bcbff595d885cd0967f8af1489d6e529557f7c099215d"
+            },
+            {
+              "path": ".tmp/runtime-spike/hosts/electron-metrics.json",
+              "sha256": "c5daef0b214a19fab13714119d0224adf2ec8f363e15dc0bf2fcd62465258b84"
+            }
+          ],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": []
+    },
+    "font": {
+      "status": "recommendation-ready",
+      "recommended": "noto-sans-sc-regular",
+      "candidates": [
+        {
+          "id": "noto-sans-sc-regular",
+          "result": "pass",
+          "exitCriteriaVersion": "font-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/fonts/font-evaluation.json",
+              "sha256": "bda440ee4b64db6b74d5e76f2a915680f0db4d4ba534cde2804c778577e1c849"
+            }
+          ],
+          "blockedReasons": []
+        },
+        {
+          "id": "lxgw-wenkai-regular",
+          "result": "pass",
+          "exitCriteriaVersion": "font-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/fonts/font-evaluation.json",
+              "sha256": "bda440ee4b64db6b74d5e76f2a915680f0db4d4ba534cde2804c778577e1c849"
+            }
+          ],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": []
+    }
+  },
+  "gates": {
+    "G0": {
+      "status": "approved",
+      "owner": "project-owner",
+      "approvedBy": "ErDong Zou",
+      "approvedAt": "2026-08-26",
+      "approvedScope": [
+        "[from-user] 2026-08-26 会话授权：按 docs/planning/v1-development-guide.md 与任务卡推进后续具体开发工作，关键节点（UI 设计、功能与快捷键等）停下来与项目负责人探讨",
+        "本地 Spike 实验：四轨（desktopHost/canvasView/exportRenderer/font）可在本机与已登记设备上实验评估",
+        "macOS Spike 设备：Apple M4 / 24 GB RAM / macOS 26.6.2 (25G83) / arm64",
+        "Windows Spike 设备：no-device-currently（2026-08-26 项目负责人确认当前无 Windows 设备；macOS 侧四轨证据先行采集，双平台聚合与 recommendation-ready 在 Windows 报告补齐前保持 BLOCKED，R-013；替代路径（借用设备/本机 ARM 虚拟机/范围调整）在 G1 讨论时决定）",
+        "实验红线：候选依赖只允许存在于 scripts/runtime-spike/** harness；不发布、不改 CI/CD、不访问凭据、不签名/公证、不安装正式产品依赖（G1 前禁止）、不上传远端",
+        "实验产物：.tmp/runtime-spike/** 只存可再生 build/output；Spike 报告与 decision snapshot 进入 docs/quality/**"
+      ],
+      "evidence": [
+        "项目负责人 2026-08-26 会话授权原文（本仓库工作会话记录）",
+        "docs/planning/v1-development-guide.md §3 决策门定义",
+        "docs/quality/mm-000-review.md G0 审签记录"
+      ]
+    },
+    "G1": {
+      "status": "approved",
+      "owner": "project-owner",
+      "approvedBy": "ErDong Zou",
+      "approvedAt": "2026-08-26",
+      "sourceSpikeResult": {
+        "path": "docs/quality/runtime-spike-decision.json",
+        "sha256": "24ea43fa43ccbdd91ac384cde2c5332c4537d38d1bbea3b5aa62651c842e145f",
+        "generatedAt": "2026-08-26T04:05:07.345Z"
+      },
+      "approvedTracks": {
+        "desktopHost": {
+          "value": "tauri",
+          "candidateResult": "pass",
+          "candidateEvidenceSha256": "4f502c91525f21e916ef7f5386b06ce3e2cb85cdff4a5bf4b6fb383820df8968",
+          "acceptedAdr": {
+            "id": "0001-desktop-host",
+            "version": "1.0.0",
+            "sha256": "ed68804f4dd669a919e4132730bc9e5d77988a74fe421aadc59cd7107d961b70"
+          }
+        },
+        "canvasView": {
+          "value": "react-flow",
+          "candidateResult": "pass",
+          "candidateEvidenceSha256": "32b16c88ee793cdd4ed3f856eca9c206a1f82e8783ec69bb6d0199a5506e0ade",
+          "acceptedAdr": {
+            "id": "0002-canvas-view",
+            "version": "1.0.0",
+            "sha256": "26a2475e8140dfb72aed8d46a8335c604ebe85dd1f6e710943f0dc3d3707afbf"
+          }
+        },
+        "exportRenderer": {
+          "value": "web-ts-wasm",
+          "candidateResult": "pass",
+          "candidateEvidenceSha256": "c4ef18b08c27187b77623b02a2070889cf78b76a48fc3811b408512f20e284bc",
+          "acceptedAdr": {
+            "id": "0004-export-renderer",
+            "version": "1.0.0",
+            "sha256": "c1202388c058a741bdb6acef5016d150682253dce62c11b80abab40561d8a522"
+          }
+        },
+        "font": {
+          "value": "noto-sans-sc-regular",
+          "candidateResult": "pass",
+          "candidateEvidenceSha256": "957b3e974ef1300f7d9e8501345f39c390d5df741b309eb8e246871292784603",
+          "acceptedAdr": {
+            "id": "0005-export-font-pdf",
+            "version": "1.0.0",
+            "sha256": "90b96016ded53e1a639aa657f1aa3c66285565a65f2dbe3aeca8a07994974268"
+          }
+        }
+      },
+      "acceptedAdrVersions": [
+        {
+          "track": "desktopHost",
+          "adrId": "0001-desktop-host",
+          "version": "1.0.0",
+          "sha256": "ed68804f4dd669a919e4132730bc9e5d77988a74fe421aadc59cd7107d961b70"
+        },
+        {
+          "track": "canvasView",
+          "adrId": "0002-canvas-view",
+          "version": "1.0.0",
+          "sha256": "26a2475e8140dfb72aed8d46a8335c604ebe85dd1f6e710943f0dc3d3707afbf"
+        },
+        {
+          "track": "exportRenderer",
+          "adrId": "0004-export-renderer",
+          "version": "1.0.0",
+          "sha256": "c1202388c058a741bdb6acef5016d150682253dce62c11b80abab40561d8a522"
+        },
+        {
+          "track": "font",
+          "adrId": "0005-export-font-pdf",
+          "version": "1.0.0",
+          "sha256": "90b96016ded53e1a639aa657f1aa3c66285565a65f2dbe3aeca8a07994974268"
+        }
+      ],
+      "evidence": [
+        "[from-user] 2026-08-26 会话决策：四轨选型（Tauri 2 / React Flow / web-ts-wasm / Noto Sans SC + LXGW WenKai 手写字体）",
+        "[from-user] 2026-08-26 平台范围变更：v1 macOS 先行、Windows 专门版本 + 移植就绪约束（PRD §1.1）",
+        "macOS Spike 快照与原始 metrics（.tmp/runtime-spike/**，digest 已绑定）",
+        "ADR 0001-0006 转 Accepted 1.0.0"
+      ]
+    },
+    "G2": {
+      "status": "pending",
+      "owner": "project-owner",
+      "approvedBy": null,
+      "approvedAt": null,
+      "approvedScope": {
+        "selectedHost": null,
+        "candidateOutputPaths": [],
+        "installationTargets": [],
+        "allowedActions": [],
+        "deletionBoundaries": [],
+        "explicitlyExcluded": [
+          "test-signing",
+          "signing",
+          "notarization",
+          "credential access",
+          "system trust changes",
+          "upload",
+          "publication"
+        ]
+      },
+      "evidence": []
+    }
+  },
+  "validationProfiles": {
+    "spike-result": {
+      "requires": [
+        "G0.status=approved",
+        "candidate results and evidence are internally consistent",
+        "each recommendation references a PASS candidate with evidence",
+        "all-failed tracks are blocked with recommended=null"
+      ],
+      "allows": [
+        "G1.status=pending",
+        "G2.status=pending"
+      ]
+    },
+    "bootstrap": {
+      "inherits": "spike-result",
+      "requires": [
+        "top-level and all required tracks status=recommendation-ready",
+        "G1.status=approved",
+        "G1.sourceSpikeResult sha256 matches the immutable spike-result snapshot",
+        "every G1 approvedTracks value matches a PASS recommendation and candidate evidence digest in that snapshot",
+        "accepted ADR id/version/sha256 entries match approvedTracks and the current ADR bytes",
+        "any recommendation, evidence, snapshot, or ADR drift after approval fails validation"
+      ]
+    },
+    "packaging": {
+      "inherits": "bootstrap",
+      "requires": [
+        "G2.status=approved for the exact selected host, candidate output paths, installation targets, allowed install/uninstall actions, and deletion boundaries"
+      ],
+      "doesNotAuthorize": [
+        "signing",
+        "notarization",
+        "credential access",
+        "upload",
+        "publication"
+      ]
+    }
+  },
+  "consumerRules": {
+    "MM-010": "Runs verify-decision --phase spike-result. Requires G0.status=approved; writes recommendations only and never changes an ADR to Accepted; G1 may remain pending.",
+    "MM-020": "Runs verify-decision --phase bootstrap. Requires top-level status=recommendation-ready, every required track recommendation-ready with a PASS candidate, and G1.status=approved with approvedTracks bound to the immutable sourceSpikeResult sha256 and matching accepted ADR id/version/sha256 entries.",
+    "MM-100": "Runs verify-decision --phase packaging. Requires G2 approval for the exact local packaging scope; signing, notarization, credentials, upload, and publication require separate explicit authorization."
+  }
+}

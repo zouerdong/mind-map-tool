@@ -1,0 +1,30 @@
+{
+  "name": "@mindmap/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "桌面应用组合根（Tauri 2 + React）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@mindmap/core": "workspace:*",
+    "@mindmap/export": "workspace:*",
+    "@mindmap/platform": "workspace:*",
+    "@mindmap/ui": "workspace:*",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.2.7",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}

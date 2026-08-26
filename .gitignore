@@ -1,0 +1,36 @@
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and tool caches
+node_modules/
+target/
+.turbo/
+.cache/
+
+# Build, test, and packaging output
+dist/
+build/
+out/
+coverage/
+artifacts/
+*.log
+
+# Tauri generated schemas (regenerated on every cargo check/build)
+apps/desktop/src-tauri/gen/
+
+# Task-local scratch space
+.tmp/
+
+# Keep OMX requirement artifacts, but ignore runtime-only state
+.omx/state/

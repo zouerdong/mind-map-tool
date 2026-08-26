@@ -1,0 +1,7 @@
+{
+  "name": "electron-host-spike",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "description": "MM-010 runtime spike harness (experimental, not a product dependency)"
+}

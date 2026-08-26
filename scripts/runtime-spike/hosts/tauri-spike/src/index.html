@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>tauri-spike</title>
+  <style>
+    body { font: 14px -apple-system, "PingFang SC", sans-serif; margin: 0; display: grid; place-items: center; height: 100vh; background: #fff; color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <div>
+    <h3>Tauri Spike 空白画布占位</h3>
+    <pre id="m">…</pre>
+  </div>
+  <script>
+    // renderer-ready marker mirrors the Electron spike: 2 rAF after scripts run
+    requestAnimationFrame(() => requestAnimationFrame(async () => {
+      window.__READY = true;
+      try { await window.__TAURI__.core.invoke("spike_ready"); } catch (e) { console.warn(e); }
+    }));
+  </script>
+</body>
+</html>

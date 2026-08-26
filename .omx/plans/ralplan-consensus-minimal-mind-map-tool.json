@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "project": "minimal-mind-map-tool",
+  "completedAt": "2026-08-26T05:23:00+08:00",
+  "ralplan_consensus_gate": {
+    "complete": true,
+    "scope": "Product, architecture proposal, quality plan, risk register, decision template, and independently dispatchable task-card contracts only.",
+    "doesNotAuthorize": [
+      "product implementation",
+      "formal dependency installation",
+      "file or directory deletion",
+      "CI/CD changes",
+      "credential access",
+      "test-signing or signing",
+      "notarization",
+      "system trust changes",
+      "GitHub upload",
+      "public release"
+    ]
+  },
+  "approvals": {
+    "architect": {
+      "verdict": "APPROVE",
+      "path": ".omx/plans/reviews/architect-review-5-minimal-mind-map-tool.md",
+      "sha256": "bc3426a4e8daef1efd84b73ef31191c0ef20367291cb97432b00c696e35fb074"
+    },
+    "critic": {
+      "verdict": "APPROVE",
+      "path": ".omx/plans/reviews/critic-review-3-minimal-mind-map-tool.md",
+      "sha256": "64c9fd4366c11737ca2f2769225a5f530d030f7efa5ad93d4c5c2ac2fcc14e5c"
+    }
+  },
+  "artifacts": [
+    {
+      "role": "product-spec",
+      "path": ".omx/plans/prd-minimal-mind-map-tool.md",
+      "sha256": "0f8b6a126fa6eb69c18d5958bcf292f679cb49a563c11ff4fca62a601c2ef7b9"
+    },
+    {
+      "role": "architecture-proposal",
+      "path": ".omx/plans/architecture-minimal-mind-map-tool.md",
+      "sha256": "9bb22f847077e56706870b12bf217f8d6f7453255d57132fd5c63e8d32beb0ec"
+    },
+    {
+      "role": "test-spec",
+      "path": ".omx/plans/test-spec-minimal-mind-map-tool.md",
+      "sha256": "f5f7b89e20a9379ac48ebada378cc444e8ea9b53cf8bfa436457b081061d7fc5"
+    },
+    {
+      "role": "task-cards",
+      "path": ".omx/plans/task-cards-minimal-mind-map-tool.md",
+      "sha256": "709c98befe15929d82f5553502d5d770d23e93e102dd22fc546aa662180d0f06"
+    },
+    {
+      "role": "risk-register",
+      "path": ".omx/plans/risk-register-minimal-mind-map-tool.md",
+      "sha256": "e870dc8a469eea7f9c65c3cbf9d9f682d10cf2fdc04c10ca4f5697cda0a90f47"
+    },
+    {
+      "role": "decision-register-template",
+      "path": ".omx/plans/decision-register-template-minimal-mind-map-tool.json",
+      "sha256": "caaeac370969145a71636145888f846a94f511d6ee23ac652551c55c60d207e2"
+    },
+    {
+      "role": "development-summary",
+      "path": ".omx/plans/planner-summary-minimal-mind-map-tool.md",
+      "sha256": "add064a1d4e7db5868b402ea82b1cdf6ee73f3c250980c74ab642b3fc809798d"
+    }
+  ],
+  "inventory": {
+    "definedTaskCards": 13,
+    "regularTaskCards": 12,
+    "conditionalTaskCards": 1,
+    "acceptanceCriteria": 14,
+    "trackedRisks": 16
+  },
+  "nextGate": {
+    "id": "G0",
+    "status": "pending",
+    "owner": "project-owner",
+    "meaning": "Local dual-platform Spike authorization only; it is not implementation or release authorization."
+  }
+}

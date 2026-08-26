@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "project": "minimal-mind-map-tool",
+  "status": "recommendation-ready",
+  "generatedAt": "2026-08-26T04:05:07.345Z",
+  "exitCriteriaAmendment": "[from-user] 2026-08-26 G1：v1 平台范围变更为 macOS 先行（PRD §1.1）；exit criteria 以 macOS 实测为完整验收基础，Windows 顺延专门版本。快照 v1（全部 blocked）在 git 历史中保留。",
+  "platforms": {
+    "macos": {
+      "model": "Mac16,12 (Apple M4)",
+      "os": "macOS 26.6.2 (25G83)",
+      "cpu": "Apple M4 arm64",
+      "ram": "24 GB"
+    },
+    "windows": {
+      "status": "deferred-to-dedicated-version",
+      "note": "v1 macOS-first per user G1 decision"
+    }
+  },
+  "gates": {
+    "G0": {
+      "status": "approved",
+      "owner": "project-owner",
+      "approvedBy": "ErDong Zou",
+      "approvedAt": "2026-08-26",
+      "approvedScope": [
+        "[from-user] 2026-08-26 会话授权：按 docs/planning/v1-development-guide.md 与任务卡推进后续具体开发工作，关键节点（UI 设计、功能与快捷键等）停下来与项目负责人探讨",
+        "本地 Spike 实验：四轨（desktopHost/canvasView/exportRenderer/font）可在本机与已登记设备上实验评估",
+        "macOS Spike 设备：Apple M4 / 24 GB RAM / macOS 26.6.2 (25G83) / arm64",
+        "Windows Spike 设备：no-device-currently（2026-08-26 项目负责人确认当前无 Windows 设备；macOS 侧四轨证据先行采集，双平台聚合与 recommendation-ready 在 Windows 报告补齐前保持 BLOCKED，R-013；替代路径（借用设备/本机 ARM 虚拟机/范围调整）在 G1 讨论时决定）",
+        "实验红线：候选依赖只允许存在于 scripts/runtime-spike/** harness；不发布、不改 CI/CD、不访问凭据、不签名/公证、不安装正式产品依赖（G1 前禁止）、不上传远端",
+        "实验产物：.tmp/runtime-spike/** 只存可再生 build/output；Spike 报告与 decision snapshot 进入 docs/quality/**"
+      ],
+      "evidence": [
+        "项目负责人 2026-08-26 会话授权原文（本仓库工作会话记录）",
+        "docs/planning/v1-development-guide.md §3 决策门定义",
+        "docs/quality/mm-000-review.md G0 审签记录"
+      ]
+    },
+    "G1": {
+      "status": "approved",
+      "approvedBy": "ErDong Zou",
+      "approvedAt": "2026-08-26"
+    },
+    "G2": {
+      "status": "pending"
+    }
+  },
+  "tracks": {
+    "desktopHost": {
+      "status": "recommendation-ready",
+      "recommended": "tauri",
+      "candidates": [
+        {
+          "id": "tauri",
+          "result": "pass",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/tauri-metrics.json",
+              "sha256": "a3146df4b1b0d7310f4bcbff595d885cd0967f8af1489d6e529557f7c099215d"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "coldStartP50Ms": 362,
+            "rssMainProcessMb": 112,
+            "binaryMb": 8,
+            "nativePngExport": {
+              "ok": true,
+              "exitCode": 0,
+              "log": "[export-png] 20.7ms 91775B",
+              "ms": 20.7,
+              "bytes": 91775,
+              "sha256": "5a07a5dc8d3cd2483bd481f1f426374c65b67a5c84bf9579254798285c600288"
+            },
+            "summary": "macOS exit criteria PASS：启动 362ms（预算 1500）、二进制 8MB（预算 25）、native 导出可用"
+          }
+        },
+        {
+          "id": "electron",
+          "result": "pass",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/electron-metrics.json",
+              "sha256": "c5daef0b214a19fab13714119d0224adf2ec8f363e15dc0bf2fcd62465258b84"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "coldStartP50Ms": 296,
+            "rssTreeMb": 139,
+            "frameworkDiskMb": 233,
+            "nativePdfExport": {
+              "ok": true,
+              "ms": 323.4,
+              "bytes": 50172,
+              "sha256": "c8d9ab5ffa15ee136de111aa668ee580999f482d8e1b9af4c78e975220a82f09"
+            },
+            "summary": "macOS exit criteria PASS：启动 296ms、RSS 139MB；磁盘 233MB 超出轻量目标（推荐落选原因）"
+          }
+        }
+      ],
+      "blockedReasons": [],
+      "rationale": "Tauri 以 29 倍体积优势胜出；启动/RSS 同级且均优于预算。Electron 保留为降级知识。"
+    },
+    "canvasView": {
+      "status": "recommendation-ready",
+      "recommended": "react-flow",
+      "candidates": [
+        {
+          "id": "react-flow",
+          "result": "pass",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/canvas/canvas-metrics.json",
+              "sha256": "75b19a8d9ec5d9c0233779a0c0d13cef4cdfd26194a2c7338840262a9b644ce6"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "frameP95Ms": {
+              "pan": 17.9,
+              "nodeDrag": 16.7,
+              "zoom": 16.7
+            },
+            "bundleKb": 372,
+            "budget32Ms": true,
+            "attribution": "visible-by-default（G1 决定保留）",
+            "proCodeDependency": false,
+            "summary": "交互完整（拖拽/框选/连线/缩放/键盘内建）、300/450 预算 PASS、MIT"
+          }
+        },
+        {
+          "id": "custom-react-view",
+          "result": "not-tested",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/canvas/canvas-metrics.json",
+              "sha256": "75b19a8d9ec5d9c0233779a0c0d13cef4cdfd26194a2c7338840262a9b644ce6"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "frameP95Ms": {
+              "pan": 17.4,
+              "nodeDrag": 16.7,
+              "zoom": 16.7
+            },
+            "bundleKb": 193,
+            "summary": "性能对照达标，但框选/多选/连线/键盘导航未实现（完整 exit criteria 未测）——React Flow 获选后不再评估"
+          }
+        }
+      ],
+      "blockedReasons": [],
+      "rationale": "交互完整性显著优势，性能与体积达标；IME 真实矩阵在 MM-050/MM-090 补。"
+    },
+    "exportRenderer": {
+      "status": "recommendation-ready",
+      "recommended": "web-ts-wasm",
+      "candidates": [
+        {
+          "id": "web-ts-wasm",
+          "result": "pass",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/export/export-metrics.json",
+              "sha256": "946775a87b34ab78355bf8ccc3d5c1e4aa818e3a8221007c36991fb28c6f79c3"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "svgDeterministic": "8/8",
+            "pngExact2x": "7/7 (large-bounds 正确拒绝)",
+            "pdfDeterministic": "8/8",
+            "envInsensitive": true,
+            "summary": "三格式确定性/守门全过；无 native IPC 面"
+          }
+        },
+        {
+          "id": "native-host",
+          "result": "not-tested",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/hosts/tauri-metrics.json",
+              "sha256": "a3146df4b1b0d7310f4bcbff595d885cd0967f8af1489d6e529557f7c099215d"
+            },
+            {
+              "path": ".tmp/runtime-spike/hosts/electron-metrics.json",
+              "sha256": "c5daef0b214a19fab13714119d0224adf2ec8f363e15dc0bf2fcd62465258b84"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "tauriResvgPng": {
+              "ok": true,
+              "exitCode": 0,
+              "log": "[export-png] 20.7ms 91775B",
+              "ms": 20.7,
+              "bytes": 91775,
+              "sha256": "5a07a5dc8d3cd2483bd481f1f426374c65b67a5c84bf9579254798285c600288"
+            },
+            "electronPrintToPdf": {
+              "ok": true,
+              "ms": 323.4,
+              "bytes": 50172,
+              "sha256": "c8d9ab5ffa15ee136de111aa668ee580999f482d8e1b9af4c78e975220a82f09"
+            },
+            "summary": "部分腿通过（resvg PNG 21ms、printToPDF 323ms），native PDF Rust 栈未评——默认分支获选后不再激活 MM-045"
+          }
+        }
+      ],
+      "blockedReasons": [],
+      "rationale": "web-ts-wasm 唯一完整拥有三格式且全部确定性验证通过。"
+    },
+    "font": {
+      "status": "recommendation-ready",
+      "recommended": "noto-sans-sc-regular",
+      "candidates": [
+        {
+          "id": "noto-sans-sc-regular",
+          "result": "pass",
+          "exitCriteriaVersion": "font-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/fonts/font-evaluation.json",
+              "sha256": "bda440ee4b64db6b74d5e76f2a915680f0db4d4ba534cde2804c778577e1c849"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "license": "SIL OFL 1.1",
+            "sizeMb": 7.9,
+            "coverageRatio": 1,
+            "corpus": 398,
+            "puaCorrectlyMissing": true
+          }
+        },
+        {
+          "id": "lxgw-wenkai-regular",
+          "result": "pass",
+          "exitCriteriaVersion": "font-v1",
+          "exitEvidence": [
+            {
+              "path": ".tmp/runtime-spike/fonts/font-evaluation.json",
+              "sha256": "bda440ee4b64db6b74d5e76f2a915680f0db4d4ba534cde2804c778577e1c849"
+            }
+          ],
+          "blockedReasons": [],
+          "macOSLeg": {
+            "license": "SIL OFL 1.1",
+            "sizeMb": 23.6,
+            "coverageRatio": 1,
+            "role": "[from-user] 手写风格第二字体（v1 字体二选一功能）"
+          }
+        }
+      ],
+      "blockedReasons": [],
+      "rationale": "Noto Sans SC 为基础字体（体积最优）；LXGW WenKai 因 [from-user] 手写体需求进入 v1 双字体功能。"
+    }
+  },
+  "notes": [
+    "验证命令：node scripts/runtime-spike/verify-decision.mjs --phase bootstrap docs/decisions/decision-register.json"
+  ]
+}

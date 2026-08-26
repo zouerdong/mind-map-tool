@@ -1,0 +1,13 @@
+# 审计与规划产物不做格式化改写（保持 Ralplan/OMX 原貌）
+docs/
+.omx/
+assets/
+scripts/runtime-spike/
+packages/*/node_modules/
+**/node_modules/
+**/dist/
+**/target/
+**/gen/schemas/
+.tmp/
+pnpm-lock.yaml
+package-lock.json

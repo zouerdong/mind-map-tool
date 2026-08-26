@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>electron-spike</title>
+  <style>
+    body { font: 14px system-ui; margin: 0; display: grid; place-items: center; height: 100vh; background: #fff; color: #1a1a1a; }
+    #opened { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <div>
+    <h3>Electron Spike 空白画布占位</h3>
+    <p>file-open events: <span id="opened">none</span></p>
+    <pre id="metrics">…</pre>
+  </div>
+  <script>
+    window.__RENDERER_READY = false;
+    (async function loop() {
+      const el = document.getElementById("metrics");
+      for (;;) {
+        if (window.spike) {
+          const rss = await window.spike.rss();
+          el.textContent = `rss=${(rss.rss / 1048576).toFixed(1)}MB windows=${rss.windowCount} uptime=${(await window.spike.uptime()).toFixed(1)}s`;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    })();
+    if (window.spike) window.spike.onOpenFile((p) => { document.getElementById("opened").textContent = p; });
+    window.__RENDERER_READY = true;
+  </script>
+</body>
+</html>

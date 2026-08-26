@@ -1,0 +1,22 @@
+[package]
+name = "tauri-spike"
+version = "0.1.0"
+edition = "2021"
+description = "MM-010 runtime spike harness (experimental, not a product dependency)"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+resvg = "0.45"
+usvg = "0.45"
+tiny-skia = "0.11"
+fontdb = "0.23"
+
+[profile.release]
+strip = true
+lto = true

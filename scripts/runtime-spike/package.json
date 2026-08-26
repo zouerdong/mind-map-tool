@@ -1,0 +1,35 @@
+{
+  "name": "runtime-spike-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MM-010 runtime spike harness. Experimental evaluation dependencies only — NOT product dependencies (G0 scope).",
+  "scripts": {
+    "fixtures": "node fixtures/generate-fixtures.mjs",
+    "measure:export": "node export/measure-export.mjs",
+    "evaluate:fonts": "node fonts/evaluate-fonts.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@xyflow/react": "^12.6.0",
+    "electron": "^33.4.11",
+    "fontkit": "^2.0.4",
+    "pdf-lib": "^1.17.1",
+    "playwright": "^1.49.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "pngjs": "^7.0.0"
+  }
+}

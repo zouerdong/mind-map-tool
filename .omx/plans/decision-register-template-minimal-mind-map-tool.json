@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "project": "minimal-mind-map-tool",
+  "status": "blocked",
+  "updatedAt": null,
+  "tracks": {
+    "desktopHost": {
+      "status": "blocked",
+      "recommended": null,
+      "candidates": [
+        {
+          "id": "tauri",
+          "result": "not-tested",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        },
+        {
+          "id": "electron",
+          "result": "not-tested",
+          "exitCriteriaVersion": "host-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        }
+      ],
+      "blockedReasons": ["NO_PASSING_CANDIDATE"]
+    },
+    "canvasView": {
+      "status": "blocked",
+      "recommended": null,
+      "candidates": [
+        {
+          "id": "react-flow",
+          "result": "not-tested",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        },
+        {
+          "id": "custom-react-view",
+          "result": "not-tested",
+          "exitCriteriaVersion": "canvas-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        }
+      ],
+      "blockedReasons": ["NO_PASSING_CANDIDATE"]
+    },
+    "exportRenderer": {
+      "status": "blocked",
+      "recommended": null,
+      "candidates": [
+        {
+          "id": "web-ts-wasm",
+          "result": "not-tested",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        },
+        {
+          "id": "native-host",
+          "result": "not-tested",
+          "exitCriteriaVersion": "export-renderer-v1",
+          "exitEvidence": [],
+          "blockedReasons": ["NOT_TESTED"]
+        }
+      ],
+      "blockedReasons": ["NO_PASSING_CANDIDATE"]
+    },
+    "font": {
+      "status": "blocked",
+      "recommended": null,
+      "candidates": [],
+      "blockedReasons": ["NO_LICENSED_CJK_CANDIDATE_EVALUATED"]
+    }
+  },
+  "gates": {
+    "G0": {
+      "status": "pending",
+      "owner": "project-owner",
+      "approvedBy": null,
+      "approvedAt": null,
+      "approvedScope": [],
+      "evidence": []
+    },
+    "G1": {
+      "status": "pending",
+      "owner": "project-owner",
+      "approvedBy": null,
+      "approvedAt": null,
+      "sourceSpikeResult": {
+        "path": "docs/quality/runtime-spike-decision.json",
+        "sha256": null,
+        "generatedAt": null
+      },
+      "approvedTracks": {
+        "desktopHost": {
+          "value": null,
+          "candidateResult": null,
+          "candidateEvidenceSha256": null,
+          "acceptedAdr": { "id": null, "version": null, "sha256": null }
+        },
+        "canvasView": {
+          "value": null,
+          "candidateResult": null,
+          "candidateEvidenceSha256": null,
+          "acceptedAdr": { "id": null, "version": null, "sha256": null }
+        },
+        "exportRenderer": {
+          "value": null,
+          "candidateResult": null,
+          "candidateEvidenceSha256": null,
+          "acceptedAdr": { "id": null, "version": null, "sha256": null }
+        },
+        "font": {
+          "value": null,
+          "candidateResult": null,
+          "candidateEvidenceSha256": null,
+          "acceptedAdr": { "id": null, "version": null, "sha256": null }
+        }
+      },
+      "acceptedAdrVersions": [
+        { "track": "desktopHost", "adrId": null, "version": null, "sha256": null },
+        { "track": "canvasView", "adrId": null, "version": null, "sha256": null },
+        { "track": "exportRenderer", "adrId": null, "version": null, "sha256": null },
+        { "track": "font", "adrId": null, "version": null, "sha256": null }
+      ],
+      "evidence": []
+    },
+    "G2": {
+      "status": "pending",
+      "owner": "project-owner",
+      "approvedBy": null,
+      "approvedAt": null,
+      "approvedScope": {
+        "selectedHost": null,
+        "candidateOutputPaths": [],
+        "installationTargets": [],
+        "allowedActions": [],
+        "deletionBoundaries": [],
+        "explicitlyExcluded": [
+          "test-signing",
+          "signing",
+          "notarization",
+          "credential access",
+          "system trust changes",
+          "upload",
+          "publication"
+        ]
+      },
+      "evidence": []
+    }
+  },
+  "validationProfiles": {
+    "spike-result": {
+      "requires": [
+        "G0.status=approved",
+        "candidate results and evidence are internally consistent",
+        "each recommendation references a PASS candidate with evidence",
+        "all-failed tracks are blocked with recommended=null"
+      ],
+      "allows": ["G1.status=pending", "G2.status=pending"]
+    },
+    "bootstrap": {
+      "inherits": "spike-result",
+      "requires": [
+        "top-level and all required tracks status=recommendation-ready",
+        "G1.status=approved",
+        "G1.sourceSpikeResult sha256 matches the immutable spike-result snapshot",
+        "every G1 approvedTracks value matches a PASS recommendation and candidate evidence digest in that snapshot",
+        "accepted ADR id/version/sha256 entries match approvedTracks and the current ADR bytes",
+        "any recommendation, evidence, snapshot, or ADR drift after approval fails validation"
+      ]
+    },
+    "packaging": {
+      "inherits": "bootstrap",
+      "requires": [
+        "G2.status=approved for the exact selected host, candidate output paths, installation targets, allowed install/uninstall actions, and deletion boundaries"
+      ],
+      "doesNotAuthorize": [
+        "signing",
+        "notarization",
+        "credential access",
+        "upload",
+        "publication"
+      ]
+    }
+  },
+  "consumerRules": {
+    "MM-010": "Runs verify-decision --phase spike-result. Requires G0.status=approved; writes recommendations only and never changes an ADR to Accepted; G1 may remain pending.",
+    "MM-020": "Runs verify-decision --phase bootstrap. Requires top-level status=recommendation-ready, every required track recommendation-ready with a PASS candidate, and G1.status=approved with approvedTracks bound to the immutable sourceSpikeResult sha256 and matching accepted ADR id/version/sha256 entries.",
+    "MM-100": "Runs verify-decision --phase packaging. Requires G2 approval for the exact local packaging scope; signing, notarization, credentials, upload, and publication require separate explicit authorization."
+  }
+}
