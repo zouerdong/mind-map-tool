@@ -36,6 +36,16 @@ export class TauriFileAdapter implements FilePort {
     };
   }
 
+  async openPath(path: string): Promise<OpenedDocument> {
+    const raw = await this.call<OpenedDocumentIpc>(IPC_COMMANDS.openPath, { path });
+    return {
+      contentBytes: toBytes(raw.contentJson),
+      documentTargetHandle: asDocumentTargetHandle(raw.documentTargetHandle),
+      versionToken: asVersionToken(raw.versionToken),
+      displayPath: raw.displayPath,
+    };
+  }
+
   async requestTargetAuthorization(
     kind: "document" | "export",
     suggestedName: string,

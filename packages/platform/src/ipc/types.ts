@@ -41,6 +41,7 @@ export const IPC_COMMANDS = {
   appReady: "platform_app_ready",
   ackLaunchIntent: "platform_ack_launch_intent",
   openDocument: "platform_open_document",
+  openPath: "platform_open_path",
   requestTargetAuthorization: "platform_request_target_authorization",
   commitDocument: "platform_commit_document",
   commitExport: "platform_commit_export",

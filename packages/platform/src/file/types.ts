@@ -59,6 +59,12 @@ export interface FilePort {
   openDocument(): Promise<OpenedDocument | null>;
 
   /**
+   * 按路径打开（launch intent / argv 文件加载；无对话框）。
+   * 路径不可读 reject PlatformError（调用方决定提示）。
+   */
+  openPath(path: string): Promise<OpenedDocument>;
+
+  /**
    * 请求一次性目标授权（Save As：kind="document"；导出：kind="export"）。
    * host 在授权时刻记录 canonical path、目标存在性与当时的 SHA-256，
    * 并在 commit 时复核（TOCTOU）。取消返回 null。

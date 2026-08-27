@@ -1,19 +1,29 @@
-// MM-020 Bootstrap 空壳：只验证工具链与窗口装配，不含任何产品功能。
-// MM-080 将在此组合 core/ui/platform/export 的完整闭环。
+// 应用入口（MM-080 组合根）：按环境装配端口（Tauri / 浏览器 dev），
+// 端口就绪（字体/wasm 加载）后挂载 MindMapApp。
+
+import { useEffect, useState } from "react";
+import { createAppPorts, type AppPorts } from "./app/ports.js";
+import { MindMapApp } from "./app/mindmap-app.js";
 
 export function App() {
-  return (
-    <main
-      style={{
-        height: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background: "#ffffff",
-        color: "#1a1a1a",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      <p style={{ margin: 0 }}>Mind Map — 空白画布占位（MM-020 Bootstrap）</p>
-    </main>
-  );
+  const [ports, setPorts] = useState<AppPorts | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    createAppPorts()
+      .then((p) => {
+        if (!cancelled) setPorts(p);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) return <main style={{ padding: 24 }}>初始化失败：{error}</main>;
+  if (ports === null) return <main style={{ padding: 24 }}>正在加载字体与渲染引擎…</main>;
+  return <MindMapApp ports={ports} />;
 }

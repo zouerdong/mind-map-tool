@@ -37,6 +37,33 @@ describe("DocumentSession dirty/保存语义", () => {
     expect(s.requestOrdinarySave()).toBeNull();
   });
 
+  it("adoptOpenedTarget（open → edit → ordinary save 不重开对话框，AC-06）", () => {
+    const s = newSession();
+    const opened = newSession(); // 模拟 open 的文档内容
+    addNode(opened, "n1");
+    s.load(opened.current.document);
+    s.adoptOpenedTarget("handle-open", "token-open", "/tmp/opened.mm");
+    expect(s.isDirty).toBe(false); // open 后 clean（load 已置保存点）
+    expect(s.displayPath).toBe("/tmp/opened.mm");
+
+    addNode(s, "n2");
+    expect(s.isDirty).toBe(true);
+    // ordinary save 直接可用（不弹选址对话框是 host 侧语义；此处验证协议就绪）
+    const snap = s.requestOrdinarySave();
+    expect(snap).not.toBeNull();
+    expect(snap!.documentTargetHandle).toBe("handle-open");
+    expect(snap!.expectedVersionToken).toBe("token-open");
+    expect(snap!.kind).toBe("ordinary");
+
+    // load（新建文档）清空目标身份：ordinary save 转回 Save As，不写旧文件。
+    const fresh = newSession();
+    fresh.load(s.current.document);
+    fresh.adoptOpenedTarget("h", "t", "/p");
+    fresh.load(emptyDocument());
+    expect(fresh.requestOrdinarySave()).toBeNull();
+    expect(fresh.displayPath).toBeNull();
+  });
+
   it("save → undo → 分叉编辑：dirty（分叉 identity ≠ 保存 identity）", () => {
     const s = newSession();
     addNode(s, "n1");

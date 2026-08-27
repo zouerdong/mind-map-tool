@@ -70,6 +70,7 @@ pub fn run() {
             ipc::platform_app_ready,
             ipc::platform_ack_launch_intent,
             ipc::platform_open_document,
+            ipc::platform_open_path,
             ipc::platform_request_target_authorization,
             ipc::platform_commit_document,
             ipc::platform_commit_export,

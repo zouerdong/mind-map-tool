@@ -16,8 +16,12 @@ export { PlatformError, toPlatformError } from "./file/errors.js";
 
 // 文件能力
 export type {
+  CommitDocumentOrdinaryRequest,
+  CommitDocumentRequest,
+  CommitDocumentSaveAsRequest,
   DocumentTargetHandle,
   FilePort,
+  OpenedDocument,
   TargetAuthorizationRef,
   VersionToken,
 } from "./file/types.js";

@@ -98,13 +98,31 @@ pub fn platform_open_document(
     let path = picked.into_path().map_err(|e| {
         crate::file::error::IpcError::new("FILE_IO_ERROR", format!("所选路径不可用：{e}"))
     })?;
-    let outcome = service.open_file(window.label(), &path)?;
-    Ok(Some(OpenedDocumentDto {
+    Ok(Some(open_path_and_issue(&window, &service, &path)?))
+}
+
+/// 按路径打开（launch intent / argv 文件加载，无对话框；MM-080 消费）。
+#[tauri::command]
+pub fn platform_open_path(
+    window: WebviewWindow,
+    service: State<'_, FileLifecycleService>,
+    path: String,
+) -> Result<OpenedDocumentDto, crate::file::error::IpcError> {
+    open_path_and_issue(&window, &service, std::path::Path::new(&path))
+}
+
+fn open_path_and_issue(
+    window: &WebviewWindow,
+    service: &State<'_, FileLifecycleService>,
+    path: &std::path::Path,
+) -> Result<OpenedDocumentDto, crate::file::error::IpcError> {
+    let outcome = service.open_file(window.label(), path)?;
+    Ok(OpenedDocumentDto {
         content_json: outcome.content_json,
         document_target_handle: outcome.document_target_handle,
         version_token: outcome.version_token,
         display_path: outcome.display_path,
-    }))
+    })
 }
 
 /// 一次性选址授权：原生 save 对话框（建议名由调用方给出，含扩展名——

@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       "packages/*/src/**/*.test.{ts,tsx}",
       "packages/*/test/**/*.test.{ts,tsx}",
+      "apps/desktop/src/**/*.test.{ts,tsx}",
       "tests/unit/**/*.test.{ts,tsx}",
       "tests/bootstrap/**/*.test.ts",
       "tests/golden/**/*.test.ts",

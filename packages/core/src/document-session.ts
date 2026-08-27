@@ -82,13 +82,29 @@ export class DocumentSession {
     return this.history.canRedo;
   }
 
-  /** load：整体替换并清空历史；返回新（clean）会话状态。 */
+  /** load：整体替换并清空历史与目标身份；返回新（clean）会话状态。
+   * 打开既有文档后由调用方 adoptOpenedTarget 重新置入目标身份；
+   * 新建文档不 adopt → ordinary save 正确转入 Save As。 */
   load(document: MindMapDocumentV1): StateNode {
     const node = this.history.load(document);
     this._savedStateIdentity = node.identity;
+    this._documentTargetHandle = null;
+    this._versionToken = null;
+    this._displayPath = null;
     this.inFlight = null;
     this.queue = [];
     return node;
+  }
+
+  /**
+   * openDocument 成功后置入 host 签发的目标身份（ADR 0003 §4/§5：
+   * session 管理 handle/token/displayPath；opaque 只存放）。
+   * 不改变历史与保存点（load 已置 clean）。失败时由调用方保持旧身份。
+   */
+  adoptOpenedTarget(documentTargetHandle: string, versionToken: string, displayPath: string): void {
+    this._documentTargetHandle = documentTargetHandle;
+    this._versionToken = versionToken;
+    this._displayPath = displayPath;
   }
 
   // ---- 保存语义 ----

@@ -44,6 +44,20 @@ describe("TauriFileAdapter", () => {
     expect(opened!.versionToken as string).toBe("tok-1");
   });
 
+  it("openPath：无对话框按路径打开，bytes/handle/token 还原", async () => {
+    invokeMock.mockResolvedValueOnce({
+      contentJson: '{"p":1}',
+      documentTargetHandle: "h-9",
+      versionToken: "tok-9",
+      displayPath: "/tmp/launch.mm",
+    });
+    const port = new TauriFileAdapter();
+    const opened = await port.openPath("/tmp/launch.mm");
+    expect(invokeMock).toHaveBeenCalledWith("platform_open_path", { path: "/tmp/launch.mm" });
+    expect(new TextDecoder().decode(opened.contentBytes)).toBe('{"p":1}');
+    expect(opened.versionToken as string).toBe("tok-9");
+  });
+
   it("requestTargetAuthorization：kind 与 suggestedName 透传，ref 标记 opaque", async () => {
     invokeMock.mockResolvedValueOnce({ authorizationRef: "auth-1", displayPath: "/tmp/x.mm" });
     const port = new TauriFileAdapter();
