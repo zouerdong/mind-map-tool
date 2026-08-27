@@ -10,7 +10,8 @@ export type ShortcutAction =
   | "save"
   | "save-as"
   | "export-panel"
-  | "replay-onboarding";
+  | "replay-onboarding"
+  | "organize";
 
 export interface NormalizedShortcut {
   action: ShortcutAction;
@@ -42,5 +43,6 @@ export function normalizeShortcut(e: KeyboardEvent): NormalizedShortcut | null {
   if (key === "n" && !e.shiftKey) return { action: "new", id: "mod+n" };
   if (key === "e" && !e.shiftKey) return { action: "export-panel", id: "mod+e" };
   if (key === "h" && e.shiftKey) return { action: "replay-onboarding", id: "mod+shift+h" };
+  if (key === "l" && e.shiftKey) return { action: "organize", id: "mod+shift+l" };
   return null;
 }

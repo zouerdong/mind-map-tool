@@ -4,7 +4,7 @@
 // host create-window 权限，属后续范围（记录于 MM-080 回报）。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { emptyDocument } from "@mindmap/core";
+import { emptyDocument, organizeCommand } from "@mindmap/core";
 import {
   createOnboardingPreferences,
   EditorCanvas,
@@ -155,6 +155,17 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     [ports.filePort, ports.renderer, session],
   );
 
+  // 一键整理（MM-085）：纯函数布局 → 单条 MoveNodes（可 undo、进历史）。
+  // bump 驱动画布重投影（外部 revision 信号——session.commit 不经画布内部通道）。
+  const onOrganize = useCallback(() => {
+    const cmd = organizeCommand(session.current.document);
+    if (cmd) {
+      session.commit(cmd);
+      bump();
+    }
+    setNotice(cmd ? { tone: "info", text: "已整理为垂直树（⌘Z 可撤销）" } : { tone: "info", text: "已经是整理好的布局" });
+  }, [bump, session]);
+
   // ---- 全局快捷键（输入/IME 隔离见 keyboard.ts） ----
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -168,11 +179,12 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         case "save-as": void onSaveAs(); break;
         case "export-panel": setExportPanel((v) => !v); break;
         case "replay-onboarding": setReplaySignal((n) => n + 1); break;
+        case "organize": onOrganize(); break;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onNew, onOpen, onSave, onSaveAs]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOrganize]);
 
   // ---- dirty 关闭保护（浏览器语义；native 窗口拦截见 MM-080 回报缺口） ----
   useEffect(() => {
@@ -240,6 +252,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         <button type="button" onClick={() => void onOpen()} data-onboarding-anchor="app.open">打开…</button>
         <button type="button" onClick={() => void onSave()} data-onboarding-anchor="app.save">保存</button>
         <button type="button" onClick={() => void onSaveAs()}>另存为…</button>
+        <button type="button" onClick={onOrganize} data-onboarding-anchor="app.organize" title="整理为垂直树（⌘⇧L）">
+          整理
+        </button>
         <button type="button" onClick={() => setExportPanel((v) => !v)} aria-expanded={exportPanel}>
           导出
         </button>
@@ -275,7 +290,12 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       ) : null}
 
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        <EditorCanvas session={session} fonts={ports.fonts} revision={revision} />
+        <EditorCanvas
+          session={session}
+          fonts={ports.fonts}
+          revision={revision}
+          positionTransitionMs={320}
+        />
         {exportPanel ? (
           <div
             role="dialog"

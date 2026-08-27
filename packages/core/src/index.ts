@@ -8,6 +8,7 @@
 // - commands.ts        纯函数命令模型 + 逆命令
 // - history.ts         undo/redo（原 identity 返回；新命令截断 redo）
 // - document-session.ts 保存快照/dirty/串行化保存队列/opaque handle+token
+// - organize.ts        一键整理（垂直树布局纯函数 → 单条 MoveNodes，MM-085）
 
 export const CORE_PACKAGE_VERSION = "0.1.0";
 
@@ -17,3 +18,4 @@ export * from "./identity.js";
 export * from "./commands.js";
 export * from "./history.js";
 export * from "./document-session.js";
+export * from "./organize.js";

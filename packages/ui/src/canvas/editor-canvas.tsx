@@ -42,6 +42,12 @@ export interface EditorCanvasProps {
    * 保存完成等）后自增，驱动画布重投影。
    */
   revision?: number;
+  /**
+   * 重投影时节点位置的过渡动画时长（ms；0=关闭）。
+   * 拖动走乐观态不经过重投影通道，不受影响（MM-085 丝滑整理动画）。
+   * prefers-reduced-motion 时强制 0。
+   */
+  positionTransitionMs?: number;
   className?: string;
   /** 画布外覆层（工具条等；MM-070/MM-080 注入）。 */
   overlay?: ReactNode;
@@ -82,7 +88,7 @@ function defaultId(prefix: string): string {
   return `${prefix}-${uuidCounter}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, className, overlay }: EditorCanvasProps) {
+export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); // session-only
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
@@ -105,14 +111,24 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
   // core 重投影同步（commit/undo/redo/外部 revision 后整体覆盖受控 view-model）。
   // 依赖只有 docVersion：setRfNodes/setRfEdges 是稳定 setter，
   // api/projectNow 每渲染新引用 —— 列入依赖会形成 set→render→effect 的无限循环。
+  // MM-085：重投影时给节点位置加 CSS 过渡（丝滑整理/undo 动画；
+  // 拖动走乐观态不经此通道）；prefers-reduced-motion 强制关闭。
   const docVersion = api.documentVersion;
   const projectNowRef = useRef(api.projectNow);
   projectNowRef.current = api.projectNow;
+  const transitionMs = useReducedMotionFlag() ? 0 : positionTransitionMs;
   useEffect(() => {
     const view = projectNowRef.current();
-    setRfNodes(view.nodes);
+    const nodes =
+      transitionMs > 0 && docVersion > 0
+        ? view.nodes.map((n) => ({
+            ...n,
+            style: { ...n.style, transition: `transform ${transitionMs}ms ease` },
+          }))
+        : view.nodes;
+    setRfNodes(nodes);
     setRfEdges(view.edges);
-  }, [docVersion]); // 依赖刻意只有 docVersion（见上注释）
+  }, [docVersion, transitionMs, setRfNodes, setRfEdges]); // setRfNodes/Edges 为稳定引用
 
   // selection（session-only）：从 RF change 流提取，供删除命令。
   // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
@@ -259,6 +275,22 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
       </div>
     </EditingContext.Provider>
   );
+}
+
+/** prefers-reduced-motion 查询（无 matchMedia 环境返回 false）。 */
+function useReducedMotionFlag(): boolean {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
 }
 
 /** 画布事件 → 画布坐标（viewport 逆变换；target 非 pane 时返回 null）。 */

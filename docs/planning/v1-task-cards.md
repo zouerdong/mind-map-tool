@@ -171,6 +171,51 @@ MM-080 -> MM-090 QA -> MM-000 G2 approval -> MM-100 packaging/license -> MM-110 
 - **风险**：窗口生命周期竞态、快捷键与输入冲突；缓解：session state machine 与 E2E。
 - **回报模板**：按统一格式，附完整流程录屏、剩余 mock/平台缺口。
 
+## MM-085｜一键整理（垂直树布局）
+
+- **目标**：[from-user 2026-08-27] 自由画布一键整理为垂直树（主干向下、分支横向、同层等距）；整理 = 纯函数布局 → **单条 MoveNodes**（可 undo、进历史、触发 dirty）；**丝滑过渡动画**（reduced-motion 关闭）。
+- **依赖**：MM-080；PRD §5"一键整理"与 AC-15 已先行更新。
+- **允许修改路径**：`packages/core/src/organize.ts` 与其相邻测试、`packages/ui/src/canvas/**`（仅位置过渡动画的最小接线）、`apps/desktop/src/**`、`docs/product/v1-product-spec.md`（本卡已先行完成）；不改 schema/文件格式。
+- **非目标**：不做布局风格切换（水平导图等留后续）、不改连线渲染风格（正交折线属视觉增强另议）、不引入分组/折叠概念。
+- **步骤**：①core 纯函数 `organize`：BFS 分层（y）+ 子树宽度简版 Reingold-Tilford（x），兄弟等距、父居中；②环形拓扑破环降级（DFS 生成树），孤立节点右侧独立列；③确定性输出（同输入同输出）；④`organizeCommand(document) → MoveNodes | null`（全部已就位时 null）；⑤UI：工具条"整理"按钮 + 快捷键，单条命令经 session 提交；⑥动画：EditorCanvas 重投影时节点位置 CSS transition（拖动走乐观态不经此通道，不受影响）；⑦单测（确定性/环/孤立/空文档/300 规模）+ 集成测试（整理→undo 恢复→redo）。
+- **交付物**：core 布局纯函数、整理入口、位置过渡动画、快捷键表更新、测试。
+- **验收**：AC-15——单条可撤销命令；确定性垂直树；undo 完整恢复；环/孤立降级不崩不丢；动画平滑且 reduced-motion 关闭。
+- **验证命令**：`pnpm --filter ./packages/core test && pnpm --filter ./packages/core typecheck && pnpm --filter ./packages/core lint && pnpm --filter ./apps/desktop typecheck && pnpm --filter ./apps/desktop test && pnpm lint && pnpm typecheck && pnpm test:unit && node scripts/quality/check-boundaries.mjs --scope selected-canvas`。
+- **Risk IDs**：R-012、R-015。
+- **STOP/BLOCKED**：适用统一规则；需要改 schema/文件格式或导出链路时停止回报。
+- **风险**：大规模图布局耗时；缓解：O(n) 算法 + 300/450 性能断言。
+- **回报模板**：按统一格式，附确定性 hash 证据与整理前后示意。
+
+## MM-088｜全局唤醒热键
+
+- **目标**：[from-user 2026-08-27] 应用运行时任意前台应用下按全局热键一键唤起画布（随手感核心；AC-16）。
+- **依赖**：MM-085；MM-060 的 activation 路由语义。
+- **允许修改路径**：`apps/desktop/src-tauri/Cargo.toml`、`apps/desktop/src-tauri/src/shortcuts/**`、`apps/desktop/src-tauri/src/lib.rs`（装配）、`apps/desktop/src-tauri/capabilities/**`、`packages/platform/src/**`（如需热键偏好 port）、`apps/desktop/src/**`（热键设置 UI）、`docs/product/v1-product-spec.md`（已先行）。
+- **非目标**：不做 menubar 常驻 UI、不改 LaunchRouter 队列协议、不拦截系统保留组合。
+- **步骤**：①集成 `tauri-plugin-global-shortcut`（license scan）；②默认热键实测选定（低冲突，如 ⌃⌥Space）+ 注册失败（冲突）稳定提示；③唤起语义 = MM-060 activation（focus 现有/新建空白，不碰 dirty 窗）；④热键可改并持久化到本机偏好（复用 preferences）；⑤cargo test + 集成测试（热键偏好读写/冲突路径）。
+- **交付物**：全局热键注册/冲突处理/偏好设置、测试、快捷键表更新。
+- **验收**：AC-16。
+- **验证命令**：`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings && pnpm lint && pnpm typecheck && pnpm test:unit && node scripts/quality/scan-dependency-licenses.mjs`。
+- **Risk IDs**：R-012、R-013、R-014。
+- **STOP/BLOCKED**：适用统一规则；插件许可证失败或需改 LaunchRouter 协议时停止回报。
+- **风险**：热键与其他应用冲突；缓解：冲突检测 + 可修改 + 稳定降级提示。
+- **回报模板**：按统一格式，附默认热键选择依据与冲突场景证据。
+
+## MM-089｜键盘操作完整性
+
+- **目标**：[from-user 2026-08-27] 全部核心操作仅用键盘完成（AC-17；键盘文化 + a11y 双重价值）。
+- **依赖**：MM-085（整理入口/动画）、MM-080（快捷键/编辑隔离基础）。
+- **允许修改路径**：`packages/ui/src/**`（导航/连线模式/快捷键）、`packages/core/src/**`（如需几何导航纯函数则相邻测试）、`apps/desktop/src/**`（快捷键接线）、`docs/product/v1-product-spec.md`（已先行）。
+- **非目标**：不做可改键系统（键位固定、表驱动）、不做指针操作的移除（鼠标全部保留）、不引入命令面板（后续另议）。
+- **步骤**：①方向键节点导航（几何最近邻纯函数：方向 + 焦点 → 下一节点，可测）；②键盘创建（Enter/⌘⏎ 视口中心建节点）、Enter 进编辑；③键盘连线流：⌘L 发起 → 方向键换目标 → Enter 确认 / Esc 取消；④⇧+方向扩展多选、⌘A 全选；⑤⌘+/⌘-/⌘0 缩放与 fit、焦点跟随滚动；⑥快捷键表全量更新（单一事实源）+ a11y 套件断言键盘流；⑦IME 隔离贯穿全部新键位。
+- **交付物**：键盘操作全集、几何导航纯函数、更新的快捷键表与测试。
+- **验收**：AC-17——建图全流程（建→连→编辑→整理→保存→导出）无鼠标可完成。
+- **验证命令**：`pnpm --filter ./packages/ui test && pnpm --filter ./packages/ui typecheck && pnpm --filter ./apps/desktop test && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:a11y`。
+- **Risk IDs**：R-003、R-012。
+- **STOP/BLOCKED**：适用统一规则；需要改 schema/平台 IPC 时停止回报。
+- **风险**：焦点管理与编辑态冲突；缓解：焦点优先级状态机（PRD §6）+ 交互测试。
+- **回报模板**：按统一格式，附键盘流录屏/测试与快捷键表。
+
 ## MM-090｜自动化 E2E、golden 与双平台验收
 
 - **目标**：执行测试规格并形成可审计发布候选证据；不修隐藏缺陷，失败回到责任卡。

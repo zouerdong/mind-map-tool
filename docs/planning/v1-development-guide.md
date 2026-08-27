@@ -42,7 +42,7 @@ MM-000 G0
 MM-030 -> MM-040 Export/Layout -> MM-050 Canvas -> MM-070 Theme/Onboarding --+
 MM-030 -> MM-060 Platform/File/Lifecycle ------------------------------------+-> MM-080
 MM-040 + MM-060 -> [native only] MM-045 ------------------------------------+
-MM-080 -> MM-090 QA -> MM-000 G2 -> MM-100 Unsigned Packaging -> MM-110 Review
+MM-080 -> MM-085 Organize -> MM-088 GlobalShortcut -> MM-089 Keyboard -> MM-090 QA -> MM-000 G2 -> MM-100 Unsigned Packaging -> MM-110 Review
 ```
 
 MM-040 与 MM-060 可并行。MM-045 只有 native renderer 获选时激活；否则记 `NOT_ACTIVATED`，不算已执行任务。MM-090 发现缺陷后必须回到责任卡，修复后完整重跑，不允许只复跑失败用例。
@@ -61,6 +61,9 @@ MM-040 与 MM-060 可并行。MM-045 只有 native renderer 获选时激活；�
 | MM-060 | 原生文件、授权 capability、原子提交与 LaunchRouter |
 | MM-070 | 白/黑主题与交互式首次引导 |
 | MM-080 | 桌面应用组合、菜单、快捷键、保存/导出闭环 |
+| MM-085 | 一键整理（垂直树布局，单条可撤销命令 + 过渡动画）[from-user 2026-08-27] |
+| MM-088 | 全局唤醒热键（随手唤出画布）[from-user 2026-08-27] |
+| MM-089 | 键盘操作完整性（全流程无鼠标）[from-user 2026-08-27] |
 | MM-090 | 自动化 E2E、golden、性能与双平台证据 |
 | MM-100 | 精确 G2 范围内的 unsigned 本地候选准备 |
 | MM-110 | 独立只读审阅与最终验收 |
