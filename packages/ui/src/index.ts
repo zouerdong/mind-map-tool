@@ -40,3 +40,42 @@ export { MindNodeView, MIND_NODE_THEME } from "./canvas/mind-node.js";
 export { NodeTextEditor, isCompositionEvent } from "./canvas/node-text-editor.js";
 export { useCanvasSession } from "./canvas/use-canvas-session.js";
 export type { CanvasSessionApi } from "./canvas/use-canvas-session.js";
+
+// 主题（MM-070）
+export {
+  contrastRatio,
+  DARK_TOKENS,
+  LIGHT_TOKENS,
+  relativeLuminance,
+  themeTokens,
+} from "./theme/theme-tokens.js";
+export type { ThemeTokens } from "./theme/theme-tokens.js";
+export { ThemeToggle } from "./theme/theme-toggle.js";
+export type { ThemeToggleProps } from "./theme/theme-toggle.js";
+
+// 首次使用引导（MM-070）
+export {
+  INITIAL_ONBOARDING_STATE,
+  ONBOARDING_STEPS,
+  observationKey,
+} from "./onboarding/onboarding-types.js";
+export type {
+  OnboardingObservation,
+  OnboardingState,
+  OnboardingStepId,
+  OnboardingStepSpec,
+  OnboardingStatus,
+} from "./onboarding/onboarding-types.js";
+export { onboardingReducer } from "./onboarding/onboarding-reducer.js";
+export type { OnboardingAction } from "./onboarding/onboarding-reducer.js";
+export {
+  createOnboardingPreferences,
+  InMemoryPreferenceStore,
+  ONBOARDING_STATUS_KEY,
+} from "./onboarding/onboarding-preferences.js";
+export type { OnboardingPreferencesPort, PreferenceStore } from "./onboarding/onboarding-preferences.js";
+export { ONBOARDING_COPY, ONBOARDING_REPLAY_LABEL } from "./onboarding/onboarding-copy.js";
+export { OnboardingOverlay } from "./onboarding/onboarding-overlay.js";
+export type { OnboardingOverlayProps } from "./onboarding/onboarding-overlay.js";
+export { OnboardingFlow } from "./onboarding/onboarding-flow.js";
+export type { OnboardingFlowProps } from "./onboarding/onboarding-flow.js";

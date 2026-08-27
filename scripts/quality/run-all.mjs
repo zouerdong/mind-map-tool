@@ -39,10 +39,13 @@ function run(cmd, cmdArgs, cwd) {
   return r.status === 0;
 }
 
+STAGES.a11y = () =>
+  run("pnpm", ["--filter", "./packages/ui", "run", "test:a11y"], ROOT); // MM-070 落地：axe-core（jsdom）
+
 const SUITES = {
   all: ["typecheck", "lint", "unit", "boundaries", "licenses", "network", "golden", "performance"],
   integration: ["unit", "boundaries"], // 集成测试在 MM-090 扩展
-  a11y: ["unit"], // a11y 套件在 MM-070/MM-050 落地
+  a11y: ["a11y"],
 };
 
 const plan = SUITES[suite] ?? SUITES.all;

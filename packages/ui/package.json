@@ -18,11 +18,13 @@
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "axe-core": "^4.13.0",
     "jsdom": "^26.0.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test perf",
-    "test": "vitest run --root ../.. packages/ui"
+    "test": "vitest run --root ../.. packages/ui",
+    "test:a11y": "vitest run --root ../.. packages/ui/test/a11y"
   }
 }
