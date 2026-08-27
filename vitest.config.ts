@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@mindmap/core": r("./packages/core/src/index.ts"),
+      "@mindmap/export/src/layout.js": r("./packages/export/src/layout.ts"),
       "@mindmap/export": r("./packages/export/src/index.ts"),
       "@mindmap/ui": r("./packages/ui/src/index.ts"),
       "@mindmap/platform": r("./packages/platform/src/index.ts"),
@@ -14,9 +15,9 @@ export default defineConfig({
   },
   test: {
     include: [
-      "packages/*/src/**/*.test.ts",
-      "packages/*/test/**/*.test.ts",
-      "tests/unit/**/*.test.ts",
+      "packages/*/src/**/*.test.{ts,tsx}",
+      "packages/*/test/**/*.test.{ts,tsx}",
+      "tests/unit/**/*.test.{ts,tsx}",
       "tests/bootstrap/**/*.test.ts",
       "tests/golden/**/*.test.ts",
     ],

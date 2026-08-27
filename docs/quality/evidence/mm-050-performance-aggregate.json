@@ -1,0 +1,62 @@
+{
+  "task": "MM-050",
+  "generatedAt": "2026-08-27T03:56:24.145Z",
+  "aggregatorVersion": "1.0.0",
+  "inputs": [
+    "docs/quality/evidence/mm-050-performance-macos.json"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "allRequiredPlatformsPresent": true,
+  "results": [
+    {
+      "path": "docs/quality/evidence/mm-050-performance-macos.json",
+      "data": {
+        "task": "MM-050",
+        "platform": "macOS",
+        "scope": "canvas",
+        "fixture": "dense-300-450",
+        "budget": {
+          "canvasFrameP95Ms": 32
+        },
+        "overall": "PASS",
+        "results": {
+          "bundleBytes": 760642,
+          "pan": {
+            "samples": 65,
+            "p50": 16.7,
+            "p95": 16.8,
+            "max": 17.4,
+            "mean": 16.7
+          },
+          "nodeDrag": {
+            "samples": 131,
+            "p50": 0,
+            "p95": 16.7,
+            "max": 33.3,
+            "mean": 8.4
+          },
+          "zoom": {
+            "samples": 182,
+            "p50": 0,
+            "p95": 16.7,
+            "max": 17.4,
+            "mean": 5.5
+          },
+          "probes": {
+            "nodeCount": 300,
+            "attribution": "React Flow",
+            "ariaLabel": "脑图画布"
+          }
+        },
+        "platformNotes": [
+          "headless Chromium（playwright）与 MM-010 Spike 同口径：pan/nodeDrag/zoom rAF 帧间隔",
+          "harness 使用真实 EditorCanvas + 共享 layout + 真字体 FontResolver（比 Spike 裸 React Flow 更重）",
+          "Windows 采样缺失：无设备（R-013）；v1 macOS 先行（ADR 0001 G1 平台范围决定）"
+        ],
+        "generatedAt": "2026-08-27T03:55:27.721Z"
+      }
+    }
+  ]
+}
