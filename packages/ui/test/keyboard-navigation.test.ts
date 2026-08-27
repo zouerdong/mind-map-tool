@@ -80,7 +80,7 @@ describe("linkingReducer（键盘连线流）", () => {
   });
 
   it("confirm 无候选时保持 linking（不产出空连接）", () => {
-    let s = linkingReducer({ phase: "idle" }, { type: "begin", sourceId: "a" }, nodes).state;
+    const s = linkingReducer({ phase: "idle" }, { type: "begin", sourceId: "a" }, nodes).state;
     const noTarget = linkingReducer(s, { type: "confirm" }, nodes);
     expect(noTarget.confirmed).toBeNull();
     expect(noTarget.state.phase).toBe("linking"); // 仍可继续选
