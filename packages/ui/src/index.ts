@@ -41,6 +41,18 @@ export { NodeTextEditor, isCompositionEvent } from "./canvas/node-text-editor.js
 export { useCanvasSession } from "./canvas/use-canvas-session.js";
 export type { CanvasSessionApi } from "./canvas/use-canvas-session.js";
 
+// 键盘导航与连线流（MM-089）
+export {
+  linkingReducer,
+  nearestNodeInDirection,
+} from "./canvas/keyboard-navigation.js";
+export type {
+  LinkingAction,
+  LinkingState,
+  MindFlowNodeLite,
+  NavDirection,
+} from "./canvas/keyboard-navigation.js";
+
 // 主题（MM-070）
 export {
   contrastRatio,

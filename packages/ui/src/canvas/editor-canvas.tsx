@@ -20,16 +20,28 @@ import {
   type NodeChange,
   type NodeProps,
   type OnConnect,
+  type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { DocumentSession, Point } from "@mindmap/core";
 import { measureNodeBox, type FontResolver } from "@mindmap/export/src/layout.js";
-import { documentDefaults, projectDocument, type MindFlowNode } from "../projection/projection.js";
+import {
+  documentDefaults,
+  projectDocument,
+  type MindFlowEdge,
+  type MindFlowNode,
+} from "../projection/projection.js";
 import { createInteractionController } from "../controller/interaction-controller.js";
 import { isCompositionEvent } from "./node-text-editor.js";
 import { useCanvasSession } from "./use-canvas-session.js";
 import { MindNodeView } from "./mind-node.js";
+import {
+  linkingReducer,
+  nearestNodeInDirection,
+  type LinkingState,
+  type NavDirection,
+} from "./keyboard-navigation.js";
 
 export interface EditorCanvasProps {
   session: DocumentSession;
@@ -58,6 +70,10 @@ export interface EditorCanvasProps {
 interface EditingContextValue {
   editingId: string | null;
   fonts: FontResolver;
+  /** 键盘焦点节点（MM-089；焦点环视觉）。 */
+  focusId: string | null;
+  /** 键盘连线模式当前候选（高亮）。 */
+  linkCandidateId: string | null;
   onCommitEdit(id: string, text: string): void;
   onCancelEdit(): void;
 }
@@ -74,6 +90,8 @@ function EditingMindNode(props: NodeProps) {
       data={data}
       fonts={ctx.fonts}
       editing={ctx.editingId === props.id}
+      focused={ctx.focusId === props.id}
+      linkCandidate={ctx.linkCandidateId === props.id}
       onCommitEdit={ctx.onCommitEdit}
       onCancelEdit={ctx.onCancelEdit}
     />
@@ -197,16 +215,100 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
     [api, controller, viewport],
   );
 
-  // 键盘：undo/redo/删除（editing 与 IME 组合期间全部隔离）。
+  // 键盘全集（MM-089；editing 与 IME 组合期间全部隔离；键位占位可改——
+  // 最终键位待键位专项讨论，机制与键位解耦）。
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [linking, setLinking] = useState<LinkingState>({ phase: "idle" });
+  const rfInstanceRef = useRef<ReactFlowInstance<MindFlowNode, MindFlowEdge> | null>(null);
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (editingId !== null) return; // 编辑输入自行处理（NodeTextEditor）
       if (isCompositionEvent(e)) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "z") {
+      const key = e.key.toLowerCase();
+
+      // 缩放（⌘+ / ⌘- / ⌘0 fit）
+      if (mod && (key === "0" || e.key === "+" || e.key === "-" || e.key === "=")) {
+        e.preventDefault();
+        if (key === "0") void rfInstanceRef.current?.fitView({ padding: 0.2 });
+        else if (e.key === "-" || key === "-") void rfInstanceRef.current?.zoomOut();
+        else void rfInstanceRef.current?.zoomIn();
+        return;
+      }
+      if (mod && key === "z") {
         e.preventDefault();
         if (e.shiftKey) api.redo();
         else api.undo();
+        return;
+      }
+      // ⌘A 全选（受控 selected 更新 + selectionRef 同步）
+      if (mod && key === "a") {
+        e.preventDefault();
+        const all = rfNodes.map((n) => n.id);
+        setRfNodes((ns) => ns.map((n) => ({ ...n, selected: true })));
+        selectionRef.current = { nodes: new Set(all), edges: new Set() };
+        return;
+      }
+      // ⌘L：键盘连线流（从焦点或首个选中发起；占位键位）
+      if (mod && key === "l" && !e.shiftKey) {
+        e.preventDefault();
+        const source = focusNodeId ?? [...selectionRef.current.nodes][0] ?? rfNodes[0]?.id ?? null;
+        if (source === null) return;
+        const r = linkingReducer(linking, { type: "begin", sourceId: source }, rfNodes);
+        setLinking(r.state);
+        setFocusNodeId(source);
+        return;
+      }
+
+      // 方向键：连线模式下换候选；否则焦点导航
+      const dir = arrowDirection(e.key);
+      if (dir !== null) {
+        e.preventDefault();
+        if (linking.phase === "linking") {
+          const r = linkingReducer(linking, { type: "retarget", direction: dir }, rfNodes);
+          setLinking(r.state);
+          if (r.state.phase === "linking" && r.state.candidateId)
+            setFocusNodeId(r.state.candidateId);
+          return;
+        }
+        const current = focusNodeId ?? rfNodes[0]?.id ?? null;
+        if (current === null) return;
+        setFocusNodeId(nearestNodeInDirection(rfNodes, current, dir) ?? current);
+        return;
+      }
+
+      // Enter：连线确认 / 焦点编辑 / 视口中心建节点
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (linking.phase === "linking") {
+          const r = linkingReducer(linking, { type: "confirm" }, rfNodes);
+          setLinking(r.state);
+          if (r.confirmed) {
+            const cmd = controller.connect(r.confirmed.source, r.confirmed.target, session.current.document);
+            if (cmd) api.commit(cmd);
+          }
+          return;
+        }
+        if (focusNodeId !== null) {
+          beginEdit(focusNodeId);
+          return;
+        }
+        // 视口中心建节点（键盘创建，无鼠标）
+        const pane = paneRectFromDom();
+        if (pane && rfInstanceRef.current) {
+          const center = rfInstanceRef.current.screenToFlowPosition({
+            x: pane.left + pane.width / 2,
+            y: pane.top + pane.height / 2,
+          });
+          const cmd = controller.createNodeAt({ x: center.x, y: center.y });
+          if (api.commit(cmd)) setFocusNodeId(null); // 新节点投影后焦点留给用户导航
+        }
+        return;
+      }
+      if (e.key === "Escape" && linking.phase === "linking") {
+        e.preventDefault();
+        setLinking(linkingReducer(linking, { type: "cancel" }, rfNodes).state);
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -220,13 +322,15 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
         }
       }
     },
-    [api, controller, editingId],
+    [api, beginEdit, controller, editingId, focusNodeId, linking, rfNodes, session],
   );
 
   const editingValue = useMemo<EditingContextValue>(
     () => ({
       editingId,
       fonts,
+      focusId: focusNodeId,
+      linkCandidateId: linking.phase === "linking" ? linking.candidateId : null,
       onCommitEdit: (id, text) => {
         const current = session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
         const cmd = controller.commitEditText(id, text, current);
@@ -235,7 +339,7 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
       },
       onCancelEdit: () => setEditingId(null),
     }),
-    [api, controller, editingId, fonts, session],
+    [api, controller, editingId, focusNodeId, fonts, linking, session],
   );
 
   return (
@@ -259,6 +363,9 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
           onConnect={onConnect}
           onNodeDoubleClick={(_e, node) => beginEdit(node.id)}
           onMove={(_, vp) => setViewport(vp)} // session-only
+          onInit={(instance) => {
+            rfInstanceRef.current = instance;
+          }}
           fitView
           nodesConnectable
           selectionOnDrag
@@ -275,6 +382,22 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
       </div>
     </EditingContext.Provider>
   );
+}
+
+/** 方向键 → 导航方向；非方向键返回 null。 */
+function arrowDirection(key: string): NavDirection | null {
+  if (key === "ArrowUp") return "up";
+  if (key === "ArrowDown") return "down";
+  if (key === "ArrowLeft") return "left";
+  if (key === "ArrowRight") return "right";
+  return null;
+}
+
+/** 画布 pane 的屏幕矩形（键盘创建节点的视口中心换算用）。 */
+function paneRectFromDom(): DOMRect | null {
+  if (typeof document === "undefined") return null;
+  const pane = document.querySelector(".react-flow__pane");
+  return pane instanceof HTMLElement ? pane.getBoundingClientRect() : null;
 }
 
 /** prefers-reduced-motion 查询（无 matchMedia 环境返回 false）。 */

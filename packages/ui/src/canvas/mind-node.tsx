@@ -19,11 +19,26 @@ interface MindNodeViewProps extends NodeProps {
   data: MindFlowNode["data"];
   fonts: FontResolver;
   editing: boolean;
+  /** 键盘焦点（MM-089 焦点环）。 */
+  focused?: boolean;
+  /** 键盘连线模式的当前候选（高亮）。 */
+  linkCandidate?: boolean;
   onCommitEdit(id: string, text: string): void;
   onCancelEdit(): void;
 }
 
-function MindNodeViewImpl({ id, data, selected, dragging, fonts, editing, onCommitEdit, onCancelEdit }: MindNodeViewProps) {
+function MindNodeViewImpl({
+  id,
+  data,
+  selected,
+  dragging,
+  fonts,
+  editing,
+  focused,
+  linkCandidate,
+  onCommitEdit,
+  onCancelEdit,
+}: MindNodeViewProps) {
   const layout = layoutNodeText(data.text, data.runs, data.font, fonts);
   const palette = MIND_NODE_THEME[data.theme];
   const isEllipse = data.shape === "ellipse";
@@ -44,7 +59,15 @@ function MindNodeViewImpl({ id, data, selected, dragging, fonts, editing, onComm
         border: `${LAYOUT.strokeWidth}px solid ${palette.border}`,
         borderRadius: isEllipse ? "50%" : 6,
         position: "relative",
-        outline: selected ? "2px solid #4c8bf5" : dragging ? "1.5px dashed #4c8bf5" : "none",
+        outline: linkCandidate
+          ? "3px solid #d97757"
+          : selected
+            ? "2px solid #4c8bf5"
+            : focused
+              ? "2px dashed #4c8bf5"
+              : dragging
+                ? "1.5px dashed #4c8bf5"
+                : "none",
         outlineOffset: 2,
         boxShadow: data.framesVisible ? `0 0 0 ${LAYOUT.strokeWidth}px ${palette.border}22` : undefined,
       }}
