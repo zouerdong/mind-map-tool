@@ -20,8 +20,17 @@ const SCAN_DIRS = [
   "apps/desktop/src-tauri/src",
 ];
 
-// 产品代码零网络端点；此清单保留为显式豁免通道（当前为空）。
-const ALLOWLIST = []; // e.g. /^https:\/\/example\.com\/ok/
+// 产品代码零网络端点；此清单保留为显式豁免通道。
+// 结构：{ file, pattern, reason } —— 窄豁免（单文件单模式），
+// 每条必须有 reason；审查可见，fail-closed（其余文件全禁）。
+const ALLOWLIST = [
+  {
+    file: "apps/desktop/src/app/ports.ts",
+    pattern: /fetch\s*\(/,
+    reason:
+      "MM-080：加载 vite ?url 打包的同源 dist 资产（字体 OTF/TTF 与 resvg wasm，相对路径资源 URL），非网络端点（AC-13）",
+  },
+];
 
 const PATTERNS = [
   { re: /fetch\s*\(/, label: "fetch(" },
@@ -54,8 +63,10 @@ for (const dir of SCAN_DIRS) {
     const text = readFileSync(file, "utf8");
     for (const { re, label } of PATTERNS) {
       const m = text.match(re);
-      if (m && !ALLOWLIST.some((a) => a.test(text))) {
-        violations.push(`${file.replace(ROOT + "/", "")}: ${label}`);
+      const rel = file.replace(ROOT + "/", "");
+      const exempted = ALLOWLIST.some((a) => a.file === rel && a.pattern.test(text));
+      if (m && !exempted) {
+        violations.push(`${rel}: ${label}`);
       }
     }
   }
