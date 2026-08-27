@@ -3,10 +3,17 @@
 // Tauri WebView 用 MM-060 适配器 + export renderer（字体/wasm 经 vite 资源加载）。
 
 import type { FilePort, PreferencesPort } from "@mindmap/platform";
-import { TauriFileAdapter, TauriPreferencesAdapter } from "@mindmap/platform";
+import { PlatformError, TauriFileAdapter, TauriPreferencesAdapter } from "@mindmap/platform";
+import { invoke } from "@tauri-apps/api/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import type { ExportRendererLike } from "./export-commands.js";
 import { FakeExportRenderer, FakeFilePort, FakePreferencesPort } from "./fake-ports.js";
+
+/** 全局热键读写（MM-088；accelerator 字符串，键位专项讨论后可改）。 */
+export interface GlobalShortcutPort {
+  get(): Promise<{ accelerator: string }>;
+  set(accelerator: string): Promise<{ accelerator: string }>;
+}
 
 export interface AppPorts {
   filePort: FilePort;
@@ -14,8 +21,37 @@ export interface AppPorts {
   renderer: ExportRendererLike;
   /** EditorCanvas 的共享 layout 字体度量（与导出同源）。 */
   fonts: FontResolver;
+  globalShortcut: GlobalShortcutPort;
   /** 浏览器 dev 模式（无原生对话框/文件系统）。 */
   readonly isBrowserDev: boolean;
+}
+
+/** Tauri 全局热键 port（invoke IPC）。 */
+class TauriGlobalShortcut implements GlobalShortcutPort {
+  async get() {
+    return invoke<{ accelerator: string }>("platform_get_global_shortcut");
+  }
+  async set(accelerator: string) {
+    return invoke<{ accelerator: string }>("platform_set_global_shortcut", { accelerator });
+  }
+}
+
+/** 浏览器 dev 的内存实现（不真实注册）。 */
+export class FakeGlobalShortcut implements GlobalShortcutPort {
+  accelerator = "CmdOrCtrl+Alt+Space";
+  conflictWith: string | null = null; // 测试模拟冲突
+  async get() {
+    return { accelerator: this.accelerator };
+  }
+  async set(accelerator: string) {
+    if (this.conflictWith !== null && accelerator === this.conflictWith)
+      throw new PlatformError(
+        "GLOBAL_SHORTCUT_CONFLICT",
+        `热键 ${accelerator} 注册失败（可能被其他应用占用）`,
+      );
+    this.accelerator = accelerator;
+    return { accelerator };
+  }
 }
 
 /** 浏览器 dev 的假字体度量（等宽近似；与导出尺寸可能略偏，仅限 dev 预览）。 */
@@ -36,6 +72,7 @@ export async function createAppPorts(): Promise<AppPorts> {
       preferences: new TauriPreferencesAdapter(),
       renderer,
       fonts: renderer.fonts(),
+      globalShortcut: new TauriGlobalShortcut(),
       isBrowserDev: false,
     };
   }
@@ -44,6 +81,7 @@ export async function createAppPorts(): Promise<AppPorts> {
     preferences: new FakePreferencesPort(),
     renderer: new FakeExportRenderer(),
     fonts: DEV_FONTS,
+    globalShortcut: new FakeGlobalShortcut(),
     isBrowserDev: true,
   };
 }

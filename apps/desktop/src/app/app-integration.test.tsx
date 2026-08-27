@@ -13,6 +13,7 @@ vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule
 
 const { MindMapApp } = await import("./mindmap-app.js");
 const { FakeFilePort, FakePreferencesPort, FakeExportRenderer } = await import("./fake-ports.js");
+const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -41,7 +42,18 @@ function setup() {
   const renderer = new FakeExportRenderer();
   filePort.writeFile("/docs/a.json", encodeDocument(docWithNode("打开的文档")));
   filePort.nextOpenDialog = "/docs/a.json";
-  const utils = render(<MindMapApp ports={{ filePort, preferences, renderer, fonts: renderer.fonts(), isBrowserDev: true }} />);
+  const utils = render(
+    <MindMapApp
+      ports={{
+        filePort,
+        preferences,
+        renderer,
+        fonts: renderer.fonts(),
+        isBrowserDev: true,
+        globalShortcut: new FakeGlobalShortcut(),
+      }}
+    />,
+  );
   return { filePort, preferences, renderer, ...utils };
 }
 

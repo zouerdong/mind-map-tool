@@ -26,6 +26,9 @@ export const PLATFORM_ERROR_CODES = [
   "FILE_IO_ERROR",
   // 偏好读写失败
   "PREFERENCES_IO_ERROR",
+  // 全局热键（MM-088）：被其他应用占用 / 格式无法解析
+  "GLOBAL_SHORTCUT_CONFLICT",
+  "GLOBAL_SHORTCUT_INVALID",
 ] as const;
 
 export type PlatformErrorCode = (typeof PLATFORM_ERROR_CODES)[number];
@@ -47,6 +50,8 @@ export const IPC_COMMANDS = {
   commitExport: "platform_commit_export",
   loadPreferences: "platform_load_preferences",
   storePreferences: "platform_store_preferences",
+  getGlobalShortcut: "platform_get_global_shortcut",
+  setGlobalShortcut: "platform_set_global_shortcut",
 } as const;
 
 /** Rust → 前端事件（Tauri event）。 */

@@ -62,6 +62,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmState, setConfirmState] = useState<PendingConfirm>(null);
   const [exportPanel, setExportPanel] = useState(false);
+  const [shortcutPanel, setShortcutPanel] = useState(false);
+  const [shortcutValue, setShortcutValue] = useState("");
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
   const bump = useCallback(() => {
     setRevision((r) => r + 1);
     refresh((n) => n + 1);
@@ -154,6 +157,25 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     },
     [ports.filePort, ports.renderer, session],
   );
+
+  // 全局热键设置（MM-088；占位键待键位专项讨论定稿）。
+  const openShortcutPanel = useCallback(async () => {
+    setShortcutError(null);
+    setShortcutValue((await ports.globalShortcut.get()).accelerator);
+    setShortcutPanel(true);
+  }, [ports.globalShortcut]);
+
+  const applyShortcut = useCallback(async () => {
+    try {
+      const r = await ports.globalShortcut.set(shortcutValue.trim());
+      setShortcutValue(r.accelerator);
+      setShortcutError(null);
+      setShortcutPanel(false);
+      setNotice({ tone: "info", text: `全局唤起热键已设为 ${r.accelerator}` });
+    } catch (e) {
+      setShortcutError(e instanceof Error ? e.message : String(e)); // 冲突/格式错误稳定提示
+    }
+  }, [ports.globalShortcut, shortcutValue]);
 
   // 一键整理（MM-085）：纯函数布局 → 单条 MoveNodes（可 undo、进历史）。
   // bump 驱动画布重投影（外部 revision 信号——session.commit 不经画布内部通道）。
@@ -266,6 +288,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           }}
         />
         <button type="button" onClick={() => setReplaySignal((n) => n + 1)}>重放引导</button>
+        <button type="button" onClick={() => void openShortcutPanel()} title="全局唤起热键设置">
+          热键…
+        </button>
         <span aria-live="polite" style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>
           {`${session.isDirty ? "未保存" : "已保存"} · ${ports.isBrowserDev ? "浏览器 dev（fake 端口）" : "桌面"}`}
         </span>
@@ -324,6 +349,46 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           </div>
         ) : null}
       </div>
+
+      {shortcutPanel ? (
+        <div
+          role="dialog"
+          aria-label="全局热键设置"
+          data-testid="shortcut-panel"
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(0,0,0,0.4)",
+          }}
+        >
+          <div style={{ background: "#fff", color: "#1f2328", padding: 16, borderRadius: 8, minWidth: 320 }}>
+            <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>全局唤起热键</h2>
+            <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 8px" }}>
+              应用运行时，任意应用前台按此热键唤起画布（占位默认，键位将专项讨论定稿）。
+            </p>
+            <input
+              aria-label="热键组合（accelerator 格式，如 CmdOrCtrl+Alt+Space）"
+              value={shortcutValue}
+              onChange={(e) => setShortcutValue(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: 6, marginBottom: 8 }}
+              data-testid="shortcut-input"
+            />
+            {shortcutError ? (
+              <p role="alert" data-testid="shortcut-error" style={{ color: "#b62324", fontSize: 12, margin: "0 0 8px" }}>
+                {shortcutError}
+              </p>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setShortcutPanel(false)}>取消</button>
+              <button type="button" onClick={() => void applyShortcut()} data-testid="shortcut-apply">
+                应用
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirmState ? (
         <div

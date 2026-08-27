@@ -8,13 +8,15 @@
 pub mod file;
 pub mod ipc;
 pub mod lifecycle;
+pub mod shortcuts;
 
 use std::sync::Arc;
 
-use tauri::{AppHandle, RunEvent};
+use tauri::{AppHandle, Manager, RunEvent};
 
 use file::{FileLifecycleService, SystemClock};
 use lifecycle::launch::LaunchIntentStore;
+use shortcuts::GlobalShortcutState;
 
 /// LaunchIntent 事件源 → 队列 → （warm 期）广播前端。
 fn ingest_open_file(app: &AppHandle, store: &LaunchIntentStore, path: &std::path::Path) {
@@ -51,6 +53,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init({
             let intents = intents.clone();
             move |app, argv, _cwd| {
@@ -60,6 +63,18 @@ pub fn run() {
         }))
         .manage(service)
         .manage(intents.clone())
+        .manage(GlobalShortcutState::new())
+        .setup({
+            let intents = intents.clone();
+            move |app| {
+                // 全局热键装配（注册失败仅日志，可经设置换绑；MM-088）。
+                if let Ok(config_dir) = app.path().app_config_dir() {
+                    shortcuts::install(app.handle(), &config_dir);
+                }
+                let _ = &intents;
+                Ok(())
+            }
+        })
         .on_window_event(move |window, event| {
             // 窗口销毁：撤销其全部授权与句柄（步骤⑤：跨窗口/撤销后 handle 拒绝）。
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -76,6 +91,8 @@ pub fn run() {
             ipc::platform_commit_export,
             ipc::platform_load_preferences,
             ipc::platform_store_preferences,
+            ipc::platform_get_global_shortcut,
+            ipc::platform_set_global_shortcut,
         ])
         .build(tauri::generate_context!())
         .expect("error while running mindmap desktop")

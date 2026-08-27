@@ -226,6 +226,35 @@ fn preferences_store(app: &AppHandle) -> Result<PreferencesStore, crate::file::e
     Ok(PreferencesStore::new(&dir))
 }
 
+// ---- 全局热键（MM-088） ----
+
+#[tauri::command]
+pub fn platform_get_global_shortcut(
+    app: AppHandle,
+) -> Result<GlobalShortcutInfo, crate::file::error::IpcError> {
+    Ok(GlobalShortcutInfo {
+        accelerator: crate::shortcuts::current(&app).unwrap_or_default(),
+    })
+}
+
+#[tauri::command]
+pub fn platform_set_global_shortcut(
+    app: AppHandle,
+    accelerator: String,
+) -> Result<GlobalShortcutInfo, crate::file::error::IpcError> {
+    let dir = app.path().app_config_dir().map_err(|e| {
+        crate::file::error::IpcError::new("PREFERENCES_IO_ERROR", format!("无法定位配置目录：{e}"))
+    })?;
+    crate::shortcuts::rebind(&app, &dir, &accelerator)?;
+    Ok(GlobalShortcutInfo { accelerator })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalShortcutInfo {
+    pub accelerator: String,
+}
+
 /// warm 期新 intent 到达：入队并广播给前端（early intents 走 app_ready 快照）。
 pub fn emit_launch_intent(app: &AppHandle, payload: &LaunchIntentPayload) {
     if let Err(e) = app.emit(LAUNCH_INTENT_EVENT, payload) {

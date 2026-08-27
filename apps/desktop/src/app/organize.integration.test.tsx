@@ -9,6 +9,7 @@ vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule
 
 const { MindMapApp } = await import("./mindmap-app.js");
 const { FakeFilePort, FakePreferencesPort, FakeExportRenderer } = await import("./fake-ports.js");
+const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -30,6 +31,7 @@ function setup() {
         renderer,
         fonts: renderer.fonts(),
         isBrowserDev: true,
+        globalShortcut: new FakeGlobalShortcut(),
       }}
     />,
   );
