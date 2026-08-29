@@ -64,13 +64,28 @@ fn dispatch(app: &AppHandle) {
     }
 }
 
-/// 启动时装配：读偏好（无则默认占位）→ 注册 → 记录 current。
-/// 注册失败不阻塞应用启动：仅日志（用户可经设置换绑）。
+/// 启动时装配：读偏好（无则默认占位）→ 注册（含重试）。
+/// MM-090-D7：前一实例退出后热键注销存在滞后（WindowServer 异步），
+/// 紧随其后的启动会注册冲突失败且**该实例永久无热键**（用户实测踩到：
+/// "⌥Space 无反应"）。后台线程指数退避重试（300ms×2ⁿ×5 次），
+/// 不阻塞应用启动；最终失败仅日志（用户可经设置换绑）。
 pub fn install(app: &AppHandle, config_dir: &std::path::Path) {
     let accelerator = stored_accelerator(&PreferencesStore::new(config_dir));
-    if let Err(e) = register(app, &accelerator) {
-        eprintln!("[shortcuts] 全局热键注册失败（可换绑）：{e}");
-    }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let mut delay_ms = 300;
+        for attempt in 1..=5u32 {
+            match register(&handle, &accelerator) {
+                Ok(()) => return,
+                Err(e) if attempt < 5 => {
+                    eprintln!("[shortcuts] 热键注册失败（第 {attempt} 次，{delay_ms}ms 后重试）：{e}");
+                    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                    delay_ms *= 2;
+                }
+                Err(e) => eprintln!("[shortcuts] 全局热键注册失败（已重试 5 次，可经设置换绑）：{e}"),
+            }
+        }
+    });
 }
 
 pub fn stored_accelerator(store: &PreferencesStore) -> String {
