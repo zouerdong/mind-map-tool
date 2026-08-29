@@ -1,0 +1,79 @@
+{
+  "task": "MM-090",
+  "description": "MM-090 责任 Risk IDs 的状态与证据索引（任务卡 Risk IDs：R-001/R-005/R-006/R-007/R-008/R-010/R-013/R-014/R-015）",
+  "generatedAt": "2026-08-29T00:00:00.000Z",
+  "statusNote": "同 evidence-index.json：自动化基线已在预检通过；exit 状态在 MM-090 完整重跑后刷新。",
+  "risks": [
+    {
+      "id": "R-001",
+      "title": "WKWebView/WebView2 差异导致入口、IME、渲染或自动化不一致",
+      "status": "mitigated-on-macos",
+      "evidence": [
+        "tests/e2e/macos/（真实 WKWebView bundle 驱动，交互通道透明记录于 evidence JSON）",
+        "manual-matrix #3（真实 IME）",
+        "packages/platform/test/（12+11 用例）"
+      ],
+      "residual": "Windows 维度 R-013 阻断"
+    },
+    {
+      "id": "R-005",
+      "title": "Save As/导出 authorization 伪造/重放/过期/错类型/TOCTOU 越权",
+      "status": "covered-by-platform-suite",
+      "evidence": ["scripts/quality/run-platform-macos.sh --suite file-lifecycle（authorization/handle/TOCTOU failure injection）"],
+      "residual": "Windows 设备复验（R-013）"
+    },
+    {
+      "id": "R-006",
+      "title": "Windows directory flush/ACL/文件系统语义",
+      "status": "open-port-readiness",
+      "evidence": ["platform evidence windowsPortReadiness（cfg 分支 + MoveFileEx 路线记录；交叉 check 被 icon.ico 阻断属 MM-100）"],
+      "residual": "无 Windows 设备——数据安全维度 BLOCKED，不得聚合 PASS（R-013 联动）"
+    },
+    {
+      "id": "R-007",
+      "title": "固定字体许可/中文覆盖/缺 glyph/包体",
+      "status": "pass-at-g1",
+      "evidence": ["ADR 0005 + decision register font 轨 PASS", "export golden missing-glyph 夹具", "bundle 747KB（预检）"],
+      "residual": "MM-090 性能复跑刷新"
+    },
+    {
+      "id": "R-008",
+      "title": "PDF 分页/字体嵌入/多 viewer",
+      "status": "covered-by-golden",
+      "evidence": ["run-export-golden.mjs PDF 结构断言", "manual-matrix #8 双查看器人工核对"],
+      "residual": "人工矩阵 #8 待执行"
+    },
+    {
+      "id": "R-010",
+      "title": "OS 级自动化/系统对话框/文件事件无法稳定执行",
+      "status": "mitigated-by-three-layer",
+      "evidence": [
+        "自动化层：tauri-driver 真实 bundle 驱动（E2E-02/03/04/05/08/09）",
+        "系统级负向：platform file-lifecycle 套件",
+        "不可自动化项：mm-090-manual-matrix.md（系统对话框/Dock/文件关联，不以 mock 冒充）"
+      ],
+      "residual": "tauri-driver/safaridriver 前置待用户授权安装（cargo install + sudo safaridriver --enable）"
+    },
+    {
+      "id": "R-013",
+      "title": "缺少 macOS 或 Windows 真实设备",
+      "status": "half-blocked",
+      "evidence": ["macOS：实机（arm64, macOS 26.6.2）", "Windows：无设备——聚合按 BLOCKED-for-Windows 记录，ADR 0001 G1 macOS 先行"],
+      "residual": "Windows 实机到位后补两平台报告"
+    },
+    {
+      "id": "R-014",
+      "title": "commit 阶段失败/外部修改/handle 生命周期/异步保存数据丢失",
+      "status": "covered-by-platform-suite",
+      "evidence": ["file-lifecycle 套件 commit/TOCTOU/分阶段 failure injection", "E2E-04 undo/redo", "单测 ordinary-save 不重复弹窗"],
+      "residual": "E2E-06/07/13/14 的系统对话框链进人工矩阵 #5/#7；完整重跑后刷新"
+    },
+    {
+      "id": "R-015",
+      "title": "300/450、启动、RSS、包体或导出超预算",
+      "status": "baseline-pass",
+      "evidence": ["预检 run-performance.mjs p95=16.7ms（预算 32ms）；bundle 747KB"],
+      "residual": "MM-090 完整重跑刷新正式数据"
+    }
+  ]
+}

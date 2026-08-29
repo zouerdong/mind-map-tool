@@ -1,0 +1,126 @@
+{
+  "task": "MM-090",
+  "description": "AC-01～AC-14 证据索引（v1-test-spec §8 追溯矩阵的登记处）",
+  "statusNote": "in-progress：自动化命令基线已在预检（mm-090-precheck.md，2026-08-27，8/8）实跑通过；本索引的 exitCode 将在 tauri-driver 授权安装后的 MM-090 完整重跑（含 run-e2e-macos.sh）时刷新——最后一次证据必须来自完整重跑（任务卡纪律），预检结果不冒充正式证据。",
+  "generatedAt": "2026-08-29T00:00:00.000Z",
+  "acs": [
+    {
+      "id": "AC-01",
+      "title": "冷启动直达空白画布；activation 不碰 dirty 窗",
+      "owner": ["MM-060", "MM-080"],
+      "command": "scripts/quality/run-e2e-macos.sh --case launch-router（路由 platform file-lifecycle 套件）",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-launch-router.json"], "manual": ["manual-matrix #1", "#6"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013 无 Windows 设备；ADR 0001 G1 macOS 先行" },
+      "automated": ["packages/platform/test/launch-router.test.ts（12 用例）"]
+    },
+    {
+      "id": "AC-02",
+      "title": "画布编辑与 IME 隔离",
+      "owner": ["MM-030", "MM-050"],
+      "command": "pnpm --filter ./packages/core test && pnpm --filter ./packages/ui test && node scripts/quality/check-boundaries.mjs --scope selected-canvas",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-02"], "manual": ["manual-matrix #3（真实 IME）"] },
+      "windows": { "status": "not-applicable-to-jsdom-unit", "reason": "单元/画布测试平台无关；真机 IME 属 Windows 人工矩阵（缺设备，R-013）" }
+    },
+    {
+      "id": "AC-03",
+      "title": "节点/连线/多选命令语义",
+      "owner": ["MM-030", "MM-050"],
+      "command": "node scripts/quality/run-all.mjs --focus core-commands,selected-canvas",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-03", "#E2E-04"] },
+      "windows": { "status": "not-applicable-to-unit", "reason": "core/UI 单测平台无关；真机交互差异归 Windows 人工矩阵（R-013）" }
+    },
+    {
+      "id": "AC-04",
+      "title": "undo/redo 历史与 dirty 分叉",
+      "owner": ["MM-030", "MM-080"],
+      "command": "node scripts/quality/run-all.mjs --focus session-history",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-04"] },
+      "windows": { "status": "not-applicable-to-unit", "reason": "会话/历史单测平台无关" }
+    },
+    {
+      "id": "AC-05",
+      "title": "主题与状态视觉",
+      "owner": ["MM-070", "MM-080"],
+      "command": "pnpm test:a11y && node scripts/quality/run-all.mjs --focus theme",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-05"], "manual": ["manual-matrix #4"] },
+      "windows": { "status": "blocked-no-device", "reason": "真机视觉五状态归 Windows 人工矩阵（R-013）" }
+    },
+    {
+      "id": "AC-06",
+      "title": "canonical round-trip 与 ordinary save",
+      "owner": ["MM-030", "MM-060", "MM-080"],
+      "command": "node scripts/quality/run-all.mjs --focus canonical-file,ordinary-save",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-file-lifecycle.json"], "manual": ["manual-matrix #5", "#7"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013；Windows flush 语义已有 cfg 分支与移植就绪记录" }
+    },
+    {
+      "id": "AC-07",
+      "title": "launch/open 路由与等价路径",
+      "owner": ["MM-060"],
+      "command": "scripts/quality/run-e2e-macos.sh --case file-open（路由 platform 套件）",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-file-open.json"], "manual": ["manual-matrix #5", "#6"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013；launch.rs cfg 分支移植就绪记录在 platform evidence" }
+    },
+    {
+      "id": "AC-08",
+      "title": "文件安全（failure injection/TOCTOU/authorization 负向）",
+      "owner": ["MM-030", "MM-060", "MM-080"],
+      "command": "scripts/quality/run-e2e-macos.sh --case file-safety（路由 platform 套件）",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-file-safety.json"], "manual": ["manual-matrix #9（人工抽查错误提示）"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013" }
+    },
+    {
+      "id": "AC-09",
+      "title": "首次引导（完成/跳过/重放，不污染文档）",
+      "owner": ["MM-070", "MM-080"],
+      "command": "pnpm --filter ./packages/ui test -- onboarding && pnpm test:e2e -- --case E2E-08",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-08"], "manual": ["manual-matrix #2"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013（组件级测试平台无关，真机引导流归人工矩阵）" }
+    },
+    {
+      "id": "AC-10",
+      "title": "SVG 导出内容齐全无 UI overlay",
+      "owner": ["MM-040"],
+      "command": "node scripts/quality/run-export-golden.mjs --format svg",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json#E2E-09（面板触发）", "tests/golden/export/golden-manifest.json"] },
+      "windows": { "status": "not-applicable-to-golden", "reason": "golden 平台无关（canonical hash）；Windows 真机渲染归 MM-100/人工（R-013）" }
+    },
+    {
+      "id": "AC-11",
+      "title": "PNG/PDF 尺寸/字体/资源边界",
+      "owner": ["MM-040/MM-045", "MM-080"],
+      "command": "node scripts/quality/run-export-golden.mjs --format png,pdf --viewers 2",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-macos-e2e.json"], "manual": ["manual-matrix #8（双查看器核对）"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013" }
+    },
+    {
+      "id": "AC-12",
+      "title": "性能预算（300/450 与资源）",
+      "owner": ["MM-010", "MM-050", "MM-090"],
+      "command": "node scripts/quality/run-performance.mjs --fixture dense-300-450 --platform current",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-performance.json"], "baseline": "预检 p95=16.7ms（预算 32ms）", "manual": ["manual-matrix #11"] },
+      "windows": { "status": "blocked-no-device", "reason": "R-013；规格要求两平台各跑" }
+    },
+    {
+      "id": "AC-13",
+      "title": "本地优先（离线、无遥测、边界）",
+      "owner": ["MM-020", "MM-090"],
+      "command": "node scripts/quality/check-boundaries.mjs && node scripts/quality/scan-dependency-licenses.mjs && node scripts/quality/scan-network-endpoints.mjs",
+      "macos": { "status": "pending-final-rerun", "artifacts": ["docs/quality/evidence/mm-090-network.json"], "manual": ["manual-matrix 前置（断网启动）"] },
+      "windows": { "status": "not-applicable", "reason": "静态扫描平台无关" }
+    },
+    {
+      "id": "AC-14",
+      "title": "安装包/文件关联（unsigned）",
+      "owner": ["MM-100"],
+      "command": "pnpm bundle:tauri -- --unsigned && pnpm test:install:tauri -- --unsigned --scope-from docs/decisions/decision-register.json",
+      "macos": { "status": "not-in-mm-090", "reason": "归属 MM-100（G2 批准后）；本卡仅在人工矩阵 #10 标注归属" },
+      "windows": { "status": "not-in-mm-090", "reason": "同上 + R-013" }
+    }
+  ],
+  "knownGaps": [
+    "native 窗口级 dirty-close 拦截（on_window_event CloseRequested）——host 缺口，等项目负责人拍板补法（MM-090 预检遗留 #5）",
+    "Cargo 依赖 license 扫描器不覆盖——5+1 依赖人工核验 Apache-2.0 OR MIT 兜底（预检遗留 #6）",
+    "Windows 全维度——R-013 无设备，blocked（不产假报告）"
+  ]
+}
