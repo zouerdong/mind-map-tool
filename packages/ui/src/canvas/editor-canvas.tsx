@@ -36,6 +36,7 @@ import { createInteractionController } from "../controller/interaction-controlle
 import { isCompositionEvent } from "./node-text-editor.js";
 import { useCanvasSession } from "./use-canvas-session.js";
 import { MindNodeView } from "./mind-node.js";
+import { themeTokens } from "../theme/theme-tokens.js";
 import {
   linkingReducer,
   nearestNodeInDirection,
@@ -60,6 +61,13 @@ export interface EditorCanvasProps {
    * 画布在视口中心建节点并自动进入编辑。编辑/连线态忽略（不打断）。
    */
   quickCreateSignal?: number;
+  /**
+   * 视野框架化信号（用户实测 2026-08-29）：声明式 fitView 会在「空文档
+   * 首次建点」时触发——单个小节点被 fit 到 maxZoom 2.5，用户感觉「字巨大」。
+   * 改为显式信号：只在文档加载（打开/新建/启动路由）时框架化，
+   * 用户建点永不拉动镜头。
+   */
+  fitViewSignal?: number;
   /**
    * 重投影时节点位置的过渡动画时长（ms；0=关闭）。
    * 拖动走乐观态不经过重投影通道，不受影响（MM-085 丝滑整理动画）。
@@ -112,7 +120,7 @@ function defaultId(prefix: string): string {
   return `${prefix}-${uuidCounter}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, quickCreateSignal = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
+export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, quickCreateSignal = 0, fitViewSignal = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); // session-only
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
@@ -321,11 +329,19 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
   // 快捷建节点（键位定稿 2026-08-29）：组合根 quickCreateSignal 自增驱动——
   // 视口中心建节点 + 自动进编辑（「捕捉 idea」闭环：按 ⌥Space → 直接打字）。
   // 编辑/连线态忽略（不打断进行中的工作）；初始 mount（signal=0）不触发。
+  // MM-090-D8 终案（用户决策：回归原设计）——⌥Space 直达建点+进编辑：
+  // 空节点建于视口中心、自动开编辑（NodeTextEditor 挂载即重试抢焦，
+  // 窗口激活动画完成后的某次重试会命中）。编辑态下本信号解释为
+  // 「焦点修复」：重新聚焦编辑框（极端情况再按一次=聚焦，不盲建）。
   const lastQuickCreateRef = useRef(quickCreateSignal);
   useEffect(() => {
     if (quickCreateSignal === lastQuickCreateRef.current) return;
     lastQuickCreateRef.current = quickCreateSignal;
-    if (editingId !== null || linking.phase === "linking") return;
+    if (editingId !== null) {
+      document.querySelector<HTMLTextAreaElement>('[aria-label="编辑节点文本"]')?.focus();
+      return;
+    }
+    if (linking.phase === "linking") return;
     const pane = paneRectFromDom();
     if (!pane || !rfInstanceRef.current) return;
     const center = rfInstanceRef.current.screenToFlowPosition({
@@ -335,10 +351,19 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
     const cmd = controller.createNodeAt({ x: center.x, y: center.y });
     api.commit(cmd);
     if (cmd.kind === "CreateNode") {
-      setFocusNodeId(cmd.id); // 焦点落在新节点：提交后方向键继续导航
+      setFocusNodeId(cmd.id);
       beginEdit(cmd.id);
     }
   }, [quickCreateSignal, api, beginEdit, controller, editingId, linking]);
+
+  // 视野框架化（fitViewSignal）：文档加载后组合根自增信号，画布 frame 内容。
+  // 刻意不做声明式 fitView——它会在空文档首次建点时误触发（跳 maxZoom）。
+  const lastFitSignalRef = useRef(fitViewSignal);
+  useEffect(() => {
+    if (fitViewSignal === lastFitSignalRef.current) return;
+    lastFitSignalRef.current = fitViewSignal;
+    void rfInstanceRef.current?.fitView({ padding: 0.2 });
+  }, [fitViewSignal]);
 
   const editingValue = useMemo<EditingContextValue>(
     () => ({
@@ -361,7 +386,15 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
     <EditingContext.Provider value={editingValue}>
       <div
         className={className}
-        style={{ width: "100%", height: "100%", position: "relative" }}
+        // MM-090-D9：黑板主题的纯黑画布此前从未接线（tokens 定义了但无消费者，
+        // jsdom 测不到视觉——用户实测发现）。画布底色/点阵随文档主题。
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          background: themeTokens(session.current.document.document.theme).canvasBackground,
+          transition: "background 200ms ease",
+        }}
         role="application"
         aria-label="脑图画布"
         tabIndex={0}
@@ -374,6 +407,9 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
+          // MM-090-D9：背景设在 RF 本体——wrapper 上的背景会被 RF 内层默认
+          // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
+          style={{ backgroundColor: themeTokens(session.current.document.document.theme).canvasBackground }}
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -383,18 +419,29 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
           onMove={(_, vp) => setViewport(vp)} // session-only
           onInit={(instance) => {
             rfInstanceRef.current = instance;
+            // 冷启动即带内容（测试/恢复场景）才框架化；空文档不框架化，
+            // 避免首个节点出现时镜头跳到 maxZoom（见 fitViewSignal 注释）。
+            if (session.current.document.document.nodes.length > 0) {
+              void instance.fitView({ padding: 0.2 });
+            }
           }}
-          fitView
           nodesConnectable
           selectionOnDrag
           panOnDrag
           zoomOnScroll
+          // 双击=建点（键位定稿 2026-08-29），不是缩放（缩放走 ⌘+/⌘-/⌘0）。
+          // 且 d3-zoom 的 dblclick.zoom 会 stopImmediatePropagation（noevent），
+          // 不关它 wrapper 的 onDoubleClick 永远收不到——双击建点从未生效的根因。
+          zoomOnDoubleClick={false}
           deleteKeyCode={null} // 删除统一走画布 keydown（selection 语义一致）
           proOptions={{ hideAttribution: false }} // G1 决定：保留 attribution
           minZoom={0.2}
           maxZoom={2.5}
         >
-          <Background gap={24} />
+          <Background
+            gap={24}
+            color={themeTokens(session.current.document.document.theme).backgroundPattern}
+          />
         </ReactFlow>
         {overlay}
       </div>
@@ -434,12 +481,15 @@ function useReducedMotionFlag(): boolean {
   return reduced;
 }
 
-/** 画布事件 → 画布坐标（viewport 逆变换；target 非 pane 时返回 null）。 */
+/** 画布事件 → 画布坐标（viewport 逆变换）。仅命中空白 pane 才有效：
+ *  命中节点/边返回 null——双击节点是「进入编辑」（onNodeDoubleClick），
+ *  不能同时触发建点（用户实测：双击编辑会在原节点上再叠一个空节点）。 */
 function panePointFromEvent(
   event: { clientX: number; clientY: number; target: EventTarget | null },
   viewport: Viewport,
 ): Point | null {
   const target = event.target as HTMLElement | null;
+  if (target?.closest(".react-flow__node, .react-flow__edge")) return null;
   const pane = target?.closest(".react-flow__pane") as HTMLElement | null;
   if (!pane) return null;
   const rect = pane.getBoundingClientRect();

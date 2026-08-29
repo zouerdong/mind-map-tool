@@ -26,6 +26,8 @@ export interface MindNodeData extends Record<string, unknown> {
 }
 
 export type MindFlowNode = Node<MindNodeData, "mind">;
+import { themeTokens } from "../theme/theme-tokens.js";
+
 export type MindFlowEdge = Edge;
 
 export interface ProjectedView {
@@ -62,11 +64,13 @@ export function projectNode(node: MindNode, defaults: ReturnType<typeof document
   };
 }
 
-export function projectEdge(edge: MindEdge): MindFlowEdge {
+export function projectEdge(edge: MindEdge, theme: ThemeName): MindFlowEdge {
+  // MM-090-D9：连线颜色随主题（此前用 RF 默认 #b1b1b7——黑底上不可见）
   return {
     id: edge.id,
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
+    style: { stroke: themeTokens(theme).edgeStroke },
   };
 }
 
@@ -74,7 +78,7 @@ export function projectDocument(doc: MindMapDocumentV1): ProjectedView {
   const defaults = documentDefaults(doc);
   return {
     nodes: doc.document.nodes.map((n) => projectNode(n, defaults)),
-    edges: doc.document.edges.map(projectEdge),
+    edges: doc.document.edges.map((e) => projectEdge(e, defaults.theme)),
   };
 }
 

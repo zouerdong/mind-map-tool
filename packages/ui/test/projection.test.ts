@@ -118,6 +118,6 @@ describe("命令后重投影一致性（无双状态漂移）", () => {
     const defaults = documentDefaults(doc);
     const whole = projectDocument(doc);
     expect(projectNode(doc.document.nodes[1]!, defaults)).toEqual(whole.nodes[1]);
-    expect(projectEdge(doc.document.edges[0]!)).toEqual(whole.edges[0]);
+    expect(projectEdge(doc.document.edges[0]!, defaults.theme)).toEqual(whole.edges[0]);
   });
 });

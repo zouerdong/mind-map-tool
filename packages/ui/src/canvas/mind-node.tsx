@@ -3,10 +3,10 @@
 // 的绘制规则一致（scene.ts），保证画布所见 = 导出所得。
 // 尺寸由 core size 权威决定（RF 不测量）。
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { FontToken } from "@mindmap/core";
-import { layoutNodeText, LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
+import { layoutNodeText, measureNodeBox, LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
 import type { MindFlowNode } from "../projection/projection.js";
 import { NodeTextEditor } from "./node-text-editor.js";
 
@@ -42,6 +42,10 @@ function MindNodeViewImpl({
   const layout = layoutNodeText(data.text, data.runs, data.font, fonts);
   const palette = MIND_NODE_THEME[data.theme];
   const isEllipse = data.shape === "ellipse";
+  // 编辑态实时尺寸（用户实测 2026-08-29：编辑框长大了、节点框没长，文字溢出框外）。
+  // 编辑器每次输入把「提交后同一口径」的测量框报上来，节点外框同步跟随，
+  // 提交时 core 写入的权威尺寸与它同源——提交瞬间无跳变。
+  const [editBox, setEditBox] = useState<{ width: number; height: number } | null>(null);
 
   const textStyle: React.CSSProperties = {
     position: "absolute",
@@ -52,8 +56,8 @@ function MindNodeViewImpl({
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
+        width: editing && editBox ? `max(100%, ${editBox.width}px)` : "100%",
+        height: editing && editBox ? `max(100%, ${editBox.height}px)` : "100%",
         boxSizing: "border-box",
         background: palette.bg,
         border: `${LAYOUT.strokeWidth}px solid ${palette.border}`,
@@ -81,6 +85,12 @@ function MindNodeViewImpl({
       {editing ? (
         <NodeTextEditor
           initialText={data.text}
+          fontFamily={fontFamily(data.font)}
+          textColor={palette.text}
+          background={palette.bg}
+          // 实时增长与提交后渲染同一测量源（所见即所得；runs 在编辑态按纯文本计）
+          measureBox={(t) => measureNodeBox(t, undefined, data.font, fonts)}
+          onMeasure={setEditBox}
           onCommit={(text) => onCommitEdit(id, text)}
           onCancel={onCancelEdit}
         />

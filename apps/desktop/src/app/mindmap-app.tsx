@@ -59,6 +59,8 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   );
 
   const [revision, setRevision] = useState(0);
+  // 视野框架化信号（EditorCanvas：仅文档加载时 frame 内容，建点不动镜头）
+  const [fitViewSignal, setFitViewSignal] = useState(0);
   const [replaySignal, setReplaySignal] = useState(0);
   // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
   // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
@@ -117,6 +119,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     }
     await newDocumentFlow(session, async () => true);
     bump();
+    setFitViewSignal((n) => n + 1);
     setNotice({ tone: "info", text: "已新建空白文档" });
   }, [bump, confirmDiscard, session]);
 
@@ -128,6 +131,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     const result = await openDocumentFlow(session, deps);
     handleResultNotice(result, result.kind === "ok" ? `已打开 ${result.value?.displayPath ?? ""}` : undefined);
     bump();
+    if (result.kind === "ok") setFitViewSignal((n) => n + 1);
   }, [bump, confirmDiscard, deps, handleResultNotice, session]);
 
   const onSave = useCallback(async () => {
@@ -216,9 +220,10 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   useEffect(() => {
     if (!isTauriRuntime()) return; // 浏览器 dev 无原生热键
     const unlisten = listen("quick-create", () => {
-      // D6：焦点判定在 WebKit 可信侧——失焦（被遮挡/刚唤醒）忽略，
-      // 保持「先聚焦再建」；已聚焦即建（视口中心 + 自动进编辑）。
-      if (document.hasFocus()) setQuickCreateSignal((n) => n + 1);
+      // MM-090-D8 终案（用户决策 2026-08-29：回归原设计）：⌥Space 直达
+      // 画布建点+进编辑（textarea 挂载即重试抢焦）；编辑态时本信号由
+      // 画布解释为「焦点修复」（极端情况再按一次=聚焦，不盲建）。
+      setQuickCreateSignal((n) => n + 1);
     });
     return () => {
       void unlisten.then((dispose) => dispose());
@@ -253,6 +258,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           const result = await openPathFlow(session, deps, action.canonicalPath);
           if (result.kind !== "ok") setNotice({ tone: "error", text: result.kind === "error" ? result.message : "启动文件无法读取" });
           bump();
+          if (result.kind === "ok") setFitViewSignal((n) => n + 1);
         } else if (action.type === "new-blank-window") {
           void onNew();
         }
@@ -341,6 +347,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           fonts={ports.fonts}
           revision={revision}
           quickCreateSignal={quickCreateSignal}
+          fitViewSignal={fitViewSignal}
           positionTransitionMs={320}
         />
         {exportPanel ? (

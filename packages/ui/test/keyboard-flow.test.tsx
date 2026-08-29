@@ -90,12 +90,11 @@ describe("全键盘建图（AC-17）", () => {
     );
   });
 
-  it("quick-create：信号自增 → 视口中心建节点并自动进编辑", async () => {
+  it("quick-create：信号自增 → 视口中心建节点并自动进编辑（原设计，用户决策 2026-08-29）", async () => {
     const { session, rerenderWith } = setup();
     await screen.findByTestId("rf-node-a");
     expect(session.current.document.document.nodes).toHaveLength(2);
     rerenderWith(1);
-    // 建节点 + 自动进编辑（「按 ⌥Space → 直接打字」闭环）
     const editor = await screen.findByLabelText("编辑节点文本");
     expect(session.current.document.document.nodes).toHaveLength(3);
     fireEvent.change(editor, { target: { value: "灵感" } });
@@ -105,16 +104,16 @@ describe("全键盘建图（AC-17）", () => {
     );
   });
 
-  it("quick-create：编辑态忽略（不打断进行中的编辑）", async () => {
+  it("quick-create：编辑态下信号 = 焦点修复（重新聚焦，不盲建）", async () => {
     const { session, rerenderWith, keyDown } = setup();
     await screen.findByTestId("rf-node-a");
     keyDown("ArrowDown");
     keyDown("Enter"); // 焦点 a 进编辑
-    rerenderWith(1); // 编辑中：忽略
-    await waitFor(() => {
-      expect(screen.getByLabelText("编辑节点文本")).toBeTruthy(); // 仍在编辑原节点
-    });
-    expect(session.current.document.document.nodes).toHaveLength(2); // 未新建
+    const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    const focusSpy = vi.spyOn(editor, "focus");
+    rerenderWith(1); // 编辑中：第二按=焦点修复（调用 focus）
+    expect(focusSpy).toHaveBeenCalled();
+    expect(session.current.document.document.nodes).toHaveLength(2); // 未盲建
   });
 
   it("⌘L 连线流：方向换候选 → Enter 确认 CreateEdge；Esc 取消不产生边", async () => {

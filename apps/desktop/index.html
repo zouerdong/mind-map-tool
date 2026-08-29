@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mind Map</title>
+    <style>
+      /* 高度链：缺了它 #root 高度塌缩为 0，画布整体不可见（白屏根因，2026-08-29） */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        overflow: hidden;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

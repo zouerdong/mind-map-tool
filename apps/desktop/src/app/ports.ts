@@ -54,10 +54,16 @@ export class FakeGlobalShortcut implements GlobalShortcutPort {
   }
 }
 
-/** 浏览器 dev 的假字体度量（等宽近似；与导出尺寸可能略偏，仅限 dev 预览）。 */
+/** 浏览器 dev 的假字体度量（CJK≈1em、ASCII≈0.55em 近似；与导出尺寸可能略偏，仅限 dev 预览）。 */
 const DEV_FONTS: FontResolver = {
-  regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
-  bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+  regular: () => ({
+    advance: (ch: string, size: number) => size * (ch.charCodeAt(0) > 0xff ? 1 : 0.55),
+    ascentRatio: 0.8,
+  }),
+  bold: () => ({
+    advance: (ch: string, size: number) => size * (ch.charCodeAt(0) > 0xff ? 1 : 0.55),
+    ascentRatio: 0.8,
+  }),
 };
 
 export function isTauriRuntime(): boolean {
