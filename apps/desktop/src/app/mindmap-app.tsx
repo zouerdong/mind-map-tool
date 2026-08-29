@@ -215,7 +215,11 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // ---- 全局热键同键分流（Tauri）：画布已聚焦时的 quick-create 事件 ----
   useEffect(() => {
     if (!isTauriRuntime()) return; // 浏览器 dev 无原生热键
-    const unlisten = listen("quick-create", () => setQuickCreateSignal((n) => n + 1));
+    const unlisten = listen("quick-create", () => {
+      // D6：焦点判定在 WebKit 可信侧——失焦（被遮挡/刚唤醒）忽略，
+      // 保持「先聚焦再建」；已聚焦即建（视口中心 + 自动进编辑）。
+      if (document.hasFocus()) setQuickCreateSignal((n) => n + 1);
+    });
     return () => {
       void unlisten.then((dispose) => dispose());
     };
@@ -259,8 +263,12 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       () => [{ windowId: "main", occupiedPath: session.displayPath, dirty: session.isDirty }],
       handleAction,
     );
-    void adapter.start().catch(() => {
-      setNotice({ tone: "error", text: "启动路由初始化失败" });
+    void adapter.start().catch((e) => {
+      // 错误详情必须可见（MM-090-D2 排查：吞错曾掩盖 launch 路由失败根因）
+      setNotice({
+        tone: "error",
+        text: `启动路由初始化失败：${e instanceof Error ? e.message : String(e)}`,
+      });
     });
     return () => {
       void adapter.stop();

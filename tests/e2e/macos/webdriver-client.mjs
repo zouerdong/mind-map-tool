@@ -1,11 +1,10 @@
-// 零依赖 W3C WebDriver 客户端（fetch → tauri-driver :4444）。
-// MM-090 E2E 基础设施：只实现本套件需要的协议子集（session/element/
-// click/keys/actions/execute/screenshot），不引入 selenium/webdriverio
-// （新增依赖须过 license scan 与包体评估——见 ADR 0007 许可约束；
-// 本客户端落在 tests/** 允许路径，零传递依赖）。
-// 兼容策略：safaridriver（WKWebView 后端）对 W3C actions 的支持不全，
-// 每个交互原语提供两条通道——actions API 优先，失败回落 execute/sync
-// 合成事件；实际使用的通道记入 evidence（不隐瞒交互方式）。
+// 【存档，当前未使用】零依赖 W3C WebDriver 客户端（fetch → tauri-driver :4444）。
+// tauri-driver v2.0.6 在 macOS 报 "not supported on this platform"（官方仅
+// 支持 Linux/Windows，本机实测 2026-08-29）——macOS E2E 已改走
+// ax-bridge.mjs（osascript/System Events）。本文件保留作为 Windows E2E
+// （run-e2e-windows.ps1 路线）的协议参考，不在 macOS 套件中执行。
+// 若启用（Windows）：safaridriver 限制不适用，但 WebView2/msedgedriver 的
+// actions 兼容性仍需实测；实际使用的通道记入 evidence。
 
 const ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf";
 /** W3C key actions 修饰键码点（Unicode 私有区）。 */

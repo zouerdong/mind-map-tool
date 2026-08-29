@@ -71,7 +71,7 @@ function MindNodeViewImpl({
         outlineOffset: 2,
         boxShadow: data.framesVisible ? `0 0 0 ${LAYOUT.strokeWidth}px ${palette.border}22` : undefined,
       }}
-      role="group"
+      role="button"
       aria-label={`节点：${data.text || "空"}`}
       tabIndex={-1}
     >

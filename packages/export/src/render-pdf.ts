@@ -41,14 +41,16 @@ export async function renderPdf(
   const needsNotoBold =
     !needsLxgw &&
     scene.items.some((it) => it.kind === "text" && it.segments.some((s) => s.bold && !s.fauxBold));
+  // embedFont 官方签名收 Uint8Array；禁用 Node Buffer（WKWebView 无全局，
+  // MM-090 E2E 缺陷 #1 同源）。
   const lxgwRegular = needsLxgw
-    ? await pdf.embedFont(Buffer.from(bundle["lxgw-wenkai-regular"]), { subset: false })
+    ? await pdf.embedFont(bundle["lxgw-wenkai-regular"], { subset: false })
     : null;
   const notoRegular = lxgwRegular
     ? lxgwRegular
-    : await pdf.embedFont(Buffer.from(bundle["noto-sans-sc-regular"]), { subset: true });
+    : await pdf.embedFont(bundle["noto-sans-sc-regular"], { subset: true });
   const notoBold = needsNotoBold
-    ? await pdf.embedFont(Buffer.from(bundle["noto-sans-sc-bold"]), { subset: true })
+    ? await pdf.embedFont(bundle["noto-sans-sc-bold"], { subset: true })
     : notoRegular;
   const fontFor = (family: string, bold: boolean): PDFFont => {
     if (family === "LXGW WenKai") return lxgwRegular!; // 无真粗体 → 双绘模拟

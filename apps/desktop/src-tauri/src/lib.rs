@@ -76,9 +76,20 @@ pub fn run() {
             }
         })
         .on_window_event(move |window, event| {
-            // 窗口销毁：撤销其全部授权与句柄（步骤⑤：跨窗口/撤销后 handle 拒绝）。
-            if matches!(event, tauri::WindowEvent::Destroyed) {
-                service_for_windows.revoke_window(window.label());
+            match event {
+                // 窗口销毁：撤销其全部授权与句柄（步骤⑤：跨窗口/撤销后 handle 拒绝）。
+                tauri::WindowEvent::Destroyed => {
+                    service_for_windows.revoke_window(window.label());
+                }
+                // MM-090-D6：is_focused() 在 macOS 不可靠——事件跟踪供热键分流。
+                tauri::WindowEvent::Focused(focused) => {
+                    if let Some(state) = window.app_handle().try_state::<crate::shortcuts::GlobalShortcutState>() {
+                        state
+                            .focused
+                            .store(*focused, std::sync::atomic::Ordering::SeqCst);
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![

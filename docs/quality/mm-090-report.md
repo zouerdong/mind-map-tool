@@ -1,7 +1,8 @@
 # MM-090 聚合报告（自动化 E2E、golden 与双平台验收）
 
-状态：**进行中**（E2E 基础设施与证据框架已落地；完整重跑等待 tauri-driver
-用户授权安装——见「待用户动作」）。本文档在完整重跑后刷新为最终版。
+状态：**macOS 维度完成**（2026-08-29 完整重跑全绿；Windows 维度 R-013
+无设备 BLOCKED，不产假报告）。自动化覆盖边界（本机 TCC 输入注入限制）
+如实记录于下——键盘交互链真机验证归人工矩阵，不以 mock 冒充。
 
 ## 执行架构（本卡落地）
 
@@ -9,30 +10,28 @@
 
 | 层 | 范围 | 载体 |
 | --- | --- | --- |
-| 自动化 E2E（真实 app） | E2E-02/03/04/05/08/09（画布交互） | `tests/e2e/macos/` + `run-e2e-macos.sh`（tauri-driver + 零依赖 W3C WebDriver 客户端，驱动真实 debug bundle） |
-| 系统级自动化（真实服务层） | E2E-01/06/07/10/11/12/13/14 的可自动化部分（launch 路由、文件安全、authorization 负向、golden、性能） | `run-platform-macos.sh --suite file-lifecycle`、`run-export-golden.mjs`、`run-performance.mjs`（路由：`run-e2e-macos.sh --case launch-router|file-open|file-safety`） |
-| 人工矩阵（系统对话框/真机 IME/Dock/文件关联） | 规格 §7 步骤 1–11 + ⌥Space 前台截获 | `mm-090-manual-matrix.md` |
+| 自动化 E2E（真实 app） | E2E-01A 冷启动健康（D1/D2 回归）+ E2E-16 热键唤醒分支（真实系统热键） | `tests/e2e/macos/`（ax-bridge + cases + run）+ `run-e2e-macos.sh`（osascript/System Events 驱动真实 debug bundle） |
+| 键盘交互链逻辑 | E2E-02/03/04/08 场景的命令语义（建点/编辑/连线/undo/引导） | packages/ui 199 个 jsdom 测试（keyboard-flow 全键盘建图等）——真机键盘链归人工矩阵 #3 |
+| 系统级自动化（真实服务层） | launch 路由、文件安全、authorization 负向、golden、性能 | `run-platform-macos.sh --suite file-lifecycle`、`run-export-golden.mjs`、`run-performance.mjs`（路由：`run-e2e-macos.sh --case launch-router\|file-open\|file-safety`） |
+| 人工矩阵（系统对话框/真机 IME/Dock/键盘链/文件关联） | 规格 §7 步骤 1–11 + ⌥Space 分流三态 | `mm-090-manual-matrix.md` |
 
 技术决策记录：
 
-- **WebDriver 客户端自研（零依赖）**：selenium/webdriverio 依赖树重且须过
-  license scan；W3C WebDriver 是 HTTP+JSON，本套件所需协议子集 200 行内
-  实现，落在 `tests/**` 允许路径，零传递依赖。
-- **交互双通道**：safaridriver 对 W3C actions 支持不全——键盘/指针原语
-  actions API 优先、失败回落 execute/sync 合成事件；实际通道逐用例记入
-  evidence JSON（透明，不隐瞒保真度边界）。
-- **合成事件保真度边界**：合成键盘不产生浏览器默认行为（textarea 换行），
-  该行为由 jsdom 单测覆盖；E2E 断言命令语义（DOM 状态、投影、dirty 位）。
-- **E2E-08 用重放入口驱动完成路径**：不删用户偏好文件（红线），
-  重放与首启共用 OnboardingFlow/reducer；真冷启动首启由首次实跑覆盖。
+- **tauri-driver 弃用**：v2.0.6 在 macOS 报 `not supported on this platform`
+  （官方仅 Linux/Windows）——授权安装后实测发现，改走 macOS 自带的
+  osascript + System Events（零依赖；客户端存档于 webdriver-client.mjs
+  供 Windows E2E 参考）。
+- **自动化覆盖边界（本机 TCC 输入注入限制，实测）**：合成鼠标
+  （CGEventPost HID/Session tap）被系统过滤；合成 activate/set_focus 不设
+  key window → 键盘不达 WKWebView。真实用户不受影响（真实点击/⌘Tab 正常
+  设 key）——键盘交互链真机验证归人工矩阵 #3，逻辑语义由 jsdom 测试覆盖。
+- **AX 断言策略**：WKWebView 对非 VoiceOver 客户端懒暴露纯视觉子树
+  （节点 aria-label 不进 AX）；表单元素（button/textarea）与 landmark
+  可靠暴露——断言与交互（AXPress）基于此设计。
+- **WebKitAccessibilityEnabled**（app 域 defaults）为 E2E 前置，fail-closed
+  由 run-e2e-macos.sh 检查；可逆（defaults delete）。
 
-## 待用户动作（阻断完整重跑）
-
-1. `cargo install --locked tauri-driver`（全局 cargo 二进制，需授权）
-2. `sudo safaridriver --enable`（一次性，需管理员密码——建议在会话里以
-   `! sudo safaridriver --enable` 执行）
-
-## 完整重跑清单（授权后执行）
+## 完整重跑清单（已执行，2026-08-29）
 
 ```
 node scripts/quality/run-all.mjs
@@ -54,15 +53,18 @@ git diff --check
 
 | 命令 | 退出码 | 证据 |
 | --- | --- | --- |
-| run-all.mjs | pending |  |
-| run-export-golden.mjs | pending |  |
-| run-performance.mjs | pending |  |
-| check-boundaries.mjs | pending |  |
-| scan-dependency-licenses.mjs | pending |  |
-| scan-network-endpoints.mjs | pending |  |
-| run-e2e-macos.sh（交互子集） | pending | docs/quality/evidence/mm-090-macos-e2e.json |
-| launch-router / file-open / file-safety | pending | docs/quality/evidence/mm-090-macos-*.json |
-| cargo test / clippy | pending |  |
+| run-all.mjs（typecheck/lint/unit/boundaries/licenses/network/golden/performance） | **0（8/8 PASS）** | 本表下附 |
+| run-export-golden.mjs | **0**（10 用例） | tests/golden/export/golden-manifest.json |
+| run-performance.mjs | **0**（pan 17ms / drag 16.7 / zoom 16.7，预算 32ms；bundle 747KB） | run-all 输出 |
+| check-boundaries.mjs | **0**（selected-canvas PASS） |  |
+| scan-network-endpoints.mjs | **0**（74 files, 0 endpoints） |  |
+| run-e2e-macos.sh（自动化子集 E2E-01A/16） | **0** | docs/quality/evidence/mm-090-macos-e2e.json |
+| launch-router / file-open / file-safety（platform 套件路由） | **0×3** | docs/quality/evidence/mm-090-macos-{launch-router,file-open,file-safety}.json |
+| cargo test / clippy -D warnings | **0**（31 tests；clippy clean） |  |
+| pnpm test:a11y | **0** |  |
+| git diff --check | **0** |  |
+
+最终重跑时间：2026-08-29（UTC 见 evidence JSON generatedAt）。
 
 ## Windows
 
@@ -74,7 +76,18 @@ Windows 移植就绪证据见 platform evidence windowsPortReadiness。
 
 | ID | owner | 复现 | 严重度 | 回归测试 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| （暂无——发现即开责任卡，修复后完整重跑本卡） | | | | | |
+| MM-090-D1 | MM-040（packages/export） | 真实 WKWebView 启动即崩：`初始化失败：ReferenceError: Can't find variable: Buffer`（font-source.ts fontkitCreate(Buffer.from) / render-pdf.ts embedFont(Buffer.from)）。jsdom/vitest 环境存在 Node 全局 Buffer，掩盖了该缺陷；仅真实 WebView 暴露 | **P0**（app 完全不可用） | ① export golden 全量（10 用例）重跑 PASS；② 重建 bundle 后 WKWebView 实机启动到达画布（E2E 首个用例到达即证）；③ grep 断言产品代码无裸 Buffer | 已修复（Uint8Array 直传，官方签名本就收 Uint8Array），待完整重跑确认 |
+| MM-090-D2 | MM-060/080（ipc/lib.rs） | 打包实机启动报"启动路由初始化失败"：`state not managed for field 'intents'`——lib.rs manage 的是 `Arc<LaunchIntentStore>`，command 取 `State<LaunchIntentStore>`，类型不匹配。dev/单测不触发（invoke 桩）；且组合根 catch 吞掉错误详情加剧定位成本 | **P1**（launch 路由整体失效：Finder 双击打开文件不工作） | ① 实机启动无错误 notice（E2E 就绪即证）；② platform file-lifecycle 套件含 app_ready 握手 | 已修复：State 类型改 `Arc<LaunchIntentStore>`；catch 显示错误详情 |
+| MM-090-D5 | MM-089/050（editor-canvas） | 点击画布后 wrapper（tabIndex=0）不获 DOM 焦点（WebKit 焦点留 body）→ 画布键盘流（方向键/Enter/⌘L/⌘A/Delete/⌘Z）在点击后不可达，需先 Tab。实测两版 mousedown 聚焦（preventDefault / setTimeout）都会破坏双击建点的 dblclick 派发 | **P2**（键盘流可用性：Tab 可绕过） | 人工矩阵 #3 加"点击画布后方向键即时可用"检查；候选修复=RF onPaneClick 聚焦 | open（记录候选方案；不阻断 MM-090——E2E 以 Tab 聚焦） |
+| MM-090-D6 | MM-088（shortcuts） | Tauri `window.is_focused()` 在 macOS 返回不可靠（实测恒 false，即使 set_focus 后）→ ⌥Space 同键分流的 quick-create 分支永不触发（唤醒分支正常）。E2E 实测发现 | **P1**（"捕捉 idea"核心动作失效） | E2E-02 ⌥Space 建点进编辑（真实热键链路） | 已修复：`Focused` 窗口事件维护 AtomicBool，dispatch 改用事件跟踪标志 |
+| MM-090-D4 | MM-050（projection/viewport） | 双击建点：视觉观察节点不在双击点（视口中心附近）——panePointFromEvent 的 viewport 换算疑似与 RF 实际 viewport 不同步（onMove 未覆盖 fitView 初始态） | **P3**（位置语义，功能可用） | 人工矩阵 #3 加"双击建点落在双击处"检查 | open（待人工矩阵复核后决定是否开修复卡） |
+
+另：tauri-driver v2.0.6 在 macOS 报 `not supported on this platform`
+（官方仅支持 Linux/Windows）——本卡 E2E 技术路线据此改为
+osascript + System Events（macOS 自带，零依赖）：真实键盘事件
+（System Events keystroke，走系统输入链）+ AX 树断言
+（`WebKitAccessibilityEnabled` app 域偏好开启后 WKWebView 暴露 DOM
+AX 树）。交互保真度高于 WebDriver 合成事件；如实记入 evidence。
 
 ## 已知缺口（继承预检，非本卡阻断项）
 

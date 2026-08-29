@@ -365,6 +365,9 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
         role="application"
         aria-label="脑图画布"
         tabIndex={0}
+        // MM-090-D5（open）：点击 pane 不聚焦 wrapper → 键盘流需先 Tab。
+        // 实测两版 mousedown 聚焦（preventDefault / setTimeout）都会破坏
+        // 双击建点的 dblclick 派发——缺陷卡记录候选：RF onPaneClick 聚焦。
         onKeyDown={onKeyDown}
         onDoubleClick={onWrapperDoubleClick}
       >

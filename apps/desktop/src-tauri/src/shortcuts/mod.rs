@@ -3,6 +3,7 @@
 //! - 画布未显示/最小化/失焦 → show + focus 唤醒（不动文档）；
 //! - 画布已聚焦 → emit `quick-create`（前端在视口中心建节点并自动进编辑，
 //!   「捕捉 idea」成为全局第一动作）。
+//!
 //! 热键存本机偏好（键 `globalShortcut`），可经 IPC 换绑。
 //! 注册冲突（热键被其他应用占用）稳定返回错误，不崩溃。
 
@@ -23,11 +24,17 @@ const LEGACY_DEFAULT: &str = "CmdOrCtrl+Alt+Space";
 pub struct GlobalShortcutState {
     /// 当前已注册的 accelerator（注册成功才写入）。
     current: Mutex<Option<String>>,
+    /// 窗口焦点跟踪（MM-090-D6：Tauri is_focused() 在 macOS 返回不可靠，
+    /// 由 lib.rs 的 Focused 事件维护——dispatch 的同键分流依赖它）。
+    pub focused: std::sync::atomic::AtomicBool,
 }
 
 impl GlobalShortcutState {
     pub fn new() -> Self {
-        Self { current: Mutex::new(None) }
+        Self {
+            current: Mutex::new(None),
+            focused: std::sync::atomic::AtomicBool::new(false),
+        }
     }
 }
 
@@ -46,18 +53,14 @@ fn parse(accelerator: &str) -> Result<Shortcut, IpcError> {
 /// 同键分流：已聚焦 → 快捷建节点；否则唤醒（show + focus，不动文档）。
 fn dispatch(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
-        let visible = win.is_visible().unwrap_or(false);
-        let minimized = win.is_minimized().unwrap_or(false);
-        let focused = win.is_focused().unwrap_or(false);
-        if visible && !minimized && focused {
-            // 画布正在使用：建新 idea（前端视口中心建节点 + 自动进编辑）。
-            let _ = win.emit("quick-create", ());
-        } else {
-            // 唤醒（含"可见但失焦"：先聚焦，再按一次才建——不盲建）。
-            let _ = win.show();
-            let _ = win.unminimize();
-            let _ = win.set_focus();
-        }
+        // 唤醒幂等（已前台时无感）；焦点判定交给前端 document.hasFocus()
+        // （MM-090-D6：Rust 侧 is_focused() 与 Focused 事件在 macOS 均不可靠，
+        // WebKit 的 hasFocus 是可信信源；失焦时前端忽略 quick-create 事件，
+        // 保持「先聚焦再建」语义——下次按键即建）。
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+        let _ = win.emit("quick-create", ());
     }
 }
 

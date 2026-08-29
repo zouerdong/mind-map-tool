@@ -20,7 +20,9 @@ interface CachedFont {
 }
 
 function loadFont(bytes: Uint8Array): CachedFont {
-  const font = fontkitCreate(Buffer.from(bytes)); // 内存字节用 create（openSync 只收路径）
+  // 字节直接传（fontkit create 收 Uint8Array）；禁用 Node Buffer——
+  // WKWebView 无 Buffer 全局，曾致 app 初始化崩溃（MM-090 E2E 缺陷 #1）。
+  const font = fontkitCreate(bytes);
   const advanceCache = new Map<string, number>();
   return {
     unitsPerEm: font.unitsPerEm,

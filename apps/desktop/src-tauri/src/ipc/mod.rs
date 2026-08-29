@@ -70,14 +70,14 @@ pub struct TargetAuthorizationRequest {
 
 #[tauri::command]
 pub fn platform_app_ready(
-    intents: State<'_, LaunchIntentStore>,
+    intents: State<'_, std::sync::Arc<LaunchIntentStore>>,
 ) -> Result<Vec<LaunchIntentPayload>, crate::file::error::IpcError> {
     Ok(intents.snapshot_unacked())
 }
 
 #[tauri::command]
 pub fn platform_ack_launch_intent(
-    intents: State<'_, LaunchIntentStore>,
+    intents: State<'_, std::sync::Arc<LaunchIntentStore>>,
     intent_id: String,
 ) -> Result<(), crate::file::error::IpcError> {
     intents.ack(&intent_id);

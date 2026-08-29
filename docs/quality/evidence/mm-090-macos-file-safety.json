@@ -1,0 +1,37 @@
+{
+  "task": "MM-060",
+  "platform": "macOS",
+  "suite": "file-lifecycle",
+  "overall": "PASS",
+  "generatedAt": "2026-08-29T10:31:45.004902+00:00",
+  "system": {
+    "machine": "arm64",
+    "macos": "26.6.2",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v26.7.0"
+  },
+  "platformNotes": [
+    "commit protocol：temp-write → fsync(file) → rename(POSIX 原子替换) → fsync(dir) 全部落地",
+    "Windows 分支（FlushFileBuffers/MoveFileEx 语义）已按移植就绪约束实现 cfg 分支，",
+    "交叉 cargo check 被 tauri-build 的 icon.ico 前置要求阻断（图标属 MM-100 范围）；",
+    "Windows 实机验证为 v1 已知缺口（ADR 0001 G1：macOS 先行、macOS 证据构成完整验收基础）"
+  ],
+  "windowsPortReadiness": {
+    "status": "not-verified-on-device",
+    "blockingOn": "无 Windows 设备（R-013）；icon.ico 为交叉 check 的 build.rs 前置（MM-100 范围）",
+    "implemented": [
+      "cfg(windows) 目录 flush 说明与 MoveFileEx(std rename) 路线",
+      "路径大小写卷折叠差异已记录（launch.rs 模块注释）"
+    ]
+  },
+  "cases": [
+    {
+      "name": "rust-service-layer-tests",
+      "result": "PASS:test result: ok. 31 passed; 0 failed"
+    },
+    {
+      "name": "ts-platform-tests",
+      "result": "PASS:Tests  23 passed (23)"
+    }
+  ]
+}
