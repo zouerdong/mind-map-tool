@@ -38,7 +38,7 @@ class TauriGlobalShortcut implements GlobalShortcutPort {
 
 /** 浏览器 dev 的内存实现（不真实注册）。 */
 export class FakeGlobalShortcut implements GlobalShortcutPort {
-  accelerator = "CmdOrCtrl+Alt+Space";
+  accelerator = "Alt+Space";
   conflictWith: string | null = null; // 测试模拟冲突
   async get() {
     return { accelerator: this.accelerator };

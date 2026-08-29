@@ -33,7 +33,10 @@ describe("NodeTextEditor（直接渲染）", () => {
     expect(committed).toBeNull();
 
     fireEvent.compositionEnd(editor);
+    // Enter 已定稿为换行（不提交）；⌘Enter 提交
     fireEvent.keyDown(editor, { key: "Enter" });
+    expect(committed).toBeNull();
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
     await waitFor(() => expect(committed).toBe("旧中文"));
   });
 
@@ -60,14 +63,14 @@ describe("NodeTextEditor（直接渲染）", () => {
 });
 
 describe("EditorCanvas 编辑流（中文提交 + 权威 size）", () => {
-  it("双击节点 → 输入中文 → Enter 提交 EditNodeText（size 同命令）", async () => {
+  it("双击节点 → 输入中文 → ⌘Enter 提交 EditNodeText（size 同命令）", async () => {
     const session = new DocumentSession(makeStateNode(makeDoc()).document);
     render(<EditorCanvas session={session} fonts={fakeFonts} />);
     const nodeText = await screen.findByText("根节点");
     fireEvent.doubleClick(nodeText);
     const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
     fireEvent.change(editor, { target: { value: "中心主题" } });
-    fireEvent.keyDown(editor, { key: "Enter" });
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
     await waitFor(() => {
       expect(session.current.document.document.nodes[0]?.text).toBe("中心主题");
     });

@@ -1,21 +1,24 @@
-//! 全局唤醒热键（MM-088；AC-16 [from-user 2026-08-27]）：
-//! 应用运行时任意前台应用下按热键唤起画布（show + focus，不动文档——
-//! 与 Dock activation 同语义）。热键存本机偏好（键 `globalShortcut`），
-//! 默认占位 `CmdOrCtrl+Alt+Space`（低冲突；**最终键位待键位专项讨论定稿**，
-//! 机制与键位解耦：改的是 accelerator 字符串与偏好）。
-//! 注册冲突（热键被其他应用占用）稳定返回错误，不崩溃；可经 IPC 换绑。
+//! 全局热键（MM-088；AC-16 [from-user 2026-08-27]）——同键分流
+//! （键位专项讨论定稿 2026-08-29，默认 ⌥Space / `Alt+Space`）：
+//! - 画布未显示/最小化/失焦 → show + focus 唤醒（不动文档）；
+//! - 画布已聚焦 → emit `quick-create`（前端在视口中心建节点并自动进编辑，
+//!   「捕捉 idea」成为全局第一动作）。
+//! 热键存本机偏好（键 `globalShortcut`），可经 IPC 换绑。
+//! 注册冲突（热键被其他应用占用）稳定返回错误，不崩溃。
 
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 use crate::file::preferences::PreferencesStore;
 use crate::file::error::{IpcError, ServiceError};
 
 pub const SHORTCUT_PREF_KEY: &str = "globalShortcut";
-/// 占位默认（待键位专项讨论定稿）。
-pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Alt+Space";
+/// 定稿默认（键位专项讨论 2026-08-29：⌥Space，机器实测空闲）。
+pub const DEFAULT_SHORTCUT: &str = "Alt+Space";
+/// 机制先行阶段的旧占位默认：读到视同未设置（升级到新默认）。
+const LEGACY_DEFAULT: &str = "CmdOrCtrl+Alt+Space";
 
 pub struct GlobalShortcutState {
     /// 当前已注册的 accelerator（注册成功才写入）。
@@ -40,12 +43,21 @@ fn parse(accelerator: &str) -> Result<Shortcut, IpcError> {
         .map_err(|e| IpcError::new("GLOBAL_SHORTCUT_INVALID", format!("热键格式无法解析：{e}")))
 }
 
-/// 唤起主窗口（show + focus；不新建、不动文档——AC-16"不碰 dirty 窗"）。
-fn wake(app: &AppHandle) {
+/// 同键分流：已聚焦 → 快捷建节点；否则唤醒（show + focus，不动文档）。
+fn dispatch(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
+        let visible = win.is_visible().unwrap_or(false);
+        let minimized = win.is_minimized().unwrap_or(false);
+        let focused = win.is_focused().unwrap_or(false);
+        if visible && !minimized && focused {
+            // 画布正在使用：建新 idea（前端视口中心建节点 + 自动进编辑）。
+            let _ = win.emit("quick-create", ());
+        } else {
+            // 唤醒（含"可见但失焦"：先聚焦，再按一次才建——不盲建）。
+            let _ = win.show();
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+        }
     }
 }
 
@@ -64,7 +76,7 @@ pub fn stored_accelerator(store: &PreferencesStore) -> String {
         .ok()
         .and_then(|m| m.get(SHORTCUT_PREF_KEY).cloned())
         .and_then(|v| v.as_str().map(str::to_string))
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && s != LEGACY_DEFAULT) // 旧占位默认视同未设置
         .unwrap_or_else(|| DEFAULT_SHORTCUT.to_string())
 }
 
@@ -82,7 +94,7 @@ fn register(app: &AppHandle, accelerator: &str) -> Result<(), IpcError> {
 
     gs.on_shortcut(shortcut, move |app, _shortcut, event| {
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            wake(app);
+            dispatch(app);
         }
     })
     .map_err(|_| {
@@ -142,15 +154,27 @@ mod tests {
     }
 
     #[test]
+    fn legacy_placeholder_default_migrates_to_new_default() {
+        // 机制先行阶段的旧占位不粘住用户偏好（从未真正换绑过的键位升级）。
+        let dir = tmpdir();
+        let store = PreferencesStore::new(&dir);
+        let mut delta = std::collections::BTreeMap::new();
+        delta.insert(SHORTCUT_PREF_KEY.to_string(), serde_json::json!("CmdOrCtrl+Alt+Space"));
+        store.store(&delta).unwrap();
+        assert_eq!(stored_accelerator(&store), DEFAULT_SHORTCUT);
+    }
+
+    #[test]
     fn parse_accepts_known_and_rejects_garbage() {
-        assert!(parse("CmdOrCtrl+Alt+Space").is_ok());
+        assert!(parse("Alt+Space").is_ok());
         assert!(parse("CmdOrCtrl+Shift+M").is_ok());
         assert!(parse("not a shortcut").is_err());
     }
 
     #[test]
-    fn default_is_low_conflict_composite() {
-        // 占位默认含三个修饰/特殊键组合（单一 Cmd/Alt 常被系统或输入法占用）。
-        assert!(DEFAULT_SHORTCUT.matches("+").count() >= 2);
+    fn default_is_two_key_combo() {
+        // 定稿默认 ⌥Space：单修饰键 + 空格（系统默认空闲；Spotlight/输入法占的是 ⌘/⌃Space）。
+        assert_eq!(DEFAULT_SHORTCUT, "Alt+Space");
+        assert_eq!(DEFAULT_SHORTCUT.matches('+').count(), 1);
     }
 }

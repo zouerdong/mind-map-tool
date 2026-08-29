@@ -47,7 +47,7 @@ describe("全局热键设置（AC-16 应用层）", () => {
     const { shortcut } = setup();
     fireEvent.click(screen.getByRole("button", { name: /热键…/ }));
     const input = await screen.findByTestId("shortcut-input") as HTMLInputElement;
-    expect(input.value).toBe("CmdOrCtrl+Alt+Space"); // 占位默认（待键位专项讨论）
+    expect(input.value).toBe("Alt+Space"); // 定稿默认（键位专项讨论 2026-08-29）
 
     fireEvent.change(input, { target: { value: "CmdOrCtrl+Shift+M" } });
     fireEvent.click(screen.getByTestId("shortcut-apply"));

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 // MM-089 键盘流集成测试（AC-17）：全键盘建图闭环——
-// Enter 建节点、方向键导航、⌘L 连线流（方向换目标/Enter 确认/Esc 取消）、
-// Enter 进编辑、⌘A 全选、Delete 删除、编辑态/IME 隔离贯穿。
-// 键位为占位（待键位专项讨论）；本测试锁机制不锁键位终值（键位集中在 onKeyDown）。
+// quick-create 建节点（⌥Space 同键分流，信号驱动）、方向键导航、
+// ⌘L 连线流（方向换目标/Enter 确认/Esc 取消）、Enter 进编辑、
+// ⌘A 全选、Delete 删除、编辑态/IME 隔离贯穿。
+// 键位定稿 2026-08-29（键位专项讨论）；本测试锁机制不锁键位终值（键位集中在 onKeyDown）。
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -43,13 +44,23 @@ function setup() {
       edges: [],
     },
   }).document);
+  let nextId = 0;
   const utils = render(
-    <EditorCanvas session={session} fonts={fakeFonts} nextNodeId={() => `kb-${Math.random()}`} />,
+    <EditorCanvas session={session} fonts={fakeFonts} nextNodeId={() => `kb-${nextId++}`} />,
   );
   const host = () => document.querySelector('[role="application"]')!;
   const keyDown = (k: string, init?: KeyboardEventInit) =>
     fireEvent.keyDown(host(), { key: k, ...init });
-  return { session, ...utils, host, keyDown };
+  const rerenderWith = (quickCreateSignal: number) =>
+    utils.rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        nextNodeId={() => `kb-${nextId++}`}
+        quickCreateSignal={quickCreateSignal}
+      />,
+    );
+  return { session, ...utils, host, keyDown, rerenderWith };
 }
 
 describe("全键盘建图（AC-17）", () => {
@@ -64,17 +75,46 @@ describe("全键盘建图（AC-17）", () => {
     void host;
   });
 
-  it("Enter：焦点节点进编辑 → 输入 → 提交 EditNodeText", async () => {
+  it("Enter：焦点节点进编辑 → 输入 → Enter 换行不提交，⌘Enter 提交", async () => {
     const { session, keyDown } = setup();
     await screen.findByTestId("rf-node-a");
     keyDown("ArrowDown"); // 焦点 a
     keyDown("Enter");
     const editor = await screen.findByLabelText("编辑节点文本");
     fireEvent.change(editor, { target: { value: "新标题" } });
-    fireEvent.keyDown(editor, { key: "Enter" });
+    fireEvent.keyDown(editor, { key: "Enter" }); // 换行（textarea 默认，不提交）
+    expect(session.current.document.document.nodes[0]?.text).toBe("甲");
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
     await waitFor(() =>
       expect(session.current.document.document.nodes[0]?.text).toBe("新标题"),
     );
+  });
+
+  it("quick-create：信号自增 → 视口中心建节点并自动进编辑", async () => {
+    const { session, rerenderWith } = setup();
+    await screen.findByTestId("rf-node-a");
+    expect(session.current.document.document.nodes).toHaveLength(2);
+    rerenderWith(1);
+    // 建节点 + 自动进编辑（「按 ⌥Space → 直接打字」闭环）
+    const editor = await screen.findByLabelText("编辑节点文本");
+    expect(session.current.document.document.nodes).toHaveLength(3);
+    fireEvent.change(editor, { target: { value: "灵感" } });
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    await waitFor(() =>
+      expect(session.current.document.document.nodes.some((n) => n.text === "灵感")).toBe(true),
+    );
+  });
+
+  it("quick-create：编辑态忽略（不打断进行中的编辑）", async () => {
+    const { session, rerenderWith, keyDown } = setup();
+    await screen.findByTestId("rf-node-a");
+    keyDown("ArrowDown");
+    keyDown("Enter"); // 焦点 a 进编辑
+    rerenderWith(1); // 编辑中：忽略
+    await waitFor(() => {
+      expect(screen.getByLabelText("编辑节点文本")).toBeTruthy(); // 仍在编辑原节点
+    });
+    expect(session.current.document.document.nodes).toHaveLength(2); // 未新建
   });
 
   it("⌘L 连线流：方向换候选 → Enter 确认 CreateEdge；Esc 取消不产生边", async () => {

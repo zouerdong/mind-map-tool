@@ -55,6 +55,12 @@ export interface EditorCanvasProps {
    */
   revision?: number;
   /**
+   * 快捷建节点信号（键位定稿 2026-08-29）：组合根收到全局热键
+   * `quick-create` 事件（画布已聚焦态，⌥Space 同键分流）后自增；
+   * 画布在视口中心建节点并自动进入编辑。编辑/连线态忽略（不打断）。
+   */
+  quickCreateSignal?: number;
+  /**
    * 重投影时节点位置的过渡动画时长（ms；0=关闭）。
    * 拖动走乐观态不经过重投影通道，不受影响（MM-085 丝滑整理动画）。
    * prefers-reduced-motion 时强制 0。
@@ -106,7 +112,7 @@ function defaultId(prefix: string): string {
   return `${prefix}-${uuidCounter}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
+export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, quickCreateSignal = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); // session-only
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
@@ -278,7 +284,7 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
         return;
       }
 
-      // Enter：连线确认 / 焦点编辑 / 视口中心建节点
+      // Enter：连线确认 / 焦点进编辑（键位定稿 2026-08-29：建节点归 ⌥Space 同键分流）
       if (e.key === "Enter") {
         e.preventDefault();
         if (linking.phase === "linking") {
@@ -290,20 +296,7 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
           }
           return;
         }
-        if (focusNodeId !== null) {
-          beginEdit(focusNodeId);
-          return;
-        }
-        // 视口中心建节点（键盘创建，无鼠标）
-        const pane = paneRectFromDom();
-        if (pane && rfInstanceRef.current) {
-          const center = rfInstanceRef.current.screenToFlowPosition({
-            x: pane.left + pane.width / 2,
-            y: pane.top + pane.height / 2,
-          });
-          const cmd = controller.createNodeAt({ x: center.x, y: center.y });
-          if (api.commit(cmd)) setFocusNodeId(null); // 新节点投影后焦点留给用户导航
-        }
+        if (focusNodeId !== null) beginEdit(focusNodeId);
         return;
       }
       if (e.key === "Escape" && linking.phase === "linking") {
@@ -324,6 +317,28 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
     },
     [api, beginEdit, controller, editingId, focusNodeId, linking, rfNodes, session],
   );
+
+  // 快捷建节点（键位定稿 2026-08-29）：组合根 quickCreateSignal 自增驱动——
+  // 视口中心建节点 + 自动进编辑（「捕捉 idea」闭环：按 ⌥Space → 直接打字）。
+  // 编辑/连线态忽略（不打断进行中的工作）；初始 mount（signal=0）不触发。
+  const lastQuickCreateRef = useRef(quickCreateSignal);
+  useEffect(() => {
+    if (quickCreateSignal === lastQuickCreateRef.current) return;
+    lastQuickCreateRef.current = quickCreateSignal;
+    if (editingId !== null || linking.phase === "linking") return;
+    const pane = paneRectFromDom();
+    if (!pane || !rfInstanceRef.current) return;
+    const center = rfInstanceRef.current.screenToFlowPosition({
+      x: pane.left + pane.width / 2,
+      y: pane.top + pane.height / 2,
+    });
+    const cmd = controller.createNodeAt({ x: center.x, y: center.y });
+    api.commit(cmd);
+    if (cmd.kind === "CreateNode") {
+      setFocusNodeId(cmd.id); // 焦点落在新节点：提交后方向键继续导航
+      beginEdit(cmd.id);
+    }
+  }, [quickCreateSignal, api, beginEdit, controller, editingId, linking]);
 
   const editingValue = useMemo<EditingContextValue>(
     () => ({

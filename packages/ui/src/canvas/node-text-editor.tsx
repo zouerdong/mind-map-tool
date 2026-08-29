@@ -1,7 +1,8 @@
-// 节点文本编辑输入（MM-050 ⑥：IME 安全）：
+// 节点文本编辑输入（MM-050 ⑥：IME 安全；提交键定稿 2026-08-29）：
 // - composition 开始到结束期间，任何全局快捷键（undo/redo/delete 等）
 //   不得由编辑态派发（composing 隔离）；
-// - Enter 提交（IME 确认的 Enter 表现为 keyCode 229，不提交）；
+// - Enter 换行（不拦截，textarea 默认）；⌘Enter/Ctrl+Enter 提交
+//   （IME 确认的 Enter 表现为 keyCode 229，不触发提交逻辑）；
 // - Escape 取消；blur 提交；
 // - 自动聚焦与全选，中/英/日输入法行为一致。
 
@@ -44,7 +45,9 @@ export function NodeTextEditor({ initialText, onCommit, onCancel }: NodeTextEdit
       onKeyDown={(e) => {
         // IME 组合中：不拦截任何键（含 Enter/Escape——组合确认优先）。
         if (composing || e.nativeEvent.isComposing || e.keyCode === 229) return;
-        if (e.key === "Enter" && !e.shiftKey) {
+        const mod = e.metaKey || e.ctrlKey;
+        if (e.key === "Enter" && mod) {
+          // ⌘Enter 提交（Enter 本身留给换行——textarea 默认行为）。
           e.preventDefault();
           e.stopPropagation();
           commitOnce(value);
@@ -54,7 +57,7 @@ export function NodeTextEditor({ initialText, onCommit, onCancel }: NodeTextEdit
           committedRef.current = true;
           onCancel();
         }
-        // 其他按键（含快捷键字母）不 stopPropagation 之外的默认行为；
+        // 其他按键（含快捷键字母、无修饰 Enter 换行）走 textarea 默认行为；
         // undo/redo 等全局键由画布层在 editing 态跳过（见 editor-canvas）。
       }}
       onBlur={() => commitOnce(value)}

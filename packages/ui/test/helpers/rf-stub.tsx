@@ -6,7 +6,7 @@
 // pane 双击→EditorCanvas wrapper（closest('.react-flow__pane') 真实路径）、
 // 隐藏按钮→onNodeDragStop/onConnect。
 
-import { createElement } from "react";
+import { createElement, useEffect } from "react";
 import { vi } from "vitest";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +17,15 @@ export async function rfStubModule(): Promise<unknown> {
   const actual = (await vi.importActual("@xyflow/react")) as any;
 
   const ReactFlowStub = (props: AnyProps) => {
+    // onInit：最小实例（缩放/fitView/坐标换算——quick-create 与 ⌘+/⌘- 路径可达）。
+    useEffect(() => {
+      props.onInit?.({
+        fitView: () => {},
+        zoomIn: () => {},
+        zoomOut: () => {},
+        screenToFlowPosition: (p: { x: number; y: number }) => ({ ...p }),
+      });
+    }, []);
     return createElement(
       "div",
       { className: "react-flow__renderer", "data-testid": "rf-canvas" },

@@ -13,6 +13,7 @@ import {
   type OnboardingObservation,
 } from "@mindmap/ui";
 import { TauriLifecycleAdapter, type WindowAction } from "@mindmap/platform";
+import { listen } from "@tauri-apps/api/event";
 import { ObservedDocumentSession, type ObservationSink } from "./observed-session.js";
 import type { AppPorts } from "./ports.js";
 import { isTauriRuntime } from "./ports.js";
@@ -59,6 +60,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
 
   const [revision, setRevision] = useState(0);
   const [replaySignal, setReplaySignal] = useState(0);
+  // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
+  // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
+  const [quickCreateSignal, setQuickCreateSignal] = useState(0);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmState, setConfirmState] = useState<PendingConfirm>(null);
   const [exportPanel, setExportPanel] = useState(false);
@@ -158,7 +162,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     [ports.filePort, ports.renderer, session],
   );
 
-  // 全局热键设置（MM-088；占位键待键位专项讨论定稿）。
+  // 全局热键设置（MM-088；默认 ⌥Space，键位专项讨论定稿 2026-08-29）。
   const openShortcutPanel = useCallback(async () => {
     setShortcutError(null);
     setShortcutValue((await ports.globalShortcut.get()).accelerator);
@@ -207,6 +211,15 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onNew, onOpen, onSave, onSaveAs, onOrganize]);
+
+  // ---- 全局热键同键分流（Tauri）：画布已聚焦时的 quick-create 事件 ----
+  useEffect(() => {
+    if (!isTauriRuntime()) return; // 浏览器 dev 无原生热键
+    const unlisten = listen("quick-create", () => setQuickCreateSignal((n) => n + 1));
+    return () => {
+      void unlisten.then((dispose) => dispose());
+    };
+  }, []);
 
   // ---- dirty 关闭保护（浏览器语义；native 窗口拦截见 MM-080 回报缺口） ----
   useEffect(() => {
@@ -319,6 +332,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           session={session}
           fonts={ports.fonts}
           revision={revision}
+          quickCreateSignal={quickCreateSignal}
           positionTransitionMs={320}
         />
         {exportPanel ? (
@@ -366,10 +380,10 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           <div style={{ background: "#fff", color: "#1f2328", padding: 16, borderRadius: 8, minWidth: 320 }}>
             <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>全局唤起热键</h2>
             <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 8px" }}>
-              应用运行时，任意应用前台按此热键唤起画布（占位默认，键位将专项讨论定稿）。
+              画布未在前台时按此热键唤起；画布已聚焦时同键直接新建 idea（默认 ⌥Space，2026-08-29 定稿）。
             </p>
             <input
-              aria-label="热键组合（accelerator 格式，如 CmdOrCtrl+Alt+Space）"
+              aria-label="热键组合（accelerator 格式，如 Alt+Space）"
               value={shortcutValue}
               onChange={(e) => setShortcutValue(e.target.value)}
               style={{ width: "100%", boxSizing: "border-box", padding: 6, marginBottom: 8 }}
