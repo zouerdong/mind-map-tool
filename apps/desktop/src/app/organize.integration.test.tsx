@@ -8,7 +8,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule()));
 
 const { MindMapApp } = await import("./mindmap-app.js");
-const { FakeFilePort, FakePreferencesPort, FakeExportRenderer } = await import("./fake-ports.js");
+const { FakeCloseLifecyclePort, FakeExportRenderer, FakeFilePort, FakePreferencesPort } =
+  await import("./fake-ports.js");
 const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
@@ -32,6 +33,7 @@ function setup() {
         fonts: renderer.fonts(),
         isBrowserDev: true,
         globalShortcut: new FakeGlobalShortcut(),
+        closeLifecycle: new FakeCloseLifecyclePort(),
       }}
     />,
   );
@@ -56,9 +58,7 @@ describe("一键整理（AC-15）", () => {
     const before = screen.getAllByTestId(/^rf-node-/).map((el) => el.getAttribute("data-testid"));
 
     fireEvent.click(screen.getByRole("button", { name: /整理/ }));
-    await waitFor(() =>
-      expect(screen.getByText(/已整理为垂直树（⌘Z 可撤销）/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/已整理为垂直树（⌘Z 可撤销）/)).toBeTruthy());
 
     // 画布 focus + ⌘Z：undo 后提示与节点仍在（位置恢复由 core 契约测试锁定）
     const canvasHost = document.querySelector('[role="application"]')!;

@@ -8,7 +8,8 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule()));
 
 const { MindMapApp } = await import("./mindmap-app.js");
-const { FakeFilePort, FakePreferencesPort, FakeExportRenderer } = await import("./fake-ports.js");
+const { FakeCloseLifecyclePort, FakeExportRenderer, FakeFilePort, FakePreferencesPort } =
+  await import("./fake-ports.js");
 const { FakeGlobalShortcut } = await import("./ports.js");
 
 import { vi } from "vitest";
@@ -36,6 +37,7 @@ function setup(conflictWith: string | null = null) {
         fonts: renderer.fonts(),
         isBrowserDev: true,
         globalShortcut: shortcut,
+        closeLifecycle: new FakeCloseLifecyclePort(),
       }}
     />,
   );
@@ -46,7 +48,7 @@ describe("全局热键设置（AC-16 应用层）", () => {
   it("打开设置显示当前热键；修改成功后提示并关闭", async () => {
     const { shortcut } = setup();
     fireEvent.click(screen.getByRole("button", { name: /热键…/ }));
-    const input = await screen.findByTestId("shortcut-input") as HTMLInputElement;
+    const input = (await screen.findByTestId("shortcut-input")) as HTMLInputElement;
     expect(input.value).toBe("Alt+Space"); // 定稿默认（键位专项讨论 2026-08-29）
 
     fireEvent.change(input, { target: { value: "CmdOrCtrl+Shift+M" } });

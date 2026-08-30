@@ -1,0 +1,137 @@
+{
+  "task": "MRT-003V",
+  "generatedAt": "2026-08-30T15:22:58+0800",
+  "automationStatus": "PASS",
+  "manualNativeStatus": "PASS",
+  "overall": "PASS",
+  "statusSemantics": "automationStatus=osascript/System Events 原生自动化子集；manualNativeStatus=V1-V7 真实系统 Save 面板矩阵（AppleScript 驱动真实面板，非 jsdom/fake）；overall 仅在前两者皆 PASS 时为 PASS",
+  "source": {
+    "commit": "d57d9b9c0ab5ee83fb0e78b53a7e27beb58860a9",
+    "dirty": true,
+    "changedFilesCount": 31,
+    "changedFilesDigest": "d9f62509018b6da3a092e39edbb00cb951b9c6cb060154f50280b58897e6c65b"
+  },
+  "bundle": {
+    "path": "apps/desktop/src-tauri/target/debug/bundle/macos/Mind Map.app",
+    "executableSha256": "6b40410433238dd5c9e9ed0e318c4c0f1975ff2dc1f3cb5370c52332425f78e6",
+    "frontendAssetSha256": "2192a6509f9cb46f49cc3390f6024364ab8f4abfdc4183028794f340655d237e",
+    "frontendAsset": "assets/index-W04bpmv5.js",
+    "builtAt": "2026-08-30T15:13:49",
+    "builtAfterLatestSourceMtime": "2026-08-30T15:13:49 > 2026-08-30T14:43:16"
+  },
+  "environment": {
+    "macOS": "26.6.2",
+    "arch": "arm64",
+    "screenUnlocked": true,
+    "driver": "osascript + System Events（解锁后 Save 面板以 sheet 暴露于 app 进程 AX 树，可编程操作）"
+  },
+  "automation": {
+    "command": "scripts/quality/run-e2e-macos.sh --case all --skip-build",
+    "log": ".tmp/mrt-003v/e2e-final.log",
+    "cases": [
+      {
+        "id": "E2E-01A",
+        "result": "PASS"
+      },
+      {
+        "id": "E2E-16",
+        "result": "PASS"
+      },
+      {
+        "id": "E2E-CL1",
+        "result": "PASS",
+        "covers": "C1 clean 关闭"
+      },
+      {
+        "id": "E2E-CL2",
+        "result": "PASS",
+        "covers": "X1 Cancel"
+      },
+      {
+        "id": "E2E-CL3",
+        "result": "PASS",
+        "covers": "D1 Discard"
+      },
+      {
+        "id": "E2E-CL4",
+        "result": "PASS",
+        "covers": "R2 重复关闭"
+      },
+      {
+        "id": "E2E-CL5",
+        "result": "PASS",
+        "covers": "X2 ⌘Q 协调"
+      }
+    ]
+  },
+  "manualNative": {
+    "driver": "真实系统面板（NSSavePanel sheet）经 System Events 编程操作（⌘⇧G 导航/set value/AX click 存储/取消）；全程真实 bundle",
+    "fixturesRoot": "/tmp/mrt-003v（合成脑图；只读目录夹具 chmod 555 已恢复 755）",
+    "v1": {
+      "scenario": "未命名 dirty → close → Save → 面板保存到 /tmp/mrt-003v/files/脑图 文档 v1.json（中文+空格路径）",
+      "result": "PASS",
+      "fileBytes": 306,
+      "schemaVersion": 1,
+      "canonical": "LF 结尾+两空格缩进",
+      "sha256After": "47bc85e9494bc29d3700dea18ffbf8ce9933a5098cc4860619c43551deadbcad",
+      "windowClosed": true,
+      "screenshots": [
+        "/tmp/mrt-003v/v1-final-named.png",
+        "/tmp/mrt-003v/v1-final-after.png"
+      ]
+    },
+    "v2": {
+      "scenario": "dirty → close → Save → 面板取消",
+      "result": "PASS",
+      "asserts": "modal 回 deciding 保持；dirty 保持；窗口保持；无目标文件",
+      "screenshots": [
+        "/tmp/mrt-003v/v2-after-cancel.png"
+      ]
+    },
+    "v3": {
+      "scenario": "launch argv 打开 V1 副本 → 编辑 → close → Save（ordinary）",
+      "result": "PASS",
+      "asserts": "不弹 Save 面板；文件节点 1→2；窗口关闭",
+      "shaBefore": "47bc85e9494bc29d3700dea18ffbf8ce9933a5098cc4860619c43551deadbcad",
+      "shaAfter": "f75f2db5c77f3e8176b3b5d1b89444e73ad1fe8e9d7149c4fcb4b1988d2fee99"
+    },
+    "v4": {
+      "scenario": "打开命名文件 → 编辑 → 外部改写 → close → Save",
+      "result": "PASS",
+      "asserts": "显示『应用外被修改』稳定错误；modal/dirty/窗口保持；外部 bytes hash 前后一致（61253cab…）",
+      "screenshots": [
+        "/tmp/mrt-003v/v4-conflict.png"
+      ]
+    },
+    "v5": {
+      "scenario": "只读目录（夹具 chmod 555）中的命名文件 → 编辑 → close → Save",
+      "result": "PASS",
+      "asserts": "FILE_IO_ERROR create temp 稳定错误；modal/窗口保持；旧文件 hash 不变",
+      "screenshots": [
+        "/tmp/mrt-003v/v5-io-error.png"
+      ]
+    },
+    "v6": {
+      "scenario": "dirty → close → Discard",
+      "result": "PASS",
+      "asserts": "不出现 Save 面板；目标 bytes 不变；窗口关闭",
+      "screenshots": [
+        "/tmp/mrt-003v/v6-after.png"
+      ]
+    },
+    "v7": {
+      "scenario": "dirty → close → Cancel",
+      "result": "PASS",
+      "asserts": "零写盘（hash 前后一致）；modal 清除；dirty 保持；窗口保持",
+      "screenshots": [
+        "/tmp/mrt-003v/v7-after.png"
+      ]
+    }
+  },
+  "bugFoundAndFixedDuringVerification": {
+    "issue": "CommitDocumentPayload 容器级 rename_all 只作用于 tag，变体字段仍是 snake_case（authorization_ref），与 TS camelCase 不符 → 真实保存提交自 MM-060 起从未反序列化成功（invalid args `payload`）；此前被对话框主线程死锁与 State<Arc> 类型两层既有缺陷先后掩盖",
+    "fix": "apps/desktop/src-tauri/src/ipc/mod.rs：两个变体各加 #[serde(rename_all = \"camelCase\")]（serde 命名修正，不涉 permit/提交语义/capability）",
+    "rerun": "修复后重建 bundle（exe 6b404104…）并从 V1 全量重跑 V1-V7 + 自动化全套，全部 PASS"
+  },
+  "artifactsRoot": "/tmp/mrt-003v（截图与合成夹具；evidence 只存索引与 hash）"
+}

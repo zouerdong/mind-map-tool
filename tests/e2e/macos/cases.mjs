@@ -20,17 +20,20 @@ export function assert(cond, message) {
   if (!cond) throw new Error(`断言失败: ${message}`);
 }
 
-export const cases = [
+const mm090Cases = [
   {
     id: "E2E-01A",
     name: "冷启动健康（D1/D2 回归探针）",
-    expectation: "画布 AX 就绪；无『初始化失败』（Buffer 缺陷 D1）；无『启动路由初始化失败』（State 类型缺陷 D2）；窗口标题正确",
+    expectation:
+      "画布 AX 就绪；无『初始化失败』（Buffer 缺陷 D1）；无『启动路由初始化失败』（State 类型缺陷 D2）；窗口标题正确",
     async run(b, shot) {
       const initFail = await b.axFind(`v.startsWith("初始化失败")`);
       assert(initFail === null, `无前端初始化失败（D1 回归）：${initFail?.value}`);
       const launchFail = await b.axFind(`v.includes("启动路由初始化失败")`);
       assert(launchFail === null, "无启动路由初始化失败（D2 回归）");
-      const title = await b.jxa(`const se = Application("System Events"); se.processes.byName("mindmap-desktop").windows()[0].name();`);
+      const title = await b.jxa(
+        `const se = Application("System Events"); se.processes.byName("mindmap-desktop").windows()[0].name();`,
+      );
       assert(String(title).includes("Mind Map"), `窗口标题正确（${title}）`);
       await shot("e2e01a-healthy");
     },
@@ -41,7 +44,9 @@ export const cases = [
     expectation: "隐藏 app → ⌥Space（真实系统热键）→ 窗口唤回可见（dispatch 的 show+focus 分支）",
     async run(b, shot) {
       // 画布就绪已由 startAppFresh 保证（避免就绪后立即查询触发 AX 坏会话窗）
-      await b.as(`tell application "System Events" to set visible of process "mindmap-desktop" to false`);
+      await b.as(
+        `tell application "System Events" to set visible of process "mindmap-desktop" to false`,
+      );
       await sleep(1000);
       // 隐藏的 AX 可见性判定不稳定（隐藏窗口有时仍可读）；核心断言是唤回
       const hidden = await b.axFind(`d === "脑图画布"`);
@@ -53,3 +58,182 @@ export const cases = [
     },
   },
 ];
+
+// ---- MRT-003：原生关闭三分支（真实 Tauri 窗口协议，非 jsdom/beforeunload） ----
+// 触发通道：窗口红关闭按钮（System Events AXPress button 1 → 真实
+// CloseRequested）与 ⌘Q（应用退出协调）。断言通道：AX 树（modal/按钮/
+// 状态指示）+ pgrep 进程存活 + AX 窗口存在性。
+// 人工矩阵承接（不可自动化，如实声明）：系统 Save As 对话框（S1/S2/S3/S4
+// 的真实保存链）、只读卷/IO 故障注入。
+
+/** 点击窗口红关闭按钮（真实 CloseRequested 事件源）。
+ * 事件后 AX 会话有瞬态失败窗（-1708/-1728，close 拦截 + modal 挂载期间），
+ * 预留稳定等待再由调用方断言。 */
+async function clickCloseButton(b) {
+  await b.as(
+    'tell application "System Events" to tell process "mindmap-desktop" to click button 1 of window 1',
+  );
+  await sleep(900);
+}
+
+/** AX 窗口是否存在。进程退出 → false；瞬态 -1728 → 重试后仍失败视为
+ * 查询不可用，抛错由用例的最终窗口/进程断言裁决（fail closed）。 */
+async function windowAlive(b) {
+  for (let i = 0; i < 4; i++) {
+    try {
+      const r = await b.as(
+        'tell application "System Events" to (exists window 1 of process "mindmap-desktop")',
+      );
+      return String(r).toLowerCase() === "true";
+    } catch {
+      await sleep(700);
+    }
+  }
+  throw new Error("windowAlive: AX 查询持续不可用");
+}
+
+/** 进程是否存活（pgrep）。 */
+async function processAlive(b) {
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync("pgrep", ["-x", "mindmap-desktop"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 画布空白处真实双击建一个节点（dirty）。React Flow 节点在 WKWebView
+ * 的 AX 树懒暴露（MM-090 已知边界），dirty 判定改用状态指示的 AX value。 */
+async function createDirtyNode(b) {
+  const frame = await b.windowFrame();
+  // 画布区域右下象限空白点（避开中心种子/引导提示）
+  const x = Math.round(frame.x + frame.w * 0.72);
+  const y = Math.round(frame.y + frame.h * 0.68);
+  // 双击位置受窗口实际布局影响（引导层/种子位置），失败换点重试一次
+  for (const [fx, fy] of [
+    [0.72, 0.68],
+    [0.3, 0.75],
+  ]) {
+    await b.doubleClickAt(Math.round(frame.x + frame.w * fx), Math.round(frame.y + frame.h * fy));
+    const dirty = await b
+      .axWaitFor(`v.includes("未保存")`, {
+        label: "状态指示转为未保存（双击建点 → dirty）",
+        timeoutMs: 5000,
+      })
+      .catch(() => null);
+    if (dirty !== null) return;
+  }
+  throw new Error("双击建点失败：状态指示未转为未保存");
+}
+
+const closeCases = [
+  {
+    id: "E2E-CL1",
+    name: "clean 文档原生关闭：无 modal，直接放行（C1）",
+    expectation: "点红关闭按钮 → 不出现三分支 modal → 窗口关闭",
+    async run(b, shot) {
+      await clickCloseButton(b);
+      await sleep(1200);
+      // 进程随最后窗口退出后 AX 查询抛 -1728——等价于"无 modal"
+      let modal = null;
+      try {
+        modal = await b.axFind(`d === "关闭确认"`);
+      } catch {
+        modal = null;
+      }
+      assert(modal === null, "clean 关闭不得弹三分支 modal");
+      const alive = await windowAlive(b);
+      assert(!alive, "窗口必须真实关闭（无 permit 的放行即二次 close 消费）");
+      await shot("e2ecl1-closed");
+    },
+  },
+  {
+    id: "E2E-CL2",
+    name: "dirty 原生关闭 Cancel：modal 出现，取消后窗口与 dirty 保持（X1）",
+    expectation:
+      "双击建点（dirty）→ 关闭 → 三分支 modal（三按钮）→ 取消 → 窗口保持、modal 消失、状态仍未保存",
+    async run(b, shot) {
+      await createDirtyNode(b);
+      await clickCloseButton(b);
+      const modal = await b.axWaitFor(`d === "关闭确认"`, {
+        label: "三分支 modal",
+        timeoutMs: 10000,
+      });
+      assert(modal !== null, "dirty 关闭必须弹三分支 modal");
+      for (const label of ["保存并关闭", "不保存并关闭", "取消关闭"]) {
+        const btn = await b.axFind(`d === "${label}"`);
+        assert(btn !== null, `三分支按钮存在：${label}`);
+      }
+      await shot("e2ecl2-modal");
+      await b.axPress("取消关闭");
+      await sleep(800);
+      assert(await windowAlive(b), "取消后窗口保持");
+      const modalGone = await b.axFind(`d === "关闭确认"`);
+      assert(modalGone === null, "取消后 modal 清除");
+      const status = await b.axFind(`v.includes("未保存")`);
+      assert(status !== null, "dirty 状态保持（零副作用）");
+    },
+  },
+  {
+    id: "E2E-CL3",
+    name: "dirty 原生关闭 Discard：不写盘，host 撤销 capability 后窗口关闭（D1）",
+    expectation: "dirty → 关闭 → modal → 不保存 → 窗口真实关闭（进程随最后窗口退出）",
+    async run(b, shot) {
+      await createDirtyNode(b);
+      await clickCloseButton(b);
+      await b.axWaitFor(`d === "关闭确认"`, { label: "三分支 modal", timeoutMs: 10000 });
+      await shot("e2ecl3-before-discard");
+      await b.axPress("不保存并关闭");
+      await sleep(1500);
+      const alive = await windowAlive(b);
+      assert(!alive, "Discard 后窗口必须真实关闭");
+      await shot("e2ecl3-closed");
+    },
+  },
+  {
+    id: "E2E-CL4",
+    name: "重复点击关闭复用同一请求：不叠第二个 modal（R2 前端）",
+    expectation: "dirty → 关闭（modal）→ 再次点关闭按钮 → 仍只有一个 modal → 取消后窗口保持",
+    async run(b) {
+      await createDirtyNode(b);
+      await clickCloseButton(b);
+      await b.axWaitFor(`d === "关闭确认"`, { label: "三分支 modal", timeoutMs: 10000 });
+      await clickCloseButton(b); // pending 未决时重复 close（host 复用 requestId 不重发）
+      await sleep(800);
+      const modals = await b.axFindAll(`d === "关闭确认"`);
+      assert(modals.length === 1, `重复关闭只保留一个流程（实际 ${modals.length}）`);
+      await b.axPress("取消关闭");
+      await sleep(800);
+      assert(await windowAlive(b), "取消后窗口保持");
+    },
+  },
+  {
+    id: "E2E-CL5",
+    name: "⌘Q 应用退出协调：Cancel 阻止整次退出，Discard 后完成退出（X2）",
+    expectation:
+      "dirty → ⌘Q → modal（exit 协调的 close-requested）→ 取消 → app 存活；再 ⌘Q → 不保存 → app 退出",
+    async run(b, shot) {
+      await createDirtyNode(b);
+      await b.keystroke("q", { cmd: true }); // 真实应用退出快捷键 → ExitRequested
+      await sleep(900);
+      await b.axWaitFor(`d === "关闭确认"`, { label: "退出协调 modal" });
+      await shot("e2ecl5-exit-modal");
+      await b.axPress("取消关闭");
+      await sleep(1200);
+      assert(await processAlive(b), "任一窗口取消必须阻止整次应用退出");
+      assert(await windowAlive(b), "取消后窗口保持");
+      await b.keystroke("q", { cmd: true });
+      await sleep(900);
+      await b.axWaitFor(`d === "关闭确认"`, { label: "再次退出协调 modal", timeoutMs: 10000 });
+      await b.axPress("不保存并关闭");
+      await sleep(1800);
+      assert(!(await processAlive(b)), "全部窗口许可后应用必须完成退出");
+      await shot("e2ecl5-exited");
+    },
+  },
+];
+
+export const closeLifecycleCases = closeCases;
+
+export const cases = [...mm090Cases, ...closeCases];

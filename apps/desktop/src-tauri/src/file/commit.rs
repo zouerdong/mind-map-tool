@@ -45,7 +45,11 @@ fn write_tmp_and_replace(tmp: &Path, target: &Path, bytes: &[u8]) -> ServiceResu
     drop(f);
 
     fs::rename(tmp, target).map_err(|e| {
-        ServiceError::file_io(format!("replace {} -> {}: {e}", tmp.display(), target.display()))
+        ServiceError::file_io(format!(
+            "replace {} -> {}: {e}",
+            tmp.display(),
+            target.display()
+        ))
     })?;
     sync_dir_best_effort(target.parent().unwrap_or(Path::new(".")));
     Ok(())
@@ -70,9 +74,7 @@ mod tests {
     use super::*;
 
     fn tmpdir() -> PathBuf {
-        let d = tempfile::tempdir().unwrap();
-        let p = d.keep();
-        p
+        tempfile::tempdir().unwrap().keep()
     }
 
     #[test]
@@ -103,6 +105,9 @@ mod tests {
     fn commit_error_is_stable_io_code() {
         let dir = tmpdir();
         let target = dir.join("no-such-dir").join("a.json");
-        assert_eq!(atomic_replace(&target, b"").unwrap_err().0.code, "FILE_IO_ERROR");
+        assert_eq!(
+            atomic_replace(&target, b"").unwrap_err().0.code,
+            "FILE_IO_ERROR"
+        );
     }
 }

@@ -49,18 +49,11 @@ export class History {
     return this.current;
   }
 
-  /** redo：重放被截断分支的下一条命令，产生全新 identity（新状态）。 */
+  /** redo：回到被截断分支的下一状态节点（identity 是当时分配的原值，
+   * 绝不新发；与 undo 对称，只移动 cursor，不重放命令——ADR 0003）。 */
   redo(): StateNode | null {
     if (!this.canRedo) return null;
-    const entry = this.entries[this.cursor + 1]!;
-    const result = applyCommand(this.current, entry.command!);
-    if (!result.ok) return null; // 理论不可达（同链重放）；fail-closed
     this.cursor += 1;
-    this.entries[this.cursor] = {
-      stateNode: result.stateNode,
-      command: entry.command,
-      inverse: result.inverse,
-    };
     return this.current;
   }
 

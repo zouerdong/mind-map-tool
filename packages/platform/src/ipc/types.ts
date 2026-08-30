@@ -29,6 +29,9 @@ export const PLATFORM_ERROR_CODES = [
   // 全局热键（MM-088）：被其他应用占用 / 格式无法解析
   "GLOBAL_SHORTCUT_CONFLICT",
   "GLOBAL_SHORTCUT_INVALID",
+  // 原生关闭协议（MRT-003）
+  "INVALID_CLOSE_REQUEST",
+  "WINDOW_CLOSE_FAILED",
 ] as const;
 
 export type PlatformErrorCode = (typeof PLATFORM_ERROR_CODES)[number];
@@ -52,12 +55,16 @@ export const IPC_COMMANDS = {
   storePreferences: "platform_store_preferences",
   getGlobalShortcut: "platform_get_global_shortcut",
   setGlobalShortcut: "platform_set_global_shortcut",
+  pendingCloseRequest: "platform_pending_close_request",
+  resolveCloseRequest: "platform_resolve_close_request",
 } as const;
 
 /** Rust → 前端事件（Tauri event）。 */
 export const IPC_EVENTS = {
   /** 启动意图 flushed 到前端；payload 为 LaunchIntentPayload。 */
   launchIntent: "platform://launch-intent",
+  /** host 发起原生关闭请求（定向窗口）；payload 为 CloseRequestPayload。 */
+  closeRequested: "platform://close-requested",
 } as const;
 
 // ---- 命令 payload / 返回类型（与 Rust ipc/mod.rs 的 serde 结构一一对应） ----
@@ -114,3 +121,22 @@ export interface LaunchIntentPayload {
   /** host 侧接收时刻（epoch ms）；等价路径 dedupe 的辅助键。 */
   receivedAt: number;
 }
+
+// ---- 原生关闭协议（MRT-003 / CR-003） ----
+
+/**
+ * 前端对一次 close request 的处置。
+ * - clean：session clean 且无 pending save，直接放行
+ * - saved：真实保存成功且 session 已 clean 后放行
+ * - discarded：不写盘丢弃（host 在真正放行前撤销该窗口 capability）
+ * - cancelled：取消本次关闭（零副作用）
+ */
+export type CloseDisposition = "clean" | "saved" | "discarded" | "cancelled";
+
+/** close-requested 事件与 pending 快照共用的 payload。 */
+export interface CloseRequestPayload {
+  requestId: string;
+}
+
+/** platform_pending_close_request 的返回；无活动请求时为 null。 */
+export type PendingCloseRequest = CloseRequestPayload | null;

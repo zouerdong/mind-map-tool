@@ -25,24 +25,18 @@ export type {
   TargetAuthorizationRef,
   VersionToken,
 } from "./file/types.js";
-export {
-  asDocumentTargetHandle,
-  asTargetAuthorizationRef,
-  asVersionToken,
-} from "./file/types.js";
+export { asDocumentTargetHandle, asTargetAuthorizationRef, asVersionToken } from "./file/types.js";
 export { TauriFileAdapter } from "./file/tauri-file-adapter.js";
 
 // 生命周期
-export {
-  decideWindowAction,
-  intentDedupeKey,
-  LaunchRouter,
-} from "./lifecycle/launch-router.js";
-export type {
-  LaunchActionHandler,
-} from "./lifecycle/tauri-adapter.js";
+export { decideWindowAction, intentDedupeKey, LaunchRouter } from "./lifecycle/launch-router.js";
+export type { LaunchActionHandler } from "./lifecycle/tauri-adapter.js";
 export { TauriLifecycleAdapter } from "./lifecycle/tauri-adapter.js";
 export type { WindowAction, WindowContext } from "./lifecycle/launch-router.js";
+// 原生关闭协议（MRT-003）
+export { CloseRequestGate, toClosePlatformError } from "./lifecycle/close-protocol.js";
+export type { CloseLifecyclePort, CloseTransport } from "./lifecycle/close-protocol.js";
+export { TauriCloseLifecycleAdapter } from "./lifecycle/tauri-close-adapter.js";
 
 // 偏好
 export type { PreferencesPort, PreferencesSnapshot, PreferenceValue } from "./preferences/types.js";

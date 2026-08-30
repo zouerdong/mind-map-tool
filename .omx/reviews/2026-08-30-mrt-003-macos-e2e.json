@@ -3,7 +3,7 @@
   "platform": "macOS",
   "suite": "e2e-macos",
   "overall": "PASS",
-  "generatedAt": "2026-08-30T07:22:15.850Z",
+  "generatedAt": "2026-08-30T06:33:01.014Z",
   "driver": {
     "kind": "osascript + System Events（macOS 自带；tauri-driver v2.0.6 不支持 macOS，见 mm-090-report.md）",
     "system": "26.6.2"
@@ -26,43 +26,43 @@
       "id": "E2E-01A",
       "name": "冷启动健康（D1/D2 回归探针）",
       "result": "PASS",
-      "durationMs": 15514
+      "durationMs": 15527
     },
     {
       "id": "E2E-16",
       "name": "全局热键唤醒分支（AC-16）",
       "result": "PASS",
-      "durationMs": 15948
+      "durationMs": 15800
     },
     {
       "id": "E2E-CL1",
       "name": "clean 文档原生关闭：无 modal，直接放行（C1）",
       "result": "PASS",
-      "durationMs": 34900
+      "durationMs": 34578
     },
     {
       "id": "E2E-CL2",
       "name": "dirty 原生关闭 Cancel：modal 出现，取消后窗口与 dirty 保持（X1）",
       "result": "PASS",
-      "durationMs": 28857
+      "durationMs": 28743
     },
     {
       "id": "E2E-CL3",
       "name": "dirty 原生关闭 Discard：不写盘，host 撤销 capability 后窗口关闭（D1）",
       "result": "PASS",
-      "durationMs": 30169
+      "durationMs": 30055
     },
     {
       "id": "E2E-CL4",
       "name": "重复点击关闭复用同一请求：不叠第二个 modal（R2 前端）",
       "result": "PASS",
-      "durationMs": 22305
+      "durationMs": 22190
     },
     {
       "id": "E2E-CL5",
       "name": "⌘Q 应用退出协调：Cancel 阻止整次退出，Discard 后完成退出（X2）",
       "result": "PASS",
-      "durationMs": 34787
+      "durationMs": 34519
     }
   ]
 }

@@ -60,7 +60,9 @@ const axPref = (() => {
   }
 })();
 if (axPref !== "1") {
-  console.error("FAIL - WebKitAccessibilityEnabled 未启用（defaults write com.mindmap.desktop WebKitAccessibilityEnabled -bool YES 后重启 app）");
+  console.error(
+    "FAIL - WebKitAccessibilityEnabled 未启用（defaults write com.mindmap.desktop WebKitAccessibilityEnabled -bool YES 后重启 app）",
+  );
   process.exit(1);
 }
 
@@ -97,6 +99,15 @@ const startAppFresh = async () => {
   execFileSync("open", [bundle]);
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 1500));
+    // 非 frontmost 时 System Events 的窗口枚举偶发失效（窗口存在但计 0，
+    // 宿主终端抢占前台时复现）——先拉回前台再探测。
+    if (i > 0 && i % 3 === 0) {
+      await b
+        .as(
+          'tell application "System Events" to set frontmost of process "mindmap-desktop" to true',
+        )
+        .catch(() => {});
+    }
     if (await b.axFind(`d === "脑图画布"`)) {
       // AX 会话"冷却即死"（实测静默 >2s 后首查必败 -1708）：就绪后用
       // 轻量查询保活代替静默等待（3 次 × 800ms）。
@@ -180,7 +191,8 @@ const doc = {
     chinese: "剪贴板 + ⌘V（真实粘贴事件→onChange）",
     pointer: "clickAt AX 坐标（真实鼠标双击）",
     assertions: "AX 树语义断言（aria-label→AXDescription；WebKitAccessibilityEnabled）",
-    limitations: "SVG edge 无 AX 暴露→undo 历史序列间接断言；工具条文本按钮无名→真实快捷键驱动；系统对话框/Dock/真机 IME→人工矩阵",
+    limitations:
+      "SVG edge 无 AX 暴露→undo 历史序列间接断言；工具条文本按钮无名→真实快捷键驱动；系统对话框/Dock/真机 IME→人工矩阵",
   },
   cases: results,
 };

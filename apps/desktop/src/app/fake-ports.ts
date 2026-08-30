@@ -4,6 +4,9 @@
 // （集成测试断言"不重弹选址对话框"的依据）。
 
 import type {
+  CloseDisposition,
+  CloseLifecyclePort,
+  CloseRequestPayload,
   CommitDocumentRequest,
   CommitReceipt,
   FilePort,
@@ -94,7 +97,11 @@ export class FakeFilePort implements FilePort {
       const currentHash = current ? await sha256Hex(current) : null;
       if (currentHash !== request.expectedVersionToken)
         throw new PlatformError("TARGET_MODIFIED_EXTERNALLY", "外部修改或删除");
-      return this.writeAndReceipt(rec.path, request.contentBytes, request.documentTargetHandle as string);
+      return this.writeAndReceipt(
+        rec.path,
+        request.contentBytes,
+        request.documentTargetHandle as string,
+      );
     }
     const auth = this.redeem(request.authorizationRef as string, "document");
     await this.verifyTargetUnchanged(auth);
@@ -166,6 +173,40 @@ export class FakePreferencesPort implements PreferencesPort {
   }
 }
 
+/** Fake 原生关闭协议端口（MRT-003）：记录 disposition，测试注入请求。 */
+export class FakeCloseLifecyclePort implements CloseLifecyclePort {
+  /** 按序记录的应答（断言"恰好 resolve 什么"）。 */
+  readonly resolutions: Array<{ requestId: string; disposition: CloseDisposition }> = [];
+  startCalls = 0;
+  stopCalls = 0;
+  nextResolveError: Error | null = null;
+  private handler: ((request: CloseRequestPayload) => void) | null = null;
+
+  async start(onRequest: (request: CloseRequestPayload) => void): Promise<void> {
+    this.startCalls += 1;
+    this.handler = onRequest;
+  }
+
+  async stop(): Promise<void> {
+    this.stopCalls += 1;
+    this.handler = null;
+  }
+
+  async resolve(requestId: string, disposition: CloseDisposition): Promise<void> {
+    if (this.nextResolveError !== null) {
+      const error = this.nextResolveError;
+      this.nextResolveError = null;
+      throw error;
+    }
+    this.resolutions.push({ requestId, disposition });
+  }
+
+  /** 测试注入：模拟 host 定向 close-requested（或快照补投）。 */
+  emit(requestId: string): void {
+    this.handler?.({ requestId });
+  }
+}
+
 /** Fake 导出 renderer（接口对齐 @mindmap/export ExportRenderer 子集）。 */
 export class FakeExportRenderer {
   readonly rendered: Array<{ format: string; sceneNodes: number }> = [];
@@ -183,8 +224,11 @@ export class FakeExportRenderer {
       bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
     };
   }
-  async buildScene(doc: { document: { nodes: unknown[] } }): Promise<
-    { ok: true; scene: { nodeCount: number } } | { ok: false; error: { code: string; message: string } }
+  async buildScene(doc: {
+    document: { nodes: unknown[] };
+  }): Promise<
+    | { ok: true; scene: { nodeCount: number } }
+    | { ok: false; error: { code: string; message: string } }
   > {
     if (doc.document.nodes.length === 0)
       return { ok: false, error: { code: "EXPORT_EMPTY_DOCUMENT", message: "空文档" } };

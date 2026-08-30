@@ -23,7 +23,10 @@ const scriptDir = mkdtempSync(path.join(tmpdir(), "mindmap-e2e-jxa-"));
 
 /** 执行 AppleScript（临时文件；keystroke/剪贴板等 System Events 语法）。 */
 export async function as(script) {
-  const file = path.join(scriptDir, `a${Date.now()}-${Math.random().toString(36).slice(2)}.applescript`);
+  const file = path.join(
+    scriptDir,
+    `a${Date.now()}-${Math.random().toString(36).slice(2)}.applescript`,
+  );
   writeFileSync(file, script);
   try {
     const { stdout } = await execFileP("osascript", [file], { maxBuffer: 16 * 1024 * 1024 });
@@ -43,7 +46,11 @@ export async function jxa(script) {
     });
     return stdout.trimEnd();
   } catch (e) {
-    const head = script.split("\n").filter((l) => l.trim()).slice(0, 2).join(" | ");
+    const head = script
+      .split("\n")
+      .filter((l) => l.trim())
+      .slice(0, 2)
+      .join(" | ");
     throw new Error(`jxa 失败（${head.slice(0, 120)}）: ${String(e.message).slice(0, 300)}`);
   } finally {
     rmSync(file, { force: true });
@@ -146,7 +153,8 @@ JSON.stringify(hits);`;
   return JSON.parse(out);
 }
 
-/** AX 元素动作：press（按钮/链接）。按 description 精确匹配。 */
+/** AX 元素动作：click（System Events JXA 标准方法；actions.press() 在
+ * WKWebView 按钮上抛 -1728，本机实测 2026-08-30）。按 description 精确匹配。 */
 export async function axPress(descMatch) {
   const script = `
 ${seHeader}
@@ -165,33 +173,39 @@ function find(el, depth) {
   return null;
 }
 const el = find(proc.windows()[0], 0);
-if (!el) { "NOT_FOUND"; } else { el.actions.press(); "OK"; }`;
-  const r = await jxa(script);
+if (!el) { "NOT_FOUND"; } else { el.click(); "OK"; }`;
+  const r = await withAxRetry(() => jxa(script));
   if (r === "NOT_FOUND") throw new Error(`axPress: 元素不存在 ${descMatch}`);
   return r;
 }
 
 /** 真实键盘：keystroke（System Events，走系统输入链；app 须前台）。 */
-export async function keystroke(text, { cmd = false, option = false, shift = false, ctrl = false } = {}) {
+export async function keystroke(
+  text,
+  { cmd = false, option = false, shift = false, ctrl = false } = {},
+) {
   const mods = [
     ...(cmd ? ["command down"] : []),
     ...(option ? ["option down"] : []),
     ...(shift ? ["shift down"] : []),
     ...(ctrl ? ["control down"] : []),
   ].join(", ");
-  const using = mods ? ` using ${mods}` : "";
+  const using = mods ? ` using {${mods}}` : "";
   await as(`tell application "System Events" to keystroke ${JSON.stringify(text)}${using}`);
 }
 
 /** 键码（key code）输入：方向键/Delete/Return/Escape 等。 */
-export async function keyCode(code, { cmd = false, option = false, shift = false, ctrl = false } = {}) {
+export async function keyCode(
+  code,
+  { cmd = false, option = false, shift = false, ctrl = false } = {},
+) {
   const mods = [
     ...(cmd ? ["command down"] : []),
     ...(option ? ["option down"] : []),
     ...(shift ? ["shift down"] : []),
     ...(ctrl ? ["control down"] : []),
   ].join(", ");
-  const using = mods ? ` using ${mods}` : "";
+  const using = mods ? ` using {${mods}}` : "";
   await as(`tell application "System Events" to key code ${code}${using}`);
 }
 
@@ -252,7 +266,8 @@ clickAt(2);
 /** 真实鼠标：在 AX 元素中心双击（descMatch 精确匹配 description）。 */
 export async function axDoubleClick(descMatch) {
   const el = await axFind(`d === ${JSON.stringify(descMatch)}`);
-  if (!el || el.pos === null || el.size === null) throw new Error(`axDoubleClick: 元素/坐标缺失 ${descMatch}`);
+  if (!el || el.pos === null || el.size === null)
+    throw new Error(`axDoubleClick: 元素/坐标缺失 ${descMatch}`);
   const cx = Math.round(el.pos.x + el.size.w / 2);
   const cy = Math.round(el.pos.y + el.size.h / 2);
   await activate();
@@ -288,10 +303,19 @@ export async function setClipboard(text) {
 }
 
 /** 轮询等待谓词匹配（超时抛错）。 */
-export async function axWaitFor(predicate, { timeoutMs = 6000, intervalMs = 300, label = "axWaitFor" } = {}) {
+export async function axWaitFor(
+  predicate,
+  { timeoutMs = 6000, intervalMs = 300, label = "axWaitFor" } = {},
+) {
   const start = Date.now();
   for (;;) {
-    const hit = await axFind(predicate);
+    let hit = null;
+    try {
+      hit = await axFind(predicate);
+    } catch {
+      // 瞬态 AX 会话失败（-1708/-1728）在 close 事件处理/modal 挂载期可超过
+      // withAxRetry 的 3 次退避窗：轮询吞掉瞬态错误，由超时统一裁决。
+    }
     if (hit) return hit;
     if (Date.now() - start > timeoutMs) {
       throw new Error(`${label} 超时（${timeoutMs}ms）：${predicate}`);

@@ -8,11 +8,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { emptyDocument, encodeDocument, makeStateNode } from "@mindmap/core";
 import type { MindMapDocumentV1 } from "@mindmap/core";
+import type { CommitDocumentRequest, CommitReceipt } from "@mindmap/platform";
 
 vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule()));
 
 const { MindMapApp } = await import("./mindmap-app.js");
-const { FakeFilePort, FakePreferencesPort, FakeExportRenderer } = await import("./fake-ports.js");
+const { FakeCloseLifecyclePort, FakeExportRenderer, FakeFilePort, FakePreferencesPort } =
+  await import("./fake-ports.js");
 const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
@@ -36,8 +38,37 @@ function docWithNode(text = "一"): MindMapDocumentV1 {
   return doc;
 }
 
-function setup() {
-  const filePort = new FakeFilePort();
+/** 统计提交次数（CR-001 回归：断言"恰好提交 N 次、不自旋"）。 */
+class CountingFilePort extends FakeFilePort {
+  commitCalls = 0;
+  override async commitDocument(request: CommitDocumentRequest): Promise<CommitReceipt> {
+    this.commitCalls += 1;
+    return super.commitDocument(request);
+  }
+}
+
+/**
+ * 挂起下一次提交（MRT-001A：制造 pending save 窗口）。arrivedCalls 在
+ * 门闩前自增——commit 挂起中即可断言"请求已到达、in-flight 已占位"。
+ */
+class HoldingFilePort extends CountingFilePort {
+  arrivedCalls = 0;
+  private gate: Promise<void> | null = null;
+  holdNextCommit(promise: Promise<void>): void {
+    this.gate = promise;
+  }
+  override async commitDocument(request: CommitDocumentRequest): Promise<CommitReceipt> {
+    this.arrivedCalls += 1;
+    if (this.gate) {
+      const gate = this.gate;
+      this.gate = null;
+      await gate;
+    }
+    return super.commitDocument(request);
+  }
+}
+
+function setup(filePort: CountingFilePort = new CountingFilePort()) {
   const preferences = new FakePreferencesPort();
   const renderer = new FakeExportRenderer();
   filePort.writeFile("/docs/a.json", encodeDocument(docWithNode("打开的文档")));
@@ -51,6 +82,7 @@ function setup() {
         fonts: renderer.fonts(),
         isBrowserDev: true,
         globalShortcut: new FakeGlobalShortcut(),
+        closeLifecycle: new FakeCloseLifecyclePort(),
       }}
     />,
   );
@@ -112,6 +144,63 @@ describe("保存闭环（AC-04/06）", () => {
     await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
     expect(filePort.saveDialogCalls).toBe(1); // ★ 只有 Save As 弹过
   });
+
+  it("CR-001 回归：已有目标时连续两次保存不弹 Save As，恰好提交两次", async () => {
+    const { filePort } = setup();
+    fireEvent.click(screen.getByText("打开…"));
+    await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
+    await createNodeViaCanvas(); // dirty
+
+    fireEvent.click(screen.getByText("保存")); // 第一次：捕获快照并提交（异步未完成）
+    fireEvent.click(screen.getByText("保存")); // 第二次：提交进行中 → 应排队而非弹 Save As
+    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    expect(filePort.saveDialogCalls).toBe(0); // ★ 第二次普通保存不得弹选址对话框
+    await waitFor(() => expect(filePort.commitCalls).toBe(2)); // ★ 恰好两次提交，队列最终为 0
+    expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
+  }, 10_000);
+
+  it('MRT-001A：保存 pending 时新建/打开被 gate——busy 提示、不弹 discard、不开对话框；完成后无"已新建"notice 且可重试', async () => {
+    const filePort = new HoldingFilePort();
+    setup(filePort);
+    fireEvent.click(screen.getByText("打开…"));
+    await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
+    expect(filePort.openDialogCalls).toBe(1);
+    await createNodeViaCanvas(); // dirty
+
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    filePort.holdNextCommit(gate);
+    fireEvent.click(screen.getByText("保存")); // 提交挂起 → in-flight pending
+    await waitFor(() => expect(filePort.arrivedCalls).toBe(1));
+
+    // ★ 新建被 gate：busy 非致命提示，不弹 discard 确认，文档未替换
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("app-notice").textContent).toContain("保存尚未完成"),
+    );
+    expect(screen.queryByTestId("dirty-confirm")).toBeNull();
+    expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy(); // dirty 保持
+
+    // ★ 打开同样被 gate：不弹文件对话框
+    fireEvent.click(screen.getByText("打开…"));
+    expect(filePort.openDialogCalls).toBe(1); // 计数不变（无新对话框）
+    expect(screen.queryByTestId("dirty-confirm")).toBeNull();
+
+    // ★ 保存链自然终态：notice 是"已保存"，不出现"已新建/已打开"（场景 9）
+    release();
+    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    expect(screen.getByTestId("app-notice").textContent).toContain("已保存 /docs/a.json");
+    expect(screen.queryByText(/已新建空白文档/)).toBeNull();
+    expect(screen.queryByText(/已打开/)).toBeNull();
+
+    // ★ 终态后重试新建成功（clean → 不弹 discard）
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
+    expect(screen.queryByTestId("dirty-confirm")).toBeNull();
+    expect(filePort.commitCalls).toBe(1); // 全程恰好 1 次提交
+  }, 10_000);
 });
 
 describe("外部冲突（AC-08 应用层语义）", () => {
@@ -125,9 +214,7 @@ describe("外部冲突（AC-08 应用层语义）", () => {
     filePort.writeFile("/docs/a.json", encodeDocument(docWithNode("被外部改写")));
 
     fireEvent.click(screen.getByText("保存"));
-    await waitFor(() =>
-      expect(screen.getByText(/文件在应用外被修改或删除/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/文件在应用外被修改或删除/)).toBeTruthy());
     // 未覆盖：文件内容仍是外部版本；应用侧 dirty 保持
     expect(new TextDecoder().decode(filePort.files.get("/docs/a.json")!)).toContain("被外部改写");
     expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
@@ -150,13 +237,17 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "导出" }));
     filePort.nextSaveDialog = "/out/map.png";
-    fireEvent.click((await screen.findByTestId("export-panel")).querySelector('[data-testid="export-png"]')!);
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-png"]')!,
+    );
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.png/)).toBeTruthy());
     expect(renderer.rendered.at(-1)?.format).toBe("png");
 
     fireEvent.click(screen.getByRole("button", { name: "导出" }));
     filePort.nextSaveDialog = "/out/map.pdf";
-    fireEvent.click((await screen.findByTestId("export-panel")).querySelector('[data-testid="export-pdf"]')!);
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-pdf"]')!,
+    );
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.pdf/)).toBeTruthy());
     expect(renderer.rendered.at(-1)?.format).toBe("pdf");
     void panel;
@@ -167,7 +258,9 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
     const calls = filePort.saveDialogCalls;
     fireEvent.click(screen.getByRole("button", { name: "导出" }));
-    fireEvent.click((await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!);
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!,
+    );
     await waitFor(() => expect(screen.getByText(/空文档/)).toBeTruthy());
     expect(filePort.saveDialogCalls).toBe(calls); // buildScene 前置失败 → 不弹授权
   });
@@ -225,7 +318,7 @@ describe("引导观察通道（MM-080 ⑥/MM-070 契约）", () => {
     const { ObservedDocumentSession } = await import("./observed-session.js");
     const seen: string[] = [];
     const session = new ObservedDocumentSession(makeStateNode(emptyDocument()).document, (o) => {
-      seen.push(o.kind === "command" ? o.command.kind : o.kind);
+      seen.push(o.kind === "command" ? o.command.kind : o.kind === "history" ? o.action : o.kind);
     });
     session.commit({
       kind: "CreateNode",
@@ -235,6 +328,7 @@ describe("引导观察通道（MM-080 ⑥/MM-070 契约）", () => {
       size: { width: 10, height: 10 },
     });
     session.undo();
-    expect(seen).toEqual(["CreateNode", "history"]);
+    session.redo();
+    expect(seen).toEqual(["CreateNode", "undo", "redo"]); // O1：redo 只广播一次 history observation
   });
 });

@@ -2,12 +2,22 @@
 // 浏览器 dev（vite dev server，无 Tauri WebView）使用 fake 端口；
 // Tauri WebView 用 MM-060 适配器 + export renderer（字体/wasm 经 vite 资源加载）。
 
-import type { FilePort, PreferencesPort } from "@mindmap/platform";
-import { PlatformError, TauriFileAdapter, TauriPreferencesAdapter } from "@mindmap/platform";
+import type { CloseLifecyclePort, FilePort, PreferencesPort } from "@mindmap/platform";
+import {
+  PlatformError,
+  TauriCloseLifecycleAdapter,
+  TauriFileAdapter,
+  TauriPreferencesAdapter,
+} from "@mindmap/platform";
 import { invoke } from "@tauri-apps/api/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import type { ExportRendererLike } from "./export-commands.js";
-import { FakeExportRenderer, FakeFilePort, FakePreferencesPort } from "./fake-ports.js";
+import {
+  FakeCloseLifecyclePort,
+  FakeExportRenderer,
+  FakeFilePort,
+  FakePreferencesPort,
+} from "./fake-ports.js";
 
 /** 全局热键读写（MM-088；accelerator 字符串，键位专项讨论后可改）。 */
 export interface GlobalShortcutPort {
@@ -22,6 +32,8 @@ export interface AppPorts {
   /** EditorCanvas 的共享 layout 字体度量（与导出同源）。 */
   fonts: FontResolver;
   globalShortcut: GlobalShortcutPort;
+  /** 原生关闭协议（MRT-003）：浏览器 dev 的 fake 不触发原生关闭。 */
+  closeLifecycle: CloseLifecyclePort;
   /** 浏览器 dev 模式（无原生对话框/文件系统）。 */
   readonly isBrowserDev: boolean;
 }
@@ -79,6 +91,7 @@ export async function createAppPorts(): Promise<AppPorts> {
       renderer,
       fonts: renderer.fonts(),
       globalShortcut: new TauriGlobalShortcut(),
+      closeLifecycle: new TauriCloseLifecycleAdapter(),
       isBrowserDev: false,
     };
   }
@@ -88,6 +101,7 @@ export async function createAppPorts(): Promise<AppPorts> {
     renderer: new FakeExportRenderer(),
     fonts: DEV_FONTS,
     globalShortcut: new FakeGlobalShortcut(),
+    closeLifecycle: new FakeCloseLifecyclePort(),
     isBrowserDev: true,
   };
 }

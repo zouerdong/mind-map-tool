@@ -1,11 +1,21 @@
-// 文件命令流（MM-080 ③）：App 层把 FilePort 与 DocumentSession 快照协议接起来。
-// 语义（ADR 0003 §4）：
-// - ordinary Save 只回传 opaque handle/token（绝不弹选址对话框）；
-//   无 handle（新建从未保存）自动转 Save As；
-// - Save As 才请求一次性 TargetAuthorization；
-// - 成功 → saveCompleted（保存点=冻结 identity）；失败/冲突 → saveFailed，
-//   保存身份完全不变（调用方保持 dirty 与提示）；
-// - 排队保存：完成后 drain（重新捕获当时状态），适配异步保存期间的编辑。
+// 文件命令流（MM-080 ③ / MRT-001 CR-001 / MRT-001A pending gate）：
+// App 层把 FilePort 与 DocumentSession 的保存队列协议接起来。语义（ADR 0003 §4）：
+// - requestXxx 返回可判别结果：no-target → 转 Save As；queued → 等待该
+//   排队请求的终态；snapshot → 本调用直接驱动到终态（saveCompleted/saveFailed）；
+// - 保存队列单一驱动：takeNextSaveIntent 原子出队并按当时状态重捕获；
+//   同一 session 同时最多一个驱动循环（WeakMap 防重入，重入请求只入队）；
+// - 失败/冲突终止驱动：core saveFailed 清空队列后，仍在等待的排队请求
+//   由本层以同一失败终态收尾——每个请求都有终态，不悬挂、不自旋、
+//   不 fire-and-forget；
+// - 文档替换 fail-closed（MRT-001A）：new/open/launch-open 在 pending save
+//   （in-flight 或排队）时返回 SAVE_IN_PROGRESS，session 完全不变——
+//   前置 gate 在调用 FilePort/确认对话框之前（不开对话框、不执行 discard），
+//   await 之后的二次检查由 core load() 的原子 fail-closed 承担（无 TOCTOU
+//   窗口）；此时已取得的 opened handle 不进入 session（capability 游离，
+//   收口记录于 MRT-003/004）。不得用 timeout、清 waiter 或伪造取消掩盖；
+// - 排队的 save-as 保留语义（不会降级成 ordinary）；
+// - 成功 → saveCompleted（保存点=冻结 identity）；失败/冲突 → 保存身份
+//   完全不变（调用方保持 dirty 与提示）。
 
 import {
   decodeDocument,
@@ -13,6 +23,7 @@ import {
   type Command,
   type DocumentSession,
   type MindMapDocumentV1,
+  type SaveSnapshot,
 } from "@mindmap/core";
 import {
   PlatformError,
@@ -31,7 +42,48 @@ export interface FileFlowDeps {
   filePort: FilePort;
 }
 
-function platformError(e: unknown): { kind: "conflict"; message: string } | { kind: "error"; code: string; message: string } {
+type SaveFlowResult = FlowResult<{ receipt: CommitReceipt }>;
+
+/** 每 session 至多一个保存队列驱动循环在跑（true=运行中）。 */
+const activeQueueDrivers = new WeakMap<DocumentSession, boolean>();
+/** 排队请求的终态等待者（FIFO，与 core 队列同序：每次排队恰好压入一个）。 */
+const queuedSaveWaiters = new WeakMap<DocumentSession, Array<(r: SaveFlowResult) => void>>();
+/**
+ * 每 session 在飞的 saveFlow/saveAsFlow 调用（MRT-003）：close 控制器在
+ * pending save 时的受控等待数据源——等待真实终态，不轮询、不 timeout。
+ */
+const inFlightSaveCalls = new WeakMap<DocumentSession, Set<Promise<unknown>>>();
+
+function trackSave(
+  session: DocumentSession,
+  call: Promise<SaveFlowResult>,
+): Promise<SaveFlowResult> {
+  const set = inFlightSaveCalls.get(session) ?? new Set();
+  inFlightSaveCalls.set(session, set);
+  set.add(call);
+  return call.finally(() => {
+    set.delete(call);
+  });
+}
+
+/**
+ * 等待该 session 全部在飞保存请求终态（MRT-003 D2：pending save 时的
+ * close 受控等待）。App 层所有保存均经 saveFlow/saveAsFlow 入口，因此
+ * in-flight/排队/驱动中的请求都在被追踪集合内。
+ */
+export async function whenSavesSettled(session: DocumentSession): Promise<void> {
+  // 不能只截取调用瞬间的 Promise：等待期间仍可能有新的保存请求入队。
+  // 每轮等待当前集合后重新检查 core pending 状态，直到整个保存链自然归零。
+  while (session.hasPendingSaves) {
+    const set = inFlightSaveCalls.get(session);
+    if (!set || set.size === 0) return; // 防御性 fail closed：调用方仍会复查 hasPendingSaves
+    await Promise.allSettled([...set]);
+  }
+}
+
+function platformError(
+  e: unknown,
+): { kind: "conflict"; message: string } | { kind: "error"; code: string; message: string } {
   if (e instanceof PlatformError) {
     if (e.code === "TARGET_MODIFIED_EXTERNALLY" || e.code === "TARGET_APPEARED")
       return {
@@ -46,11 +98,21 @@ function platformError(e: unknown): { kind: "conflict"; message: string } | { ki
   return { kind: "error", code: "UNKNOWN", message: String(e) };
 }
 
-/** open 对话框 → decode → load + adoptOpenedTarget。 */
+/** 文档替换的 pending-save gate 统一 busy 终态（MRT-001A；UI 映射为非致命提示）。 */
+function saveInProgressBusy(): { kind: "error"; code: string; message: string } {
+  return {
+    kind: "error",
+    code: "SAVE_IN_PROGRESS",
+    message: "保存尚未完成；请在保存完成后再新建或打开文件。",
+  };
+}
+
+/** open 对话框 → decode → load + adoptOpenedTarget；pending save 时不弹对话框、不替换。 */
 export async function openDocumentFlow(
   session: DocumentSession,
   deps: FileFlowDeps,
 ): Promise<FlowResult<{ displayPath: string }>> {
+  if (session.hasPendingSaves) return saveInProgressBusy(); // 前置 gate：不打开对话框
   let opened: OpenedDocument | null;
   try {
     opened = await deps.filePort.openDocument();
@@ -61,12 +123,13 @@ export async function openDocumentFlow(
   return adoptOpened(session, opened);
 }
 
-/** 按路径打开（launch intent 加载，无对话框）。 */
+/** 按路径打开（launch intent 加载，无对话框）；pending save 时 fail closed。 */
 export async function openPathFlow(
   session: DocumentSession,
   deps: FileFlowDeps,
   path: string,
 ): Promise<FlowResult<{ displayPath: string }>> {
+  if (session.hasPendingSaves) return saveInProgressBusy(); // 前置 gate：不发起读取
   try {
     const opened = await deps.filePort.openPath(path);
     return adoptOpened(session, opened);
@@ -90,44 +153,46 @@ function adoptOpened(
           : "文件不是有效的脑图文档。",
     };
   }
-  session.load(decoded.doc);
-  session.adoptOpenedTarget(
-    opened.documentTargetHandle,
-    opened.versionToken,
-    opened.displayPath,
-  );
+  // 读取 await 之后的二次 gate：core load() 同步原子地 fail-closed（检查与
+  // 替换之间无窗口）。save-pending 时 opened handle 不进入 session（游离）。
+  const loaded = session.load(decoded.doc);
+  if (loaded.kind !== "replaced") return saveInProgressBusy();
+  session.adoptOpenedTarget(opened.documentTargetHandle, opened.versionToken, opened.displayPath);
   return { kind: "ok", value: { displayPath: opened.displayPath } };
 }
 
-/** 保存：ordinary（handle+token，无对话框）→ 无 handle 时转 Save As。 */
+/** 保存：ordinary（handle+token，无对话框）→ 无 handle 时转 Save As；提交进行中则排队等终态。 */
 export async function saveFlow(
   session: DocumentSession,
   deps: FileFlowDeps,
-): Promise<FlowResult<{ receipt: CommitReceipt }>> {
-  const snapshot = session.requestOrdinarySave();
-  if (snapshot === null) return saveAsFlow(session, deps, suggestedName(session));
-  try {
-    const receipt = await deps.filePort.commitDocument({
-      kind: "ordinary",
-      documentTargetHandle: snapshot.documentTargetHandle as never,
-      expectedVersionToken: snapshot.expectedVersionToken as never,
-      contentBytes: snapshot.canonicalBytes,
-    });
-    session.saveCompleted(snapshot, receipt);
-    drainQueue(session, deps);
-    return { kind: "ok", value: { receipt } };
-  } catch (e) {
-    session.saveFailed(snapshot);
-    return platformError(e);
-  }
+): Promise<SaveFlowResult> {
+  return trackSave(session, executeSaveFlow(session, deps));
 }
 
-/** Save As：一次性选址授权 → 提交（成功签发新 handle）。 */
+async function executeSaveFlow(
+  session: DocumentSession,
+  deps: FileFlowDeps,
+): Promise<SaveFlowResult> {
+  const request = session.requestOrdinarySave();
+  if (request.kind === "no-target") return executeSaveAsFlow(session, deps, suggestedName(session));
+  if (request.kind === "queued") return awaitQueuedSave(session, deps);
+  return executeSaveSnapshot(session, deps, request.snapshot);
+}
+
+/** Save As：一次性选址授权 → 提交（成功签发新 handle）；授权后若已有保存进行中则排队（保留 save-as 语义）。 */
 export async function saveAsFlow(
   session: DocumentSession,
   deps: FileFlowDeps,
   suggested: string,
-): Promise<FlowResult<{ receipt: CommitReceipt }>> {
+): Promise<SaveFlowResult> {
+  return trackSave(session, executeSaveAsFlow(session, deps, suggested));
+}
+
+async function executeSaveAsFlow(
+  session: DocumentSession,
+  deps: FileFlowDeps,
+  suggested: string,
+): Promise<SaveFlowResult> {
   let grant;
   try {
     grant = await deps.filePort.requestTargetAuthorization("document", suggested);
@@ -135,53 +200,127 @@ export async function saveAsFlow(
     return platformError(e);
   }
   if (grant === null) return { kind: "cancelled" };
-  const snapshot = session.requestSaveAs(grant.authorizationRef);
-  if (snapshot === null) return { kind: "error", code: "SAVE_IN_FLIGHT", message: "已有保存进行中" };
-  try {
-    const receipt = await deps.filePort.commitDocument({
-      kind: "save-as",
-      authorizationRef: snapshot.authorizationRef as never,
-      contentBytes: snapshot.canonicalBytes,
-    });
-    session.saveCompleted(snapshot, receipt);
-    drainQueue(session, deps);
-    return { kind: "ok", value: { receipt } };
-  } catch (e) {
-    session.saveFailed(snapshot);
-    return platformError(e);
-  }
+  const request = session.requestSaveAs(grant.authorizationRef);
+  if (request.kind === "queued") return awaitQueuedSave(session, deps);
+  return executeSaveSnapshot(session, deps, request.snapshot);
 }
 
-/** 新建：确认丢弃后清空文档与目标身份（load 已清 → ordinary 转回 Save As）。 */
+/** 新建结果：ok（已替换为空白文档）/ cancelled（放弃确认）/ error（busy 等）。 */
+export type NewDocumentFlowResult =
+  { kind: "ok" } | { kind: "cancelled" } | { kind: "error"; code: string; message: string };
+
+/** 新建：pending save 时不执行 discard、不替换（fail closed）；确认丢弃后
+ * 清空文档与目标身份（load 已清 → ordinary 转回 Save As）。 */
 export async function newDocumentFlow(
   session: DocumentSession,
   confirmDiscard: () => Promise<boolean>,
-): Promise<{ kind: "ok" } | { kind: "cancelled" }> {
+): Promise<NewDocumentFlowResult> {
+  if (session.hasPendingSaves) return saveInProgressBusy(); // 前置 gate：不调用 discard callback
   if (session.isDirty && !(await confirmDiscard())) return { kind: "cancelled" };
-  session.load(emptyDocument());
+  // 确认等待（await）之后的二次 gate 由 core load() 原子承担
+  const loaded = session.load(emptyDocument());
+  if (loaded.kind !== "replaced") return saveInProgressBusy();
   return { kind: "ok" };
 }
 
-/** 排队保存 drain：完成后逐条重新捕获（异步保存期间的新编辑不丢）。 */
-function drainQueue(session: DocumentSession, deps: FileFlowDeps): void {
-  void (async () => {
-    while (session.queuedSaveCount > 0 && !session.hasInFlightSave) {
-      const snapshot = session.requestOrdinarySave();
-      if (snapshot === null) break; // 无 handle → 留给用户显式 Save As
-      try {
-        const receipt = await deps.filePort.commitDocument({
+function commitSnapshot(deps: FileFlowDeps, snapshot: SaveSnapshot): Promise<CommitReceipt> {
+  return deps.filePort.commitDocument(
+    snapshot.kind === "ordinary"
+      ? {
           kind: "ordinary",
           documentTargetHandle: snapshot.documentTargetHandle as never,
           expectedVersionToken: snapshot.expectedVersionToken as never,
           contentBytes: snapshot.canonicalBytes,
-        });
+        }
+      : {
+          kind: "save-as",
+          authorizationRef: snapshot.authorizationRef as never,
+          contentBytes: snapshot.canonicalBytes,
+        },
+  );
+}
+
+/** 直接驱动一个已捕获的快照到终态；成功后确保队列驱动在跑（消费等待中的排队请求）。 */
+async function executeSaveSnapshot(
+  session: DocumentSession,
+  deps: FileFlowDeps,
+  snapshot: SaveSnapshot,
+): Promise<SaveFlowResult> {
+  let receipt: CommitReceipt;
+  try {
+    receipt = await commitSnapshot(deps, snapshot);
+  } catch (e) {
+    const failure = platformError(e);
+    session.saveFailed(snapshot); // 失败策略（core）：清空剩余队列
+    failPendingWaiters(session, failure); // 排队请求以同一失败终态收尾
+    return failure;
+  }
+  session.saveCompleted(snapshot, receipt);
+  ensureSaveQueueDriver(session, deps);
+  return { kind: "ok", value: { receipt } };
+}
+
+/** 排队请求：压入等待者并确保驱动在跑；终态由驱动送达（成功回执/失败/无目标）。 */
+function awaitQueuedSave(session: DocumentSession, deps: FileFlowDeps): Promise<SaveFlowResult> {
+  const waiters = queuedSaveWaiters.get(session) ?? [];
+  queuedSaveWaiters.set(session, waiters);
+  const p = new Promise<SaveFlowResult>((resolve) => {
+    waiters.push(resolve);
+  });
+  ensureSaveQueueDriver(session, deps);
+  return p;
+}
+
+/**
+ * 保存队列的唯一驱动循环：串行执行直到队列空/失败。
+ * 防重入：WeakMap 标记在首个 await 前同步置位，完成/失败后在 finally
+ * 同步清除——入队与驱动启动之间不存在搁浅窗口。
+ */
+function ensureSaveQueueDriver(session: DocumentSession, deps: FileFlowDeps): void {
+  if (activeQueueDrivers.get(session)) return;
+  activeQueueDrivers.set(session, true);
+  void (async () => {
+    try {
+      for (;;) {
+        const next = session.takeNextSaveIntent();
+        if (next.kind === "empty") return;
+        if (next.kind === "dropped-no-target") {
+          // 该排队请求以"无目标"终态出队（见 core NextSaveIntent 注释）
+          resolveNextWaiter(session, {
+            kind: "error",
+            code: "SAVE_NO_TARGET",
+            message: "尚未选择保存位置；请使用“另存为…”选择目标。",
+          });
+          continue;
+        }
+        const { snapshot } = next;
+        let receipt: CommitReceipt;
+        try {
+          receipt = await commitSnapshot(deps, snapshot);
+        } catch (e) {
+          const failure = platformError(e);
+          session.saveFailed(snapshot); // 清空剩余队列（core 失败策略）
+          failPendingWaiters(session, failure);
+          return;
+        }
         session.saveCompleted(snapshot, receipt);
-      } catch {
-        session.saveFailed(snapshot);
-        break; // 失败停止 drain，保持 dirty 交给用户
+        resolveNextWaiter(session, { kind: "ok", value: { receipt } });
       }
+    } finally {
+      activeQueueDrivers.delete(session);
     }
   })();
+}
+
+function resolveNextWaiter(session: DocumentSession, result: SaveFlowResult): void {
+  queuedSaveWaiters.get(session)?.shift()?.(result);
+}
+
+/** 失败清队后，把仍在等待的排队请求全部以同一失败终态收尾（不悬挂）。 */
+function failPendingWaiters(session: DocumentSession, failure: SaveFlowResult): void {
+  const waiters = queuedSaveWaiters.get(session);
+  if (!waiters) return;
+  for (const resolve of waiters.splice(0)) resolve(failure);
 }
 
 export function suggestedName(session: DocumentSession): string {
