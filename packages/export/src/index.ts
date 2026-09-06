@@ -16,6 +16,7 @@ export const EXPORT_PACKAGE_VERSION = "0.1.0";
 export * from "./layout.js";
 export * from "./visual-style.js";
 export * from "./edge-geometry.js";
+export * from "./graph-json.js";
 export * from "./font-source.js";
 export * from "./scene.js";
 export * from "./svg.js";
