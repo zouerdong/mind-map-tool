@@ -142,11 +142,13 @@ export const EDGE_GEOMETRY = {
 
 export interface PlanContext {
   /** 全图节点框（遮挡检测 obstacles；缺省用边端点框） */
-  obstacles?: readonly NodeBox[];
+  obstacles?: readonly NodeBox[] | undefined;
   /** 全图边界（贴边通道/外弧基准；缺省由 obstacles 推导） */
-  bounds?: GraphBounds;
+  bounds?: GraphBounds | undefined;
   /** 目标列入口缝宽（缺省 EDGE_GEOMETRY.seamWidth） */
-  seamWidth?: number;
+  seamWidth?: number | undefined;
+  /** 冻结的路由拓扑（动效期间保持通道与拓扑不变，防止离散跳形；缺省由 planEdgeRoutes 计算） */
+  routes?: Map<string, RoutedEdge> | undefined;
 }
 
 export function formatNum(v: number): string {
@@ -588,7 +590,9 @@ export function planEdgeGeometry(
   const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
   const gb = context.bounds ?? graphBoundsOf(obstacles);
   const seam = Math.max(40, context.seamWidth ?? EDGE_GEOMETRY.seamWidth);
-  const routed = planEdgeRoutes(edges, direction, { ...context, obstacles, bounds: gb, seamWidth: seam });
+  const routed =
+    context.routes ??
+    planEdgeRoutes(edges, direction, { ...context, obstacles, bounds: gb, seamWidth: seam });
   const result = new Map<string, EdgeGeometry>();
   const gap = EDGE_VISUAL.endpointGap;
   const arrowLen = EDGE_VISUAL.arrowLength;

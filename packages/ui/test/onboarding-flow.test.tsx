@@ -129,8 +129,12 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
-    expect(await prefs.load()).toBe("completed");
-    expect(store.snapshot()).toEqual({ onboardingStatus: "completed" });
+    // Overlay 隐藏与偏好持久化由两个独立 effect 完成；不能用前者的
+    // DOM 终态推断后者的 Promise 已经落定，否则全量门禁负载下会抖动。
+    await waitFor(async () => {
+      expect(await prefs.load()).toBe("completed");
+      expect(store.snapshot()).toEqual({ onboardingStatus: "completed" });
+    });
   });
 
   it("跳过：写偏好，后续启动不再弹出（AC-09）", async () => {

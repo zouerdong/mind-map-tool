@@ -23,8 +23,9 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { DocumentSession, Point } from "@mindmap/core";
+import { organizeCommand, type DocumentSession, type OrganizeCommandResult, type Point } from "@mindmap/core";
 import { measureNodeBox, type FontResolver } from "@mindmap/export/src/layout.js";
+import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
 import {
   documentDefaults,
   projectDocument,
@@ -35,8 +36,14 @@ import { createInteractionController } from "../controller/interaction-controlle
 import { isCompositionEvent } from "./node-text-editor.js";
 import { useCanvasSession } from "./use-canvas-session.js";
 import { MindNodeView } from "./mind-node.js";
+import { MindEdgeView } from "./mind-edge.js";
 import { ContextToolbar } from "./context-toolbar.js";
 import { themeTokens } from "../theme/theme-tokens.js";
+import {
+  MotionCoordinator,
+  computeCoordinatedViewport,
+  type MotionFrame,
+} from "./motion-coordinator.js";
 import {
   linkingReducer,
   nearestNodeInDirection,
@@ -69,9 +76,23 @@ export interface EditorCanvasProps {
    */
   fitViewSignal?: number;
   /**
-   * 重投影时节点位置的过渡动画时长（ms；0=关闭）。
-   * 拖动走乐观态不经过重投影通道，不受影响（MM-085 丝滑整理动画）。
-   * prefers-reduced-motion 时强制 0。
+   * 整理动画触发信号（VRA-060）：外部触发整理动作时自增此信号。
+   */
+  organizeSignal?: number;
+  /**
+   * 整理布局方向（默认 horizontal；G-VIS D7）。
+   */
+  organizeDirection?: LayoutDirection;
+  /**
+   * 整理结果回调（通知上层成功/no-op/超限错误）。
+   */
+  onOrganizeResult?: (result: OrganizeCommandResult) => void;
+  /**
+   * 整理完成回调。
+   */
+  onOrganizeComplete?: () => void;
+  /**
+   * @deprecated 兼容历史 prop；VRA-060 起由 motion-coordinator 统一接管，普通交互不再套全局 transition。
    */
   positionTransitionMs?: number;
   className?: string;
@@ -113,6 +134,7 @@ function EditingMindNode(props: NodeProps) {
 }
 
 const NODE_TYPES = { mind: EditingMindNode };
+const EDGE_TYPES = { mind: MindEdgeView };
 
 let uuidCounter = 0;
 function defaultId(prefix: string): string {
@@ -120,7 +142,22 @@ function defaultId(prefix: string): string {
   return `${prefix}-${uuidCounter}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision = 0, quickCreateSignal = 0, fitViewSignal = 0, positionTransitionMs = 0, className, overlay }: EditorCanvasProps) {
+export function EditorCanvas({
+  session,
+  fonts,
+  nextNodeId,
+  nextEdgeId,
+  revision = 0,
+  quickCreateSignal = 0,
+  fitViewSignal = 0,
+  organizeSignal = 0,
+  organizeDirection = "horizontal",
+  onOrganizeResult,
+  onOrganizeComplete,
+  positionTransitionMs: _positionTransitionMs = 0,
+  className,
+  overlay,
+}: EditorCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); // session-only
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
@@ -140,27 +177,155 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
   const [rfNodes, setRfNodes, onNodesChangeBase] = useNodesState(initial.nodes);
   const [rfEdges, setRfEdges, onEdgesChangeBase] = useEdgesState(initial.edges);
 
-  // core 重投影同步（commit/undo/redo/外部 revision 后整体覆盖受控 view-model）。
-  // 依赖只有 docVersion：setRfNodes/setRfEdges 是稳定 setter，
-  // api/projectNow 每渲染新引用 —— 列入依赖会形成 set→render→effect 的无限循环。
-  // MM-085：重投影时给节点位置加 CSS 过渡（丝滑整理/undo 动画；
-  // 拖动走乐观态不经此通道）；prefers-reduced-motion 强制关闭。
+  const coordinatorRef = useRef<MotionCoordinator>(new MotionCoordinator());
+  const reducedMotion = useReducedMotionFlag();
+  const displayPositionsRef = useRef<Map<string, Point>>(
+    new Map(initial.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }])),
+  );
+
+  // 卸载清理动画
+  useEffect(() => {
+    return () => {
+      coordinatorRef.current.cancel();
+    };
+  }, []);
+
+  // 显式整理信号（organizeSignal）
+  const lastOrganizeSignalRef = useRef(organizeSignal);
+  useEffect(() => {
+    if (organizeSignal === 0 || organizeSignal === lastOrganizeSignalRef.current) return;
+    lastOrganizeSignalRef.current = organizeSignal;
+
+    const result = organizeCommand(session.current.document, { direction: organizeDirection });
+    onOrganizeResult?.(result);
+    if (result.status === "moved") {
+      api.commit(result.command);
+    }
+  }, [organizeSignal, organizeDirection, onOrganizeResult, api, session]);
+
+  // core 重投影同步
+  // VRA-060：由 MotionCoordinator 统一接管整理/undo 动画；彻底移除旧 MM-085 的全局 CSS transition。
+  // 拖动、文本编辑、节点增删等普通操作无过渡直接更新。
   const docVersion = api.documentVersion;
   const projectNowRef = useRef(api.projectNow);
   projectNowRef.current = api.projectNow;
-  const transitionMs = useReducedMotionFlag() ? 0 : positionTransitionMs;
+  const lastDocVersionRef = useRef(docVersion);
+  const lastRevisionRef = useRef(revision);
+
   useEffect(() => {
+    const isExternalRevision = revision !== lastRevisionRef.current;
+    lastRevisionRef.current = revision;
+    const isDocChange = docVersion !== lastDocVersionRef.current;
+    lastDocVersionRef.current = docVersion;
+
     const view = projectNowRef.current();
-    const nodes =
-      transitionMs > 0 && docVersion > 0
-        ? view.nodes.map((n) => ({
-            ...n,
-            style: { ...n.style, transition: `transform ${transitionMs}ms ease` },
-          }))
-        : view.nodes;
-    setRfNodes(nodes);
+    const doc = session.current.document;
+
+    // 若外部 revision 导致文档切换（例如 session.load）
+    if (isExternalRevision && !isDocChange) {
+      coordinatorRef.current.cancel();
+      displayPositionsRef.current = new Map(
+        view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
+      );
+      setRfNodes(view.nodes);
+      setRfEdges(view.edges);
+      return;
+    }
+
+    // 检查是否发生了多节点布局重排（整理动作提交或 undo/redo）
+    let movedCount = 0;
+    const targetPositions = new Map<string, Point>();
+    for (const n of doc.document.nodes) {
+      targetPositions.set(n.id, { x: n.position.x, y: n.position.y });
+      const cur = displayPositionsRef.current.get(n.id);
+      if (cur && (Math.abs(cur.x - n.position.x) > 1 || Math.abs(cur.y - n.position.y) > 1)) {
+        movedCount++;
+      }
+    }
+
+    // 若正在动画中或者有多节点位置变更（且不是单节点拖拽提交）
+    if (movedCount >= 2 || coordinatorRef.current.getPhase() === "running") {
+      const isUndo = session.canRedo; // undo 导致的重排
+      const onFrame = (frame: MotionFrame) => {
+        setRfNodes((prevNodes) =>
+          prevNodes.map((n) => {
+            const p = frame.positions.get(n.id);
+            if (!p) return n;
+            displayPositionsRef.current.set(n.id, p);
+            return { ...n, position: { x: p.x, y: p.y } };
+          }),
+        );
+        setRfEdges((prevEdges) =>
+          prevEdges.map((e) => {
+            const geom = frame.edgePaths.get(e.id);
+            if (!geom || !e.data) return e;
+            const updated: MindFlowEdge = {
+              ...e,
+              data: {
+                lineStyle: e.data.lineStyle,
+                theme: e.data.theme,
+                pathD: geom.pathD,
+                arrowD: geom.arrowD,
+              },
+            };
+            return updated;
+          }),
+        );
+      };
+
+      if (isUndo) {
+        coordinatorRef.current.reverseTo(doc, targetPositions, {
+          direction: organizeDirection,
+          reducedMotion,
+          onFrame,
+          onComplete: () => {
+            onOrganizeComplete?.();
+          },
+        });
+      } else {
+        // 视口一次性协调
+        const pane = paneRectFromDom();
+        if (pane && rfInstanceRef.current) {
+          const { target, needed } = computeCoordinatedViewport(
+            displayPositionsRef.current,
+            targetPositions,
+            doc,
+            pane.width,
+            pane.height,
+            rfInstanceRef.current.getViewport(),
+          );
+          if (needed) {
+            void rfInstanceRef.current.setViewport(target, { duration: 600 });
+          }
+        }
+        coordinatorRef.current.start(doc, displayPositionsRef.current, targetPositions, {
+          direction: organizeDirection,
+          reducedMotion,
+          onFrame,
+          onComplete: () => {
+            onOrganizeComplete?.();
+          },
+        });
+      }
+      return;
+    }
+
+    // 普通编辑、文本修改、增删节点、单节点拖动结束等：直接投影，不套动画
+    displayPositionsRef.current = new Map(
+      view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
+    );
+    setRfNodes(view.nodes);
     setRfEdges(view.edges);
-  }, [docVersion, transitionMs, setRfNodes, setRfEdges]); // setRfNodes/Edges 为稳定引用
+  }, [
+    docVersion,
+    revision,
+    reducedMotion,
+    organizeDirection,
+    onOrganizeComplete,
+    setRfNodes,
+    setRfEdges,
+    session,
+  ]);
 
   // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。
   // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
@@ -204,6 +369,13 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
   const onNodesChange = useCallback(
     (changes: NodeChange<MindFlowNode>[]) => {
       trackSelection("nodes", changes);
+      // 若动画运行中，用户拖拽节点立即打断接管该节点
+      for (const c of changes) {
+        if (c.type === "position" && c.position) {
+          coordinatorRef.current.interruptNode(c.id, c.position);
+          displayPositionsRef.current.set(c.id, c.position);
+        }
+      }
       onNodesChangeBase(changes); // 受控 view-model（拖动位移在此本地应用）
     },
     [onNodesChangeBase, trackSelection],
@@ -433,6 +605,7 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
           // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
           style={{ backgroundColor: themeTokens(session.current.document.document.theme).canvasBackground }}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeDragStop={onNodeDragStop}

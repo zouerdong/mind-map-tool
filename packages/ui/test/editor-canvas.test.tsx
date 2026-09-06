@@ -133,4 +133,80 @@ describe("EditorCanvas", () => {
     expect(undoSpy).not.toHaveBeenCalled();
     undoSpy.mockRestore();
   });
+
+  it("organizeSignal 触发整理：单条 MoveNodes 提交 + onOrganizeResult 回调", async () => {
+    const session = new DocumentSession(makeStateNode(makeDoc()).document);
+    const onResult = vi.fn();
+    const onComplete = vi.fn();
+
+    const { rerender } = render(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={0}
+        onOrganizeResult={onResult}
+        onOrganizeComplete={onComplete}
+      />,
+    );
+
+    const commitSpy = vi.spyOn(session, "commit");
+
+    // 触发整理信号
+    rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={1}
+        onOrganizeResult={onResult}
+        onOrganizeComplete={onComplete}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onResult).toHaveBeenCalledTimes(1);
+    });
+    expect(onResult.mock.calls[0]![0].status).toBe("moved");
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    expect(session.isDirty).toBe(true);
+  });
+
+  it("已整理布局再次触发 organizeSignal → 返回 no-op，不提交多余命令", async () => {
+    const session = new DocumentSession(makeStateNode(makeDoc()).document);
+    const onResult = vi.fn();
+
+    const { rerender } = render(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={0}
+        onOrganizeResult={onResult}
+      />,
+    );
+
+    // 第一次触发整理
+    rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={1}
+        onOrganizeResult={onResult}
+      />,
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
+    expect(onResult.mock.calls[0]![0].status).toBe("moved");
+
+    // 第二次触发整理
+    rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={2}
+        onOrganizeResult={onResult}
+      />,
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2));
+    expect(onResult.mock.calls[1]![0].status).toBe("no-op");
+  });
 });

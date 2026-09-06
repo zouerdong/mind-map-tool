@@ -37,9 +37,24 @@ export type {
 export { EditorCanvas } from "./canvas/editor-canvas.js";
 export type { EditorCanvasProps } from "./canvas/editor-canvas.js";
 export { MindNodeView } from "./canvas/mind-node.js";
+export { MindEdgeView } from "./canvas/mind-edge.js";
 export { NodeTextEditor, isCompositionEvent } from "./canvas/node-text-editor.js";
 export { useCanvasSession } from "./canvas/use-canvas-session.js";
 export type { CanvasSessionApi } from "./canvas/use-canvas-session.js";
+export {
+  MotionCoordinator,
+  MOTION_TIMELINE,
+  computeCoordinatedViewport,
+  computeNodeDelays,
+  computeNodeDepths,
+  easeOutCubic,
+} from "./canvas/motion-coordinator.js";
+export type {
+  CoordinatedViewport,
+  MotionFrame,
+  MotionOptions,
+  MotionPhase,
+} from "./canvas/motion-coordinator.js";
 
 // 键盘导航与连线流（MM-089）
 export {

@@ -23,6 +23,8 @@ export async function rfStubModule(): Promise<unknown> {
         fitView: () => {},
         zoomIn: () => {},
         zoomOut: () => {},
+        getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+        setViewport: () => {},
         screenToFlowPosition: (p: { x: number; y: number }) => ({ ...p }),
       });
     }, []);
@@ -59,6 +61,31 @@ export async function rfStubModule(): Promise<unknown> {
                 // RF NodeProps 其余字段对 MindNodeView 非必需
               })
             : String(n.data?.text ?? n.id),
+        ),
+      ),
+      createElement(
+        "svg",
+        { className: "react-flow__edges" },
+        ...(props.edges ?? []).map((e: AnyProps) =>
+          createElement(
+            "g",
+            {
+              key: e.id,
+              className: "react-flow__edge",
+              "data-testid": `rf-edge-${e.id}`,
+              "data-path": e.data?.pathD,
+            },
+            props.edgeTypes?.[e.type]
+              ? createElement(props.edgeTypes[e.type], {
+                  id: e.id,
+                  source: e.source,
+                  target: e.target,
+                  data: e.data,
+                  style: e.style,
+                  markerEnd: e.markerEnd,
+                })
+              : null,
+          ),
         ),
       ),
       createElement("button", {

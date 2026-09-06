@@ -37,9 +37,13 @@ export type MindFlowNode = Node<MindNodeData, "mind">;
 export interface MindEdgeData extends Record<string, unknown> {
   lineStyle: LineStyle;
   theme: ThemeName;
+  /** 自定义主线 SVG path（整理动效或规整态由 edgePathD 计算，缺省走 RF 平滑贝塞尔） */
+  pathD?: string;
+  /** 自定义箭头 SVG path（与 export 共享三角箭头，缺省走 markerEnd） */
+  arrowD?: string;
 }
 
-export type MindFlowEdge = Edge<MindEdgeData>;
+export type MindFlowEdge = Edge<MindEdgeData, "mind">;
 
 export interface ProjectedView {
   nodes: MindFlowNode[];
@@ -93,6 +97,7 @@ export function projectEdge(edge: MindEdge, theme: ThemeName): MindFlowEdge {
   const stroke = lineStyle === "solid" ? t.edgePrimary : t.edgeSecondary;
   return {
     id: edge.id,
+    type: "mind",
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
     data: { lineStyle, theme },
