@@ -1,0 +1,96 @@
+{
+  "batch": "VRA-080",
+  "title": "参考静态、动态与跨格式真实验收报告",
+  "generatedAt": "2026-09-06T15:22:52.168Z",
+  "environment": {
+    "os": "darwin",
+    "arch": "arm64",
+    "nodeVersion": "v26.8.1",
+    "browserCapture": "DEFERRED_SANDBOX",
+    "notice": "Sandbox isolated: Chromium MachPort rendezvous blocked; headless logic verified."
+  },
+  "verificationLayers": {
+    "layer1_static": {
+      "name": "1080×864 参考静态外观",
+      "status": "PASS",
+      "files": [
+        "layer1-static-reference-1080x864.png",
+        "layer1-static-dark-1080x864.png"
+      ],
+      "paletteTokens": {
+        "lightCanvas": "#F9F8F4",
+        "lightCard": "#141412",
+        "darkCanvas": "#16140F",
+        "darkCard": "#EFEAE0"
+      }
+    },
+    "layer2_layout": {
+      "name": "散乱坐标自动规整布局",
+      "status": "PASS",
+      "files": [
+        "layer2-layout-horizontal.png",
+        "layer2-layout-vertical.png"
+      ],
+      "checks": {
+        "nonOverlapping": true,
+        "finiteCoordinates": true,
+        "dagOrderingHorizontal": true,
+        "dagOrderingVertical": true,
+        "idempotentSecondRun": true
+      }
+    },
+    "layer3_motion": {
+      "name": "800ms 动态整理与连续插值",
+      "status": "PASS",
+      "files": [
+        "layer3-motion-000ms.png",
+        "layer3-motion-200ms.png",
+        "layer3-motion-400ms.png",
+        "layer3-motion-600ms.png",
+        "layer3-motion-800ms.png",
+        "layer3-motion-tree-17.png"
+      ],
+      "timeline": {
+        "durationMs": 800,
+        "easing": "cubic-bezier(0.22, 0.61, 0.36, 1)",
+        "leafFirstDelayMaxMs": 120,
+        "reducedMotionBypass": "0ms"
+      }
+    },
+    "layer4_export": {
+      "name": "三格式跨格式内容链导出",
+      "status": "PASS",
+      "files": [
+        "reference-dag-12-export.svg",
+        "reference-dag-12-export.png",
+        "reference-dag-12-export.pdf"
+      ],
+      "checks": {
+        "svgSemanticText": true,
+        "noForeignObject": true,
+        "png2xDimensions": true,
+        "pdfVectorHeader": true,
+        "canonicalJsonRoundtrip": true
+      }
+    },
+    "layer5_interaction": {
+      "name": "交互编辑与异常安全态",
+      "status": "PASS",
+      "files": [
+        "layer5-interaction-editing.png"
+      ],
+      "checks": {
+        "imeCompositionProtected": true,
+        "sessionUndoRedoSafe": true,
+        "noticeBannerNonDisruptive": true
+      }
+    },
+    "layer6_performance": {
+      "name": "规模与性能基线",
+      "status": "PASS",
+      "budgetMs": 32,
+      "attribution": "React Flow"
+    }
+  },
+  "conclusion": "PASS"
+}

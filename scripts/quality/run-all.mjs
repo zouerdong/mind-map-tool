@@ -31,6 +31,8 @@ const STAGES = {
     ),
   performance: () =>
     run("node", [resolve(HERE, "run-performance.mjs"), ...(focus ? ["--focus", focus] : [])], ROOT),
+  visual: () =>
+    run("node", [resolve(HERE, "run-visual-alignment.mjs")], ROOT),
 };
 
 function run(cmd, cmdArgs, cwd) {
@@ -43,9 +45,10 @@ STAGES.a11y = () =>
   run("pnpm", ["--filter", "./packages/ui", "run", "test:a11y"], ROOT); // MM-070 落地：axe-core（jsdom）
 
 const SUITES = {
-  all: ["typecheck", "lint", "unit", "boundaries", "licenses", "network", "golden", "performance"],
-  integration: ["unit", "boundaries"], // 集成测试在 MM-090 扩展
+  all: ["typecheck", "lint", "unit", "boundaries", "licenses", "network", "golden", "performance", "visual"],
+  integration: ["unit", "boundaries", "visual"], // 集成测试包含视觉与动效契约
   a11y: ["a11y"],
+  visual: ["visual"],
 };
 
 const plan = SUITES[suite] ?? SUITES.all;

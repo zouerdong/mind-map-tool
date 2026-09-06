@@ -23,6 +23,7 @@ export default defineConfig({
       "tests/unit/**/*.test.{ts,tsx}",
       "tests/bootstrap/**/*.test.ts",
       "tests/golden/**/*.test.ts",
+      "tests/visual/**/*.test.ts",
     ],
     environment: "node",
     hookTimeout: 300_000,
