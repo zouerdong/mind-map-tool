@@ -33,7 +33,7 @@ describe("视觉 token 与文档一致（docs/product/visual-state-tokens-2026-0
     expect(LIGHT_PALETTE.cardNormalKicker).toBe("#A8A296");
     expect(LIGHT_PALETTE.cardAccentFill).toBe("#D97757");
     expect(LIGHT_PALETTE.cardAccentText).toBe("#331708");
-    expect(LIGHT_PALETTE.cardAccentKicker).toBe("#6B3A22");
+    expect(LIGHT_PALETTE.cardAccentKicker).toBe("#5C2F1A");
     expect(LIGHT_PALETTE.edgePrimary).toBe("#4A4640");
     expect(LIGHT_PALETTE.edgeSecondary).toBe("#8A8478");
   });

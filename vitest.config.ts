@@ -8,6 +8,8 @@ export default defineConfig({
     alias: {
       "@mindmap/core": r("./packages/core/src/index.ts"),
       "@mindmap/export/src/layout.js": r("./packages/export/src/layout.ts"),
+      "@mindmap/export/src/visual-style.js": r("./packages/export/src/visual-style.ts"),
+      "@mindmap/export/src/edge-geometry.js": r("./packages/export/src/edge-geometry.ts"),
       "@mindmap/export": r("./packages/export/src/index.ts"),
       "@mindmap/ui": r("./packages/ui/src/index.ts"),
       "@mindmap/platform": r("./packages/platform/src/index.ts"),

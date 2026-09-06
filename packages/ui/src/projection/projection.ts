@@ -2,9 +2,11 @@
 // 纯函数、无 React 依赖：core nodes/edges 是唯一事实源；画布库内部
 // selection/measurement/缓存绝不进入投影产物，也绝不进入文件。
 // node size 直接采用 core 持久化权威值（不触发 RF 自动测量）。
+// VRA-050：kicker/emphasis/lineStyle（ADR 0010）与 G-VIS palette 同源投影。
 
 import type {
   FontToken,
+  LineStyle,
   MindEdge,
   MindMapDocumentV1,
   MindNode,
@@ -12,11 +14,16 @@ import type {
   TextRun,
   ThemeName,
 } from "@mindmap/core";
-import type { Edge, Node } from "@xyflow/react";
+import { MarkerType, type Edge, type Node } from "@xyflow/react";
+import { themeTokens } from "../theme/theme-tokens.js";
 
 export interface MindNodeData extends Record<string, unknown> {
   text: string;
   runs: TextRun[] | undefined;
+  /** 可选单行眉题（ADR 0010；缺省 undefined = 无眉题自然卡）。 */
+  kicker: string | undefined;
+  /** 强调角色（ADR 0010；true = 橙实心卡）。 */
+  emphasis: boolean;
   /** 解析后的有效形状（节点覆盖 ?? 文档默认）。 */
   shape: NodeShape;
   theme: ThemeName;
@@ -26,9 +33,13 @@ export interface MindNodeData extends Record<string, unknown> {
 }
 
 export type MindFlowNode = Node<MindNodeData, "mind">;
-import { themeTokens } from "../theme/theme-tokens.js";
 
-export type MindFlowEdge = Edge;
+export interface MindEdgeData extends Record<string, unknown> {
+  lineStyle: LineStyle;
+  theme: ThemeName;
+}
+
+export type MindFlowEdge = Edge<MindEdgeData>;
 
 export interface ProjectedView {
   nodes: MindFlowNode[];
@@ -56,6 +67,8 @@ export function projectNode(node: MindNode, defaults: ReturnType<typeof document
     data: {
       text: node.text,
       runs: node.runs,
+      kicker: node.kicker,
+      emphasis: node.emphasis === true,
       shape: node.shape ?? defaults.shape,
       theme: defaults.theme,
       font: defaults.font,
@@ -64,13 +77,33 @@ export function projectNode(node: MindNode, defaults: ReturnType<typeof document
   };
 }
 
+/** 线型 dash（G-VIS tokens §1.4：虚 5 4 / 点 0.1 5 round；实线无 dash）。 */
+export function edgeDash(lineStyle: LineStyle): string | undefined {
+  if (lineStyle === "dashed") return "5 4";
+  if (lineStyle === "dotted") return "0.1 5";
+  return undefined;
+}
+
 export function projectEdge(edge: MindEdge, theme: ThemeName): MindFlowEdge {
-  // MM-090-D9：连线颜色随主题（此前用 RF 默认 #b1b1b7——黑底上不可见）
+  // G-VIS D4：默认箭头（指向 target）；实/虚/点线型；颜色与 export 同源。
+  // 自由拖动态为平滑曲线（RF default bezier）；正交规整态布线归 VRA-060 消费
+  // export planEdgeGeometry —— 本卡先把方向（底出顶入）与外观做对。
+  const t = themeTokens(theme);
+  const lineStyle = edge.lineStyle ?? "solid";
+  const stroke = lineStyle === "solid" ? t.edgePrimary : t.edgeSecondary;
   return {
     id: edge.id,
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
-    style: { stroke: themeTokens(theme).edgeStroke },
+    data: { lineStyle, theme },
+    style: {
+      stroke,
+      strokeWidth: lineStyle === "solid" ? 2 : 1.5,
+      ...(edgeDash(lineStyle) !== undefined
+        ? { strokeDasharray: edgeDash(lineStyle) }
+        : {}),
+    },
+    markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 16, height: 16 },
   };
 }
 

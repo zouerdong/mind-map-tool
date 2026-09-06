@@ -1,0 +1,110 @@
+// @vitest-environment jsdom
+// 上下文工具条（VRA-050 ③）：选中 → 工具条出现；节点操作（强调/眉题/字号）
+// 与边线型经 session.commit 提交对应命令；无选中不渲染。RF stub 环境。
+
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DocumentSession, makeStateNode, type MindMapDocumentV1 } from "@mindmap/core";
+import type { FontResolver } from "@mindmap/export/src/layout.js";
+
+vi.mock("@xyflow/react", () => import("./helpers/rf-stub.js").then((m) => m.rfStubModule()));
+
+const { EditorCanvas } = await import("../src/canvas/editor-canvas.js");
+
+afterEach(cleanup);
+
+const fakeFonts: FontResolver = {
+  regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+  bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+};
+
+function doc(): MindMapDocumentV1 {
+  return {
+    schemaVersion: 2,
+    document: {
+      theme: "light",
+      font: "noto-sans-sc",
+      shape: "card",
+      framesVisible: true,
+      nodes: [
+        { id: "a", text: "起点", position: { x: 0, y: 0 }, size: { width: 100, height: 40 }, kicker: "IDEA" },
+        { id: "b", text: "目标", position: { x: 200, y: 0 }, size: { width: 100, height: 40 } },
+      ],
+      edges: [{ id: "e1", sourceNodeId: "a", targetNodeId: "b", lineStyle: "dashed" }],
+    },
+  };
+}
+
+function renderCanvas() {
+  const session = new DocumentSession(makeStateNode(doc()).document);
+  render(
+    <EditorCanvas
+      session={session}
+      fonts={fakeFonts}
+      nextNodeId={() => `n-${Math.random().toString(36).slice(2, 6)}`}
+      nextEdgeId={() => `e-${Math.random().toString(36).slice(2, 6)}`}
+    />,
+  );
+  return { session };
+}
+
+/** 模拟 RF 选中变化（rf-stub 的节点 testid 触发 select change 的方式同其他测试）。 */
+async function selectNode(id: string) {
+  const el = await screen.findByTestId(`rf-node-${id}`);
+  fireEvent.click(el); // rf-stub click → select change 流
+  await waitFor(() => expect(screen.getByTestId("context-toolbar")).toBeTruthy());
+}
+
+describe("上下文工具条（VRA-050）", () => {
+  it("无选中不渲染；选中节点出现工具条（强调/眉题/字体/字号/形状/框线/删除）", async () => {
+    renderCanvas();
+    expect(screen.queryByTestId("context-toolbar")).toBeNull();
+    await selectNode("a");
+    for (const title of ["普通/强调角色", "字号 −2", "字号 +2", "整节点粗体", "整节点下划线", "单节点形状", "文档级框线显隐", "删除选中（⌫）"]) {
+      expect(screen.getByTitle(title), title).toBeTruthy();
+    }
+    expect(screen.getByTestId("kicker-input")).toBeTruthy();
+  });
+
+  it("强调切换 → SetNodeEmphasis 提交（kicker 保留）", async () => {
+    const { session } = renderCanvas();
+    await selectNode("a");
+    fireEvent.click(screen.getByTitle("普通/强调角色"));
+    await waitFor(() => {
+      const n = session.current.document.document.nodes.find((x) => x.id === "a");
+      expect(n?.emphasis).toBe(true);
+      expect(n?.kicker).toBe("IDEA"); // 强调不清眉题
+    });
+    // undo 一次恢复
+    session.undo();
+    await waitFor(() => {
+      expect(session.current.document.document.nodes.find((x) => x.id === "a")?.emphasis).toBeUndefined();
+    });
+  });
+
+  it("眉题输入（失焦提交）→ SetNodeKicker；清空 = 移除眉题", async () => {
+    const { session } = renderCanvas();
+    await selectNode("b");
+    const input = screen.getByTestId("kicker-input");
+    fireEvent.change(input, { target: { value: "工具 TOOL" } });
+    fireEvent.blur(input);
+    await waitFor(() => {
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.kicker).toBe("工具 TOOL");
+    });
+  });
+
+  it("字号 A+ → 整节点 runs 字号 18 提交（EditNodeText 通道，可 undo）", async () => {
+    const { session } = renderCanvas();
+    await selectNode("b");
+    fireEvent.click(screen.getByTitle("字号 +2"));
+    await waitFor(() => {
+      const n = session.current.document.document.nodes.find((x) => x.id === "b");
+      expect(n?.runs?.[0]?.fontSize).toBe(18);
+      expect(n?.text).toBe("目标"); // 文本不被清空（runs 不清内容）
+    });
+    session.undo();
+    await waitFor(() => {
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.runs).toBeUndefined();
+    });
+  });
+});

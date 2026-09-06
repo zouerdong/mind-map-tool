@@ -1,76 +1,106 @@
-// 主题 tokens（MM-070 ①）：白板/黑板，纯粹极简（PRD §6：纯白与纯黑，
-// 无纸张/粉笔质感装饰 [from-user 2026-08-26]）。
-// 覆盖 AC-05 的全部状态面：内容、选择、焦点、编辑、连接；非文本图形对比
-// ≥ 3:1（WCAG 2.2），正文文本对比 ≥ 4.5:1 —— 对比值由 theme-tokens.test.ts
-// 用相对亮度公式实算断言（不引依赖、不靠目测）。
-// 文档主题（light/dark）持久化于 core schema 并经 SetDocumentStyle 进入 undo；
-// 本 tokens 只负责视觉映射。canvas 接线（背景/边/选择色应用）在 MM-080。
+// 主题 tokens（VRA-050 ①）：G-VIS 定稿视觉（docs/product/visual-state-tokens-2026-09-06.md
+// §1.1 暖白工作态 / §1.2 黑板同构，2026-09-06 用户逐项校准）。
+// 覆盖旧「纯白/纯黑 + 蓝色选择」MM-070 方案（该方案随 G-VIS 裁决退役，见 tokens §5 D1）。
+//
+// 同源约束：色值与 packages/export/src/visual-style.ts（LIGHT_PALETTE/DARK_PALETTE/
+// VISUAL_TYPOGRAPHY/EDGE_VISUAL，VRA-040 契约）逐项一致 —— ui 侧经 @mindmap/export
+// 直接消费同一份常数（packages/ui/package.json 已有该 workspace 依赖），不复制第二份；
+// 同步防线见 test/visual-contract.test.ts（ui tokens ↔ export palette 对照断言）。
+//
+// 对比度按 WCAG 2.2 相对亮度公式实算断言（theme-tokens.test.ts，不引依赖、不靠目测）：
+// 正文 ≥4.5:1；眉题为辅助文字 ≥3:1；非文本图形（线/选中/焦点/端口）≥3:1。
+// 状态区分不靠颜色单通道：选中=描边、主选=角标记、焦点=环（§2/§3，形状双通道）。
 
 import type { ThemeName } from "@mindmap/core";
 
 export interface ThemeTokens {
-  /** 画布背景（纯白/纯黑基调）。 */
+  /** 画布底（§1.1 canvas.light / §1.2 canvas.dark）。平坦无纹理、无常驻点阵。 */
   canvasBackground: string;
-  /** 节点底色与描边。 */
-  nodeBackground: string;
-  nodeBorder: string;
-  nodeText: string;
-  /** 连接线。 */
-  edgeStroke: string;
-  /** 选择态（框线）。 */
+  /** 普通卡：实心填充 + 正文 + 眉题（无投影无描边，§1.1）。 */
+  cardNormalFill: string;
+  cardNormalText: string;
+  cardNormalKicker: string;
+  /** 强调卡（用户手动角色，橙卡不随主题反转，§1.2）。 */
+  cardAccentFill: string;
+  cardAccentText: string;
+  cardAccentKicker: string;
+  /** 卡圆角（§1.3 12px；与 export VISUAL_TYPOGRAPHY.cardRadius 同源）。 */
+  cardRadius: number;
+  /** 连线：主（实线）/ 次（虚线、点线）。 */
+  edgePrimary: string;
+  edgeSecondary: string;
+  /** 状态：选中描边 / 键盘焦点环 / 拖动反馈 / hover 连接端口（同一橙 token，§1.1 原则）。 */
   selectionOutline: string;
-  /** 焦点环（键盘可达性）。 */
   focusRing: string;
-  /** 编辑态输入底色/光标色（与节点底一致的纯色）。 */
-  editingBackground: string;
-  editingCaret: string;
-  /** 拖动中反馈。 */
   draggingOutline: string;
+  hoverPort: string;
+  /** framesVisible=false 纯文字态：画布上的正文/眉题色（墨/纸互换）。 */
+  canvasInk: string;
+  canvasKicker: string;
+  /** 编辑态文本光标（§2 编辑中：对卡底 14.6:1）。 */
+  editingCaret: string;
+  /** shell 文字（顶栏/菜单/提示）与次要文字。 */
+  shellText: string;
+  shellSubtle: string;
   /** 引导遮罩与提示卡。 */
   onboardingScrim: string;
   onboardingCardBackground: string;
   onboardingCardBorder: string;
   onboardingCardText: string;
-  /** 画布网格点。 */
-  backgroundPattern: string;
 }
 
-/** 纯白主题（light）。 */
+/** §1.1 暖白工作态（light）。 */
 export const LIGHT_TOKENS: ThemeTokens = {
-  canvasBackground: "#ffffff",
-  nodeBackground: "#ffffff",
-  nodeBorder: "#1f2328", // 近黑描边：对纯白底对比 > 12:1
-  nodeText: "#1f2328",
-  edgeStroke: "#424a53", // 非文本 ≥3:1
-  selectionOutline: "#0969da",
-  focusRing: "#0969da",
-  editingBackground: "#ffffff",
-  editingCaret: "#1f2328",
-  draggingOutline: "#0969da",
-  onboardingScrim: "rgba(31, 35, 40, 0.45)",
-  onboardingCardBackground: "#ffffff",
-  onboardingCardBorder: "#1f2328",
-  onboardingCardText: "#1f2328",
-  backgroundPattern: "#d0d7de",
+  canvasBackground: "#F9F8F4",
+  cardNormalFill: "#141412",
+  cardNormalText: "#F5F2EA",
+  cardNormalKicker: "#A8A296",
+  cardAccentFill: "#D97757",
+  cardAccentText: "#331708",
+  cardAccentKicker: "#5C2F1A",
+  cardRadius: 12,
+  edgePrimary: "#4A4640",
+  edgeSecondary: "#8A8478",
+  selectionOutline: "#D06B47",
+  focusRing: "#D06B47",
+  draggingOutline: "#D06B47",
+  hoverPort: "#D06B47",
+  canvasInk: "#141412",
+  canvasKicker: "#8A8478",
+  editingCaret: "#F5F2EA",
+  shellText: "#3B372F",
+  shellSubtle: "#8A8478",
+  onboardingScrim: "rgba(20, 20, 18, 0.45)",
+  onboardingCardBackground: "#FFFFFF",
+  onboardingCardBorder: "#141412",
+  onboardingCardText: "#141412",
 };
 
-/** 纯黑主题（dark）。 */
+/** §1.2 黑板同构（dark）：卡片实心镜像反转、同一橙强调、深底亮线。 */
 export const DARK_TOKENS: ThemeTokens = {
-  canvasBackground: "#000000",
-  nodeBackground: "#0d1117", // 纯黑画布上的节点面
-  nodeBorder: "#e6edf3", // 近白描边：对纯黑底对比 > 14:1
-  nodeText: "#e6edf3",
-  edgeStroke: "#c9d1d9", // 非文本 ≥3:1
-  selectionOutline: "#58a6ff",
-  focusRing: "#58a6ff",
-  editingBackground: "#0d1117",
-  editingCaret: "#e6edf3",
-  draggingOutline: "#58a6ff",
+  canvasBackground: "#16140F",
+  cardNormalFill: "#EFEAE0",
+  cardNormalText: "#141412",
+  cardNormalKicker: "#7A7264",
+  cardAccentFill: "#D97757",
+  cardAccentText: "#331708",
+  cardAccentKicker: "#5C2F1A", // §1.2 未单列 → 沿用 light（与 export DARK_PALETTE 一致）
+  cardRadius: 12,
+  edgePrimary: "#A39C8E",
+  edgeSecondary: "#6B655A",
+  selectionOutline: "#D06B47",
+  focusRing: "#D06B47",
+  draggingOutline: "#D06B47",
+  hoverPort: "#D06B47",
+  canvasInk: "#EFEAE0",
+  canvasKicker: "#A39C8E",
+  editingCaret: "#141412",
+  shellText: "#EFEAE0",
+  shellSubtle: "#A39C8E",
   onboardingScrim: "rgba(0, 0, 0, 0.55)",
-  onboardingCardBackground: "#0d1117",
-  onboardingCardBorder: "#e6edf3",
-  onboardingCardText: "#e6edf3",
-  backgroundPattern: "#30363d",
+  onboardingCardBackground: "#201D17",
+  onboardingCardBorder: "#EFEAE0",
+  onboardingCardText: "#EFEAE0",
 };
 
 export function themeTokens(theme: ThemeName): ThemeTokens {

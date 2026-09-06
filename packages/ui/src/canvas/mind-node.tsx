@@ -1,19 +1,18 @@
-// 节点渲染（MM-050 ①④）：视觉与 exporter 同源——行/段几何来自共享
-// layoutNodeText（packages/export），card/ellipse、白/黑主题与 ExportScene
-// 的绘制规则一致（scene.ts），保证画布所见 = 导出所得。
+// 节点渲染（VRA-050）：视觉与 exporter 同源——行/段几何来自共享
+// layoutNodeVisual（packages/export，含眉题+正文两层），palette 与
+// theme-tokens / export visual-style 同一事实源（G-VIS 定稿）。
+// 实心卡（普通近黑/强调橙）、无投影无描边、圆角 12；状态双通道：
+// 选中=描边、主选/焦点=角标记+环（形状区分，不靠颜色深浅）。
 // 尺寸由 core size 权威决定（RF 不测量）。
 
 import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { FontToken } from "@mindmap/core";
-import { layoutNodeText, measureNodeBox, LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
+import { layoutNodeVisual, VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
+import { measureNodeBox, LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
+import { themeTokens } from "../theme/theme-tokens.js";
 import type { MindFlowNode } from "../projection/projection.js";
 import { NodeTextEditor } from "./node-text-editor.js";
-
-export const MIND_NODE_THEME = {
-  light: { bg: "#ffffff", border: "#1f2328", text: "#1f2328" },
-  dark: { bg: "#0d1117", border: "#e6edf3", text: "#e6edf3" },
-} as const;
 
 interface MindNodeViewProps extends NodeProps {
   data: MindFlowNode["data"];
@@ -39,12 +38,25 @@ function MindNodeViewImpl({
   onCommitEdit,
   onCancelEdit,
 }: MindNodeViewProps) {
-  const layout = layoutNodeText(data.text, data.runs, data.font, fonts);
-  const palette = MIND_NODE_THEME[data.theme];
+  // 眉题 + 正文两层排版（export 同源；无眉题自然单层）
+  const layout = layoutNodeVisual(
+    {
+      text: data.text,
+      ...(data.runs !== undefined ? { runs: data.runs } : {}),
+      ...(data.kicker !== undefined && data.kicker.length > 0 ? { kicker: data.kicker } : {}),
+    },
+    data.shape,
+    data.font,
+    fonts,
+  );
+  const t = themeTokens(data.theme);
+  const accent = data.emphasis === true;
+  const fill = accent ? t.cardAccentFill : t.cardNormalFill;
+  const text = accent ? t.cardAccentText : t.cardNormalText;
+  const kicker = accent ? t.cardAccentKicker : t.cardNormalKicker;
   const isEllipse = data.shape === "ellipse";
+  const primary = selected || focused; // 主选/焦点：角标记
   // 编辑态实时尺寸（用户实测 2026-08-29：编辑框长大了、节点框没长，文字溢出框外）。
-  // 编辑器每次输入把「提交后同一口径」的测量框报上来，节点外框同步跟随，
-  // 提交时 core 写入的权威尺寸与它同源——提交瞬间无跳变。
   const [editBox, setEditBox] = useState<{ width: number; height: number } | null>(null);
 
   const textStyle: React.CSSProperties = {
@@ -53,67 +65,100 @@ function MindNodeViewImpl({
     pointerEvents: "none",
   };
 
+  // 角标记（主选/键盘焦点；形状通道，色弱可辨）
+  const corner = 9;
+  const corners: Array<[number, number, number, number]> = [
+    [-6, -6, 1, 1], [1, -6, -1, 1], [-6, 1, 1, -1], [1, 1, -1, -1],
+  ];
+
   return (
     <div
       style={{
         width: editing && editBox ? `max(100%, ${editBox.width}px)` : "100%",
         height: editing && editBox ? `max(100%, ${editBox.height}px)` : "100%",
         boxSizing: "border-box",
-        background: palette.bg,
-        border: `${LAYOUT.strokeWidth}px solid ${palette.border}`,
-        borderRadius: isEllipse ? "50%" : 6,
+        background: fill,
+        borderRadius: isEllipse ? "50%" : t.cardRadius,
         position: "relative",
         outline: linkCandidate
-          ? "3px solid #d97757"
+          ? `3px solid ${t.hoverPort}`
           : selected
-            ? "2px solid #4c8bf5"
+            ? `2px solid ${t.selectionOutline}`
             : focused
-              ? "2px dashed #4c8bf5"
+              ? `2px solid ${t.focusRing}`
               : dragging
-                ? "1.5px dashed #4c8bf5"
+                ? `1.5px dashed ${t.draggingOutline}`
                 : "none",
-        outlineOffset: 2,
-        boxShadow: data.framesVisible ? `0 0 0 ${LAYOUT.strokeWidth}px ${palette.border}22` : undefined,
+        outlineOffset: 3,
       }}
       role="button"
-      aria-label={`节点：${data.text || "空"}`}
+      aria-label={`${data.kicker ? data.kicker + "·" : ""}节点：${data.text || "空"}${accent ? "（强调）" : ""}`}
       tabIndex={-1}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0.35 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0.35 }} />
+      {/* G-VIS D7：整理默认横向（右出左入）；纵向可选时由 VRA-060 协调切换 */}
+      <Handle type="target" position={Position.Left} style={{ opacity: selected || focused ? 0.9 : 0.35 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: selected || focused ? 0.9 : 0.35 }} />
 
       {editing ? (
         <NodeTextEditor
           initialText={data.text}
           fontFamily={fontFamily(data.font)}
-          textColor={palette.text}
-          background={palette.bg}
+          textColor={text}
+          background={fill}
           // 实时增长与提交后渲染同一测量源（所见即所得；runs 在编辑态按纯文本计）
-          measureBox={(t) => measureNodeBox(t, undefined, data.font, fonts)}
+          measureBox={(txt) => measureNodeBox(txt, undefined, data.font, fonts)}
           onMeasure={setEditBox}
-          onCommit={(text) => onCommitEdit(id, text)}
+          onCommit={(txt) => onCommitEdit(id, txt)}
           onCancel={onCancelEdit}
         />
       ) : (
         <svg style={textStyle} aria-hidden="true">
+          {primary
+            ? corners.map(([cx, cy, sx, sy], i) => (
+                <path
+                  key={`c${i}`}
+                  className="corner-tick"
+                  d={`M ${cx + sx * corner} ${cy} L ${cx} ${cy} L ${cx} ${cy + sy * corner}`}
+                  stroke={t.focusRing}
+                  strokeWidth={2.5}
+                  fill="none"
+                  transform={i % 2 === 0 ? "translate(-3,-3)" : "translate(3,-3)"}
+                />
+              ))
+            : null}
+          {/* 眉题（§1.3：11px 上行、letter-spacing 0.06em；空眉题自然不渲染） */}
+          {layout.kicker ? (
+            <text
+              x={layout.kicker.x}
+              y={VISUAL_TYPOGRAPHY.paddingTop + layout.kicker.baselineY}
+              fill={kicker}
+              fontSize={layout.kicker.fontSize}
+              fontFamily={fontFamily(data.font)}
+              letterSpacing={`${layout.kicker.letterSpacing}px`}
+              style={{ whiteSpace: "pre" }}
+            >
+              {layout.kicker.text}
+            </text>
+          ) : null}
           {layout.lines.map((line, li) => {
-            const y =
-              LAYOUT.paddingY +
+            const yBase =
+              VISUAL_TYPOGRAPHY.paddingTop +
+              layout.bodyTop +
               layout.lines.slice(0, li).reduce((s, l) => s + l.height, 0) +
               line.baselineOffset;
             let lastX = -1;
             return (
               <g key={li}>
                 {line.segments.map((seg, si) => {
-                  const x = LAYOUT.paddingX + seg.startX;
+                  const x = VISUAL_TYPOGRAPHY.paddingX + seg.startX;
                   const showUnderline = seg.underline;
                   lastX = x + seg.width;
                   return (
                     <g key={si}>
                       <text
                         x={x}
-                        y={y}
-                        fill={palette.text}
+                        y={yBase}
+                        fill={text}
                         fontSize={seg.fontSize}
                         fontFamily={fontFamily(data.font)}
                         fontWeight={seg.bold ? 700 : 400}
@@ -126,9 +171,9 @@ function MindNodeViewImpl({
                         <line
                           x1={x}
                           x2={lastX}
-                          y1={y + LAYOUT.underlineGap}
-                          y2={y + LAYOUT.underlineGap}
-                          stroke={palette.text}
+                          y1={yBase + LAYOUT.underlineGap}
+                          y2={yBase + LAYOUT.underlineGap}
+                          stroke={text}
                           strokeWidth={LAYOUT.underlineThickness}
                         />
                       ) : null}

@@ -70,7 +70,7 @@ describe("全键盘建图（AC-17）", () => {
     keyDown("ArrowRight"); // 无焦点 → 首个 a
     keyDown("ArrowRight"); // a → b（右侧最近）
     await waitFor(() => {
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("dashed");
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47");
     });
     void host;
   });
@@ -125,7 +125,7 @@ describe("全键盘建图（AC-17）", () => {
     keyDown("ArrowRight");
     // 候选高亮（Claude 橙）
     await waitFor(() =>
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#d97757"),
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47"),
     );
     keyDown("Enter");
     await waitFor(() => {
@@ -175,7 +175,7 @@ describe("全键盘建图（AC-17）", () => {
     // 焦点仍在 a：再按 Right 应到 b；若组合期已移动则这次会失败（b 无右侧）
     keyDown("ArrowRight");
     await waitFor(() =>
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("dashed"),
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47"),
     );
   });
 });

@@ -66,6 +66,8 @@ export async function rfStubModule(): Promise<unknown> {
         style: { display: "none" },
         onClick: () => props.onNodeDragStop?.(null, null),
       }),
+      // children（VRA-050：ContextToolbar 以 Panel 形式作为 ReactFlow 子元素）
+      ...(Array.isArray(props.children) ? props.children : props.children ? [props.children] : []),
       createElement("button", {
         "data-testid": "rf-connect-b-a",
         style: { display: "none" },

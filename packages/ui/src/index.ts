@@ -36,7 +36,7 @@ export type {
 // 画布
 export { EditorCanvas } from "./canvas/editor-canvas.js";
 export type { EditorCanvasProps } from "./canvas/editor-canvas.js";
-export { MindNodeView, MIND_NODE_THEME } from "./canvas/mind-node.js";
+export { MindNodeView } from "./canvas/mind-node.js";
 export { NodeTextEditor, isCompositionEvent } from "./canvas/node-text-editor.js";
 export { useCanvasSession } from "./canvas/use-canvas-session.js";
 export type { CanvasSessionApi } from "./canvas/use-canvas-session.js";

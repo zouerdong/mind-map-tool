@@ -11,7 +11,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Background,
   ReactFlow,
   useEdgesState,
   useNodesState,
@@ -36,6 +35,7 @@ import { createInteractionController } from "../controller/interaction-controlle
 import { isCompositionEvent } from "./node-text-editor.js";
 import { useCanvasSession } from "./use-canvas-session.js";
 import { MindNodeView } from "./mind-node.js";
+import { ContextToolbar } from "./context-toolbar.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 import {
   linkingReducer,
@@ -162,20 +162,42 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
     setRfEdges(view.edges);
   }, [docVersion, transitionMs, setRfNodes, setRfEdges]); // setRfNodes/Edges 为稳定引用
 
-  // selection（session-only）：从 RF change 流提取，供删除命令。
+  // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。
   // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
   const selectionRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
     nodes: new Set(),
     edges: new Set(),
   });
+  // VRA-050：工具条需要响应选中（ref 不触发渲染）——同步一份 state；
+  // primary = 最后选中的节点（主选：角标记 + 工具条目标）。
+  const [uiSelection, setUiSelection] = useState<{ nodes: string[]; edges: string[]; primary: string | null }>({
+    nodes: [],
+    edges: [],
+    primary: null,
+  });
+  const primaryRef = useRef<string | null>(null);
   const trackSelection = useCallback((source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
+    let touched = false;
     for (const c of changes) {
       if (c.type !== "select" || !("id" in c)) continue;
       const selected = (c as { selected?: boolean }).selected;
       if (selected === undefined) continue;
       const id = (c as { id: string }).id;
-      if (selected) selectionRef.current[source].add(id);
-      else selectionRef.current[source].delete(id);
+      if (selected) {
+        selectionRef.current[source].add(id);
+        if (source === "nodes") primaryRef.current = id;
+        touched = true;
+      } else if (selectionRef.current[source].delete(id)) {
+        if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
+        touched = true;
+      }
+    }
+    if (touched) {
+      setUiSelection({
+        nodes: [...selectionRef.current.nodes],
+        edges: [...selectionRef.current.edges],
+        primary: primaryRef.current,
+      });
     }
   }, []);
 
@@ -188,7 +210,7 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
   );
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
+    (changes: EdgeChange<MindFlowEdge>[]) => {
       trackSelection("edges", changes);
       onEdgesChangeBase(changes);
     },
@@ -438,9 +460,14 @@ export function EditorCanvas({ session, fonts, nextNodeId, nextEdgeId, revision 
           minZoom={0.2}
           maxZoom={2.5}
         >
-          <Background
-            gap={24}
-            color={themeTokens(session.current.document.document.theme).backgroundPattern}
+          {/* G-VIS D1：画布平坦无纹理、无常驻点阵——Background 点阵已移除 */}
+          <ContextToolbar
+            selection={{ nodes: uiSelection.nodes, edges: uiSelection.edges }}
+            document={session.current.document}
+            primaryNodeId={uiSelection.primary}
+            onCommand={(command) => {
+              session.commit(command); // 版本号驱动重投影（useCanvasSession）
+            }}
           />
         </ReactFlow>
         {overlay}

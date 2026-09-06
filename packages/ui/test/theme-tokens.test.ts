@@ -1,6 +1,6 @@
-// 主题 tokens 测试（MM-070 ①；AC-05）：
-// 两主题全状态对比达标（正文 ≥4.5:1、图形非文本 ≥3:1，WCAG 2.2），
-// 纯白/纯黑极简约束（无装饰色），tokens 覆盖状态面完整。
+// 主题 tokens 测试（VRA-050 ①；AC-05）：G-VIS 定稿 palette 的对比度实算断言。
+// 正文 ≥4.5:1；眉题为辅助文字 ≥3:1；图形非文本（线/选中/焦点/端口）≥3:1。
+// 暖白/黑板极简约束（无装饰色）；与 export palette 的同源对照见 visual-contract.test.ts。
 
 import { describe, expect, it } from "vitest";
 import {
@@ -11,23 +11,33 @@ import {
   type ThemeTokens,
 } from "../src/theme/theme-tokens.js";
 
-const TEXT_PAIRS = (t: ThemeTokens) => [
-  ["正文/节点底", t.nodeText, t.nodeBackground],
-  ["编辑光标/编辑底", t.editingCaret, t.editingBackground],
-  ["提示卡正文/卡底", t.onboardingCardText, t.onboardingCardBackground],
-] as const;
+const TEXT_PAIRS = (t: ThemeTokens) =>
+  [
+    ["普通卡正文/卡底", t.cardNormalText, t.cardNormalFill],
+    ["强调卡正文/卡底", t.cardAccentText, t.cardAccentFill],
+    ["编辑光标/普通卡底", t.editingCaret, t.cardNormalFill],
+    ["shell 文字/画布底", t.shellText, t.canvasBackground],
+    ["提示卡正文/卡底", t.onboardingCardText, t.onboardingCardBackground],
+  ] as const;
 
-const GRAPHIC_PAIRS = (t: ThemeTokens) => [
-  ["节点描边/画布底", t.nodeBorder, t.canvasBackground],
-  ["节点描边/节点底", t.nodeBorder, t.nodeBackground],
-  ["连接线/画布底", t.edgeStroke, t.canvasBackground],
-  ["选择框/画布底", t.selectionOutline, t.canvasBackground],
-  ["焦点环/画布底", t.focusRing, t.canvasBackground],
-  ["拖动框/画布底", t.draggingOutline, t.canvasBackground],
-  ["卡描边/卡底", t.onboardingCardBorder, t.onboardingCardBackground],
-] as const;
+const KICKER_PAIRS = (t: ThemeTokens) =>
+  [
+    ["普通卡眉题/卡底", t.cardNormalKicker, t.cardNormalFill],
+    ["强调卡眉题/卡底", t.cardAccentKicker, t.cardAccentFill],
+  ] as const;
 
-describe("两主题对比度（WCAG 2.2，实算断言）", () => {
+const GRAPHIC_PAIRS = (t: ThemeTokens) =>
+  [
+    ["主线/画布底", t.edgePrimary, t.canvasBackground],
+    ["次线/画布底", t.edgeSecondary, t.canvasBackground],
+    ["选择描边/画布底", t.selectionOutline, t.canvasBackground],
+    ["焦点环/画布底", t.focusRing, t.canvasBackground],
+    ["拖动框/画布底", t.draggingOutline, t.canvasBackground],
+    ["端口/画布底", t.hoverPort, t.canvasBackground],
+    ["提示卡描边/卡底", t.onboardingCardBorder, t.onboardingCardBackground],
+  ] as const;
+
+describe("两主题对比度（WCAG 2.2，实算断言；G-VIS palette）", () => {
   for (const [name, tokens] of [
     ["light", LIGHT_TOKENS],
     ["dark", DARK_TOKENS],
@@ -37,23 +47,33 @@ describe("两主题对比度（WCAG 2.2，实算断言）", () => {
         expect(contrastRatio(fg, bg), `${name} ${label} ${fg}/${bg}`).toBeGreaterThanOrEqual(4.5);
       }
     });
-    it(`${name}：图形非文本对比 ≥3:1（内容/选择/焦点/连接状态清晰，AC-05）`, () => {
+    it(`${name}：眉题辅助文字 ≥3:1`, () => {
+      for (const [label, fg, bg] of KICKER_PAIRS(tokens)) {
+        expect(contrastRatio(fg, bg), `${name} ${label} ${fg}/${bg}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+    it(`${name}：图形非文本对比 ≥3:1（内容/选择/焦点/连接，AC-05）`, () => {
       for (const [label, fg, bg] of GRAPHIC_PAIRS(tokens)) {
         expect(contrastRatio(fg, bg), `${name} ${label} ${fg}/${bg}`).toBeGreaterThanOrEqual(3);
       }
     });
   }
 
-  it("纯白/纯黑极简：画布底色为 #ffffff / #000000（PRD [from-user] 无质感装饰）", () => {
-    expect(LIGHT_TOKENS.canvasBackground).toBe("#ffffff");
-    expect(DARK_TOKENS.canvasBackground).toBe("#000000");
+  it("暖白/黑板极简（G-VIS D1，覆盖旧纯白/纯黑措辞）", () => {
+    expect(LIGHT_TOKENS.canvasBackground).toBe("#F9F8F4");
+    expect(DARK_TOKENS.canvasBackground).toBe("#16140F");
+    expect(LIGHT_TOKENS.cardNormalFill).toBe("#141412");
   });
 
-  it("两主题 tokens 互不相同且覆盖同一状态面（键一致）", () => {
+  it("两主题 tokens 覆盖同一状态面（键一致）", () => {
     expect(Object.keys(LIGHT_TOKENS).sort()).toEqual(Object.keys(DARK_TOKENS).sort());
-    for (const key of Object.keys(LIGHT_TOKENS) as Array<keyof ThemeTokens>) {
-      expect(LIGHT_TOKENS[key]).not.toBe(DARK_TOKENS[key]);
-    }
+  });
+
+  it("强调色/圆角/状态色跨主题一致（橙不随主题反转；§1.1 原则 + 状态变体）", () => {
+    expect(LIGHT_TOKENS.cardAccentFill).toBe(DARK_TOKENS.cardAccentFill);
+    expect(LIGHT_TOKENS.cardRadius).toBe(DARK_TOKENS.cardRadius);
+    expect(LIGHT_TOKENS.cardAccentFill).toBe("#D97757"); // 卡片填充 = G-VIS 已批产品 token
+    expect(LIGHT_TOKENS.selectionOutline).toBe("#D06B47"); // 细描边状态变体（≥3:1 实测修正）
   });
 
   it("themeTokens 按 ThemeName 派生", () => {
