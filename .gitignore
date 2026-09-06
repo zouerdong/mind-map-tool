@@ -39,3 +39,4 @@ apps/desktop/src-tauri/gen/
 packages/ui/perf/canvas-perf-app/public/
 packages/ui/perf/canvas-perf-app/dist/
 packages/ui/node_modules/.vite-temp/
+.playwright-cli/
