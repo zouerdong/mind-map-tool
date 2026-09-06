@@ -401,7 +401,7 @@ export class MotionCoordinator {
     this.currentPositions = positions;
     this.currentLineMorph = m;
 
-    if (elapsed >= this.duration && allFinished) {
+    if (allFinished || elapsed >= this.duration - 1) {
       this.phase = "completed";
       this.currentPositions = new Map(this.toPositions);
       // 保持被拖拽打断的节点位置

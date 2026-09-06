@@ -6,7 +6,7 @@
 // pane 双击→EditorCanvas wrapper（closest('.react-flow__pane') 真实路径）、
 // 隐藏按钮→onNodeDragStop/onConnect。
 
-import { createElement } from "react";
+import { createElement, useEffect } from "react";
 import { vi } from "vitest";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +17,17 @@ export async function rfStubModule(): Promise<unknown> {
   const actual = (await vi.importActual("@xyflow/react")) as any;
 
   const ReactFlowStub = (props: AnyProps) => {
+    // onInit：最小实例（缩放/fitView/坐标换算——quick-create 与 ⌘+/⌘- 路径可达）。
+    useEffect(() => {
+      props.onInit?.({
+        fitView: () => {},
+        zoomIn: () => {},
+        zoomOut: () => {},
+        getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+        setViewport: () => {},
+        screenToFlowPosition: (p: { x: number; y: number }) => ({ ...p }),
+      });
+    }, []);
     return createElement(
       "div",
       { className: "react-flow__renderer", "data-testid": "rf-canvas" },
@@ -52,11 +63,38 @@ export async function rfStubModule(): Promise<unknown> {
             : String(n.data?.text ?? n.id),
         ),
       ),
+      createElement(
+        "svg",
+        { className: "react-flow__edges" },
+        ...(props.edges ?? []).map((e: AnyProps) =>
+          createElement(
+            "g",
+            {
+              key: e.id,
+              className: "react-flow__edge",
+              "data-testid": `rf-edge-${e.id}`,
+              "data-path": e.data?.pathD,
+            },
+            props.edgeTypes?.[e.type]
+              ? createElement(props.edgeTypes[e.type], {
+                  id: e.id,
+                  source: e.source,
+                  target: e.target,
+                  data: e.data,
+                  style: e.style,
+                  markerEnd: e.markerEnd,
+                })
+              : null,
+          ),
+        ),
+      ),
       createElement("button", {
         "data-testid": "rf-drag-stop",
         style: { display: "none" },
         onClick: () => props.onNodeDragStop?.(null, null),
       }),
+      // children（VRA-050：ContextToolbar 以 Panel 形式作为 ReactFlow 子元素）
+      ...(Array.isArray(props.children) ? props.children : props.children ? [props.children] : []),
       createElement("button", {
         "data-testid": "rf-connect-b-a",
         style: { display: "none" },

@@ -1,18 +1,34 @@
 // MindMapApp（MM-080 组合根主体）：core session + 画布 + 文件流 + 导出 +
-// 引导偏好 + 启动路由 + 快捷键 + dirty 确认/错误 UI + 窗口标题。
-// 单窗口策略（v1）：launch 文件在主窗口承载（dirty 先确认）；多窗口需
-// host create-window 权限，属后续范围（记录于 MM-080 回报）。
+// 引导偏好 + 按窗 bootstrap + 快捷键 + dirty 确认/错误 UI + 窗口标题。
+// MRT-004 Wave 2：每个 WebView 一个 WindowBootstrapAdapter（targeted
+// 交付）；工具条 Open/New 经 host launch intent；启动/打开/关闭/热键路由
+// 全部由 Rust host 单 owner 决定（ADR 0008）。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { emptyDocument, organizeCommand } from "@mindmap/core";
+import {
+  decodeDocument,
+  emptyDocument,
+  type OrganizeCommandResult,
+  type OrganizeDirection,
+} from "@mindmap/core";
 import {
   createOnboardingPreferences,
   EditorCanvas,
   OnboardingFlow,
-  ThemeToggle,
   type OnboardingObservation,
 } from "@mindmap/ui";
-import { TauriLifecycleAdapter, type CloseDisposition, type WindowAction } from "@mindmap/platform";
+import { AppHeader } from "./app-header.js";
+import { AppNotice } from "./app-notice.js";
+import {
+  createTauriBootstrapPorts,
+  WindowBootstrapAdapter,
+  type BootstrapActionOutcome,
+  type CloseDisposition,
+  type LaunchRetryableError,
+  type PendingRecovery,
+  type WindowBootstrap,
+} from "@mindmap/platform";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ObservedDocumentSession, type ObservationSink } from "./observed-session.js";
 import type { AppPorts } from "./ports.js";
@@ -20,7 +36,6 @@ import { isTauriRuntime } from "./ports.js";
 import {
   newDocumentFlow,
   openDocumentFlow,
-  openPathFlow,
   saveAsFlow,
   saveFlow,
   whenSavesSettled,
@@ -37,8 +52,26 @@ type PendingConfirm = {
 /** pending-save gate（MRT-001A）的非致命提示：不弹 discard、不替换文档。 */
 const SAVE_BUSY_NOTICE = "保存尚未完成，请稍后再新建或打开。";
 
+// 每 WebView 一个 bootstrap adapter（模块级单例：StrictMode 重挂载复用；
+// 窗口销毁随 WebView 进程终止）。null 仅出现在浏览器 dev。
+// W2R P4：单例不捕获任何已失效的实例 closure——action 与 report-error
+// 均经"当前挂载实现"持有者解析（重挂载/热替换后指向新实例，旧 session
+// 不再被写入，report 状态进入当前组件）。
+let windowBootstrapAdapter: WindowBootstrapAdapter | null = null;
+let windowBootstrapStart: Promise<void> | null = null;
+let currentBootstrapAction:
+  ((bootstrap: WindowBootstrap) => Promise<BootstrapActionOutcome>) | null = null;
+let currentReportError: ((deliveryId: string, error: unknown) => void) | null = null;
+
 function isSaveInProgress(r: { kind: string; code?: string }): boolean {
   return r.kind === "error" && r.code === "SAVE_IN_PROGRESS";
+}
+
+/** report-pending 交付的 outcome 描述（W2R R3 UI；功能性文案，非最终视觉）。 */
+function describeOutcome(outcome: { kind: string; reason?: string }): string {
+  if (outcome.kind === "opened") return "文档已打开，回报未送达";
+  if (outcome.kind === "blank-created") return "空白窗口已就绪，回报未送达";
+  return `打开失败（${outcome.reason ?? "未知原因"}），回报未送达`;
 }
 
 /** 原生关闭三分支 modal 的阶段（MRT-003 / CR-003）。 */
@@ -80,6 +113,8 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // 视野框架化信号（EditorCanvas：仅文档加载时 frame 内容，建点不动镜头）
   const [fitViewSignal, setFitViewSignal] = useState(0);
   const [replaySignal, setReplaySignal] = useState(0);
+  const [organizeSignal, setOrganizeSignal] = useState(0);
+  const [organizeDirection, setOrganizeDirection] = useState<OrganizeDirection>("horizontal");
   // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
   // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
   const [quickCreateSignal, setQuickCreateSignal] = useState(0);
@@ -100,6 +135,15 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   const [shortcutPanel, setShortcutPanel] = useState(false);
   const [shortcutValue, setShortcutValue] = useState("");
   const [shortcutError, setShortcutError] = useState<string | null>(null);
+  // MRT-004 Wave 2 §5D2/§4.3：host launch retryable 错误与 post-commit
+  // recovery 的最小功能性 UI（不做最终视觉换肤）。
+  const [launchErrors, setLaunchErrors] = useState<LaunchRetryableError[]>([]);
+  const [pendingRecovery, setPendingRecovery] = useState<PendingRecovery | null>(null);
+  // W2R R3：bootstrap 交付的 report 失败（report-pending）可见 + 显式
+  // 一次重报（不自动 timer、不自旋）。
+  const [pendingReports, setPendingReports] = useState<
+    { deliveryId: string; outcomeText: string }[]
+  >([]);
   const bump = useCallback(() => {
     setRevision((r) => r + 1);
     refresh((n) => n + 1);
@@ -145,6 +189,20 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   );
 
   const onNew = useCallback(async () => {
+    // MRT-004 Wave 2 §5C4（Tauri）：New = 新空白窗口（activation 语义）；
+    // 当前窗口（含 dirty/已打开）不被替换，无 discard 确认。浏览器 dev
+    // 保留本地新建流程。
+    if (!ports.isBrowserDev) {
+      try {
+        await ports.launch.requestBlankWindow();
+      } catch (e) {
+        setNotice({
+          tone: "error",
+          text: `新建窗口失败：${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+      return;
+    }
     // pending-save gate（MRT-001A）：不弹 discard 确认，保存链自然终态后可重试
     if (session.hasPendingSaves) {
       setNotice({ tone: "info", text: SAVE_BUSY_NOTICE });
@@ -162,9 +220,23 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     } else if (isSaveInProgress(result)) {
       setNotice({ tone: "info", text: SAVE_BUSY_NOTICE }); // 确认等待期间保存进入 pending：兜底 gate
     }
-  }, [bump, confirmDiscard, session]);
+  }, [bump, confirmDiscard, ports, session]);
 
   const onOpen = useCallback(async () => {
+    // MRT-004 Wave 2 §5C4（Tauri）：Open = 请求 host 入队（原生对话框由
+    // host 打开）；当前窗口（含 dirty）不被替换，新文件开新窗。浏览器 dev
+    // 保留本地打开流程。
+    if (!ports.isBrowserDev) {
+      try {
+        await ports.launch.requestOpenIntent();
+      } catch (e) {
+        setNotice({
+          tone: "error",
+          text: `打开失败：${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+      return;
+    }
     // pending-save gate（MRT-001A）：不弹 discard、不打开文件对话框
     if (session.hasPendingSaves) {
       setNotice({ tone: "info", text: SAVE_BUSY_NOTICE });
@@ -185,25 +257,45 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     );
     bump();
     if (result.kind === "ok") setFitViewSignal((n) => n + 1);
-  }, [bump, confirmDiscard, deps, handleResultNotice, session]);
+  }, [bump, confirmDiscard, deps, handleResultNotice, ports, session]);
+
+  /** §4.3：PostCommit 失败时 receipt 真实有效——已提交快照记为成功，
+   * 同时呈现恢复状态（不得显示为普通保存失败）。 */
+  const reportSaveResult = useCallback(
+    (result: {
+      kind: string;
+      message?: string;
+      code?: string;
+      value?: { receipt: { displayPath: string; rebindState?: string } };
+    }) => {
+      if (result.kind === "ok" && result.value) {
+        session.notifySaved();
+        const { receipt } = result.value;
+        if (receipt.rebindState === "recovery-pending") {
+          setNotice({
+            tone: "info",
+            text: `已保存 ${receipt.displayPath}（窗口文件状态恢复待完成）`,
+          });
+          void refreshRecovery();
+        } else {
+          setNotice({ tone: "info", text: `已保存 ${receipt.displayPath}` });
+        }
+      } else if (result.kind === "conflict" || result.kind === "error") {
+        handleResultNotice(result);
+      }
+    },
+    [handleResultNotice, session],
+  );
 
   const onSave = useCallback(async () => {
-    const result = await saveFlow(session, deps);
-    if (result.kind === "ok") {
-      session.notifySaved();
-      setNotice({ tone: "info", text: `已保存 ${result.value.receipt.displayPath}` });
-    } else handleResultNotice(result);
+    reportSaveResult(await saveFlow(session, deps));
     bump();
-  }, [bump, deps, handleResultNotice, session]);
+  }, [bump, deps, reportSaveResult, session]);
 
   const onSaveAs = useCallback(async () => {
-    const result = await saveAsFlow(session, deps, `未命名.json`);
-    if (result.kind === "ok") {
-      session.notifySaved();
-      setNotice({ tone: "info", text: `已保存 ${result.value.receipt.displayPath}` });
-    } else handleResultNotice(result);
+    reportSaveResult(await saveAsFlow(session, deps, `未命名.json`));
     bump();
-  }, [bump, deps, handleResultNotice, session]);
+  }, [bump, deps, reportSaveResult, session]);
 
   // ---- 原生关闭三分支控制器（MRT-003 / CR-003）----
   // host fail-closed 持有 pending request；此处只做应答：clean 直接放行；
@@ -279,7 +371,13 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       return;
     }
     session.notifySaved();
-    setNotice({ tone: "info", text: `已保存 ${result.value.receipt.displayPath}` });
+    setNotice({
+      tone: "info",
+      text:
+        result.value.receipt.rebindState === "recovery-pending"
+          ? `已保存 ${result.value.receipt.displayPath}（窗口文件状态恢复待完成）`
+          : `已保存 ${result.value.receipt.displayPath}`,
+    });
     if (session.isDirty || session.hasPendingSaves) {
       // 保存期间又产生编辑：回执只确认冻结快照，不误清 dirty；允许再次决定
       setCloseError("保存后文档仍有未保存修改，请再次保存或选择其他分支。");
@@ -382,24 +480,28 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     }
   }, [ports.globalShortcut, shortcutValue]);
 
-  // 一键整理（VRA-030：DAG 分层、默认横向）：纯函数布局 → 单条 MoveNodes（可 undo、进历史）。
+  // 一键整理（VRA-030 / VRA-060 / VRA-070）：信号触发 EditorCanvas 协调动画与 MoveNodes 提交。
   // 三态：moved / no-op / 结构化失败（COORD_LIMIT 不动文档与历史）。
-  // bump 驱动画布重投影（外部 revision 信号——session.commit 不经画布内部通道）。
   const onOrganize = useCallback(() => {
-    const result = organizeCommand(session.current.document);
-    if (result.status === "moved") {
-      session.commit(result.command);
-      bump();
-      setNotice({ tone: "info", text: "已整理为分层布局（⌘Z 可撤销）" });
-    } else if (result.status === "no-op") {
-      setNotice({ tone: "info", text: "已经是整理好的布局" });
-    } else {
-      setNotice({
-        tone: "error",
-        text: `整理失败：文档规模超出画布坐标上限（${result.error.span.toFixed(0)} > ${result.error.max}），未改动文档`,
-      });
-    }
-  }, [bump, session]);
+    setOrganizeSignal((n) => n + 1);
+  }, []);
+
+  const handleOrganizeResult = useCallback(
+    (result: OrganizeCommandResult) => {
+      if (result.status === "moved") {
+        bump();
+        setNotice({ tone: "info", text: "已整理为分层布局（⌘Z 可撤销）" });
+      } else if (result.status === "no-op") {
+        setNotice({ tone: "info", text: "已经是整理好的布局" });
+      } else {
+        setNotice({
+          tone: "error",
+          text: `整理失败：文档规模超出画布坐标上限（${result.error.span.toFixed(0)} > ${result.error.max}），未改动文档`,
+        });
+      }
+    },
+    [bump],
+  );
 
   // ---- 全局快捷键（输入/IME 隔离见 keyboard.ts） ----
   useEffect(() => {
@@ -478,136 +580,224 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     document.title = `${session.isDirty ? "● " : ""}${name} — Mind Map`;
   });
 
-  // ---- launch 路由（Tauri）：AppReady → intent → 单窗口策略 ----
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-    const handleAction = (action: WindowAction) => {
-      void (async () => {
-        if (action.type === "open-in-window" || action.type === "open-new-window") {
-          // pending-save gate（MRT-001A）：launch open 同样 fail closed
-          if (session.hasPendingSaves) {
-            setNotice({ tone: "info", text: SAVE_BUSY_NOTICE });
-            return;
-          }
-          if (session.isDirty) {
-            const ok = await confirmDiscard(
-              "当前文档有未保存修改，打开启动文件将丢弃这些修改。继续吗？",
-            );
-            if (!ok) return;
-          }
-          const result = await openPathFlow(session, deps, action.canonicalPath);
-          if (isSaveInProgress(result)) {
-            setNotice({ tone: "info", text: SAVE_BUSY_NOTICE });
-            return;
-          }
-          if (result.kind !== "ok")
-            setNotice({
-              tone: "error",
-              text: result.kind === "error" ? result.message : "启动文件无法读取",
-            });
-          bump();
-          if (result.kind === "ok") setFitViewSignal((n) => n + 1);
-        } else if (action.type === "new-blank-window") {
-          void onNew();
+  // ---- 按窗 bootstrap 装配（MRT-004 Wave 2 §5C5；ADR 0008 §6-7） ----
+  // 每 WebView 恰好一个 WindowBootstrapAdapter：模块级单例，React
+  // StrictMode mount/unmount 不重复 listener、不丢 report-pending
+  // （adapter dispose 属于窗口销毁语义，进程随 WebView 终止，无需卸载）。
+  // W2R P4：单例不得捕获已失效的 session/ports closure——action 经 ref
+  // 每次解析到**当前**挂载的处理函数（StrictMode 重挂载/热替换后交付
+  // 进入当前 session，旧 session 不再被写入）。
+  const handleBootstrapAction = useCallback(
+    async (bootstrap: WindowBootstrap): Promise<BootstrapActionOutcome> => {
+      if (bootstrap.kind === "blank") {
+        // blank 只在目标窗口初始 session 已空白时回报（§5C5）
+        if (!session.isDirty && session.displayPath === null) {
+          return { kind: "blank-created" };
         }
-        // focus-existing / none：无需动作
-      })();
-    };
-    const adapter = new TauriLifecycleAdapter(
-      () => [{ windowId: "main", occupiedPath: session.displayPath, dirty: session.isDirty }],
-      handleAction,
-    );
-    void adapter.start().catch((e) => {
-      // 错误详情必须可见（MM-090-D2 排查：吞错曾掩盖 launch 路由失败根因）
+        throw new Error("窗口已承载文档，不能作为空白窗口完成初始化");
+      }
+      const opened = await invoke<{
+        contentJson: string;
+        documentTargetHandle: string;
+        versionToken: string;
+        displayPath: string;
+      }>("platform_open_assigned_document", { deliveryId: bootstrap.deliveryId }).catch((e) => {
+        // invoke reject 是 {code,message} 形状（不经 FilePort 的错误映射）；
+        // 提取 message，避免 reason 退化为 "[object Object]"（§5D2 reason 可见）。
+        const message =
+          typeof e === "object" && e !== null && "message" in e
+            ? String((e as { message: unknown }).message)
+            : String(e);
+        throw new Error(`读取启动文档失败：${message}`);
+      });
+      const decoded = decodeDocument(new TextEncoder().encode(opened.contentJson));
+      if (!decoded.ok) {
+        throw new Error(
+          decoded.error.code === "FUTURE_VERSION"
+            ? "文档来自更新版本，无法打开（不会覆盖原文件）。"
+            : "文件不是有效的脑图文档。",
+        );
+      }
+      // 二次 gate：core load() 原子 fail-closed（保存 pending 时不替换）
+      const loaded = session.load(decoded.doc);
+      if (loaded.kind !== "replaced") throw new Error("保存尚未完成，无法加载启动文件");
+      session.adoptOpenedTarget(
+        opened.documentTargetHandle as never,
+        opened.versionToken as never,
+        opened.displayPath,
+      );
+      bump();
+      setFitViewSignal((n) => n + 1);
+      setNotice({ tone: "info", text: `已打开 ${opened.displayPath}` });
+      return { kind: "opened" };
+    },
+    [bump, session],
+  );
+
+  const refreshLaunchErrors = useCallback(async () => {
+    try {
+      setLaunchErrors(await ports.launch.launchErrors());
+    } catch {
+      // 快照查询失败不阻塞；下次定向事件会再刷新
+    }
+  }, [ports.launch]);
+
+  const refreshRecovery = useCallback(async () => {
+    try {
+      setPendingRecovery(await ports.launch.pendingRecovery());
+    } catch {
+      // 同上
+    }
+  }, [ports.launch]);
+
+  const onRetryLaunchError = useCallback(
+    async (intentId: string) => {
+      try {
+        await ports.launch.retryLaunchIntent(intentId);
+      } catch (e) {
+        setNotice({
+          tone: "error",
+          text: `重试失败：${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+      void refreshLaunchErrors();
+    },
+    [ports.launch, refreshLaunchErrors],
+  );
+
+  const onDismissLaunchError = useCallback(
+    async (intentId: string) => {
+      try {
+        await ports.launch.dismissLaunchIntent(intentId);
+      } catch (e) {
+        setNotice({
+          tone: "error",
+          text: `放弃失败：${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+      void refreshLaunchErrors();
+    },
+    [ports.launch, refreshLaunchErrors],
+  );
+
+  /** 一次显式、有限的 post-commit recovery（§4.3；不自动重试）。 */
+  const onResolveRecovery = useCallback(async () => {
+    try {
+      await ports.launch.resolvePendingRecovery();
+      setNotice({ tone: "info", text: "窗口文件状态恢复完成" });
+    } catch (e) {
       setNotice({
         tone: "error",
-        text: `启动路由初始化失败：${e instanceof Error ? e.message : String(e)}`,
+        text: `恢复失败（保持待恢复）：${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+    void refreshRecovery();
+  }, [ports.launch, refreshRecovery]);
+
+  /** W2R R3：显式一次重报——每个 pending delivery 至多重报一次；成功后
+   * 清提示；action 不重跑（adapter 缓存 outcome）。无自动 timer。 */
+  const onRetryPendingReports = useCallback(async () => {
+    const adapter = windowBootstrapAdapter;
+    if (!adapter) return;
+    try {
+      await adapter.retryPendingReports();
+    } catch {
+      // retryPendingReports 不抛（report 失败经 onReportError 呈现）
+    }
+    setPendingReports(
+      adapter.pendingReports().map((p) => ({
+        deliveryId: p.deliveryId,
+        outcomeText: describeOutcome(p.outcome),
+      })),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    // W2R P4：当前挂载的实现注册到模块级持有者（adapter 单例经它们解析，
+    // 不捕获失效实例的 closure；StrictMode 重挂载后指向新实例）。
+    currentBootstrapAction = handleBootstrapAction;
+    currentReportError = (deliveryId, error) => {
+      setNotice({
+        tone: "error",
+        text: `启动动作回报失败（${deliveryId}）：${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      setPendingReports(
+        (windowBootstrapAdapter?.pendingReports() ?? []).map((p) => ({
+          deliveryId: p.deliveryId,
+          outcomeText: describeOutcome(p.outcome),
+        })),
+      );
+    };
+    if (!windowBootstrapAdapter) {
+      windowBootstrapAdapter = new WindowBootstrapAdapter(
+        createTauriBootstrapPorts(),
+        (bootstrap) =>
+          currentBootstrapAction
+            ? currentBootstrapAction(bootstrap)
+            : Promise.reject(new Error("bootstrap action 未就绪")),
+        {
+          // report 失败不得静默（A1-F2 语义的 UI 呈现；W2R R3：delivery
+          // 级 report-pending 进入可重报状态）
+          onReportError: (deliveryId, error) => currentReportError?.(deliveryId, error),
+        },
+      );
+      windowBootstrapStart = windowBootstrapAdapter.start();
+    }
+    void windowBootstrapStart?.catch((e) => {
+      // 错误详情必须可见（MM-090-D2 教训：吞错掩盖装配失败根因）
+      setNotice({
+        tone: "error",
+        text: `窗口启动装配失败：${e instanceof Error ? e.message : String(e)}`,
       });
     });
+    // 定向 retryable-error 事件（只发呈现窗口）→ 拉取快照显示
+    const unlisten = listen("platform://launch-retryable-error", () => {
+      void refreshLaunchErrors();
+    });
+    void refreshLaunchErrors();
+    void refreshRecovery();
+    setPendingReports(
+      (windowBootstrapAdapter?.pendingReports() ?? []).map((p) => ({
+        deliveryId: p.deliveryId,
+        outcomeText: describeOutcome(p.outcome),
+      })),
+    );
     return () => {
-      void adapter.stop();
+      void unlisten.then((dispose) => dispose());
     };
-  }, [session]); // 依赖刻意只有 session（adapter 内部闭包读取最新 action 依赖的简化：单窗口策略下足够）
+  }, [handleBootstrapAction, refreshLaunchErrors, refreshRecovery]);
 
   const theme = session.current.document.document.theme;
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <header
-        role="toolbar"
-        aria-label="主工具条"
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          padding: "6px 10px",
-          borderBottom: "1px solid rgba(127,127,127,0.35)",
-          flex: "0 0 auto",
+      <AppHeader
+        theme={theme}
+        docName={session.displayPath?.split(/[\\/]/).pop() ?? "未命名"}
+        isDirty={session.isDirty}
+        statusSuffix={ports.isBrowserDev ? " · 浏览器 dev（fake 端口）" : ""}
+        onNew={() => void onNew()}
+        onOpen={() => void onOpen()}
+        onSave={() => void onSave()}
+        onSaveAs={() => void onSaveAs()}
+        onExport={(f) => void onExport(f)}
+        onOpenExportPanel={() => setExportPanel((v) => !v)}
+        onOrganize={onOrganize}
+        organizeDirection={organizeDirection}
+        onToggleOrganizeDirection={() =>
+          setOrganizeDirection((d) => (d === "horizontal" ? "vertical" : "horizontal"))
+        }
+        onFitView={() => setFitViewSignal((n) => n + 1)}
+        onOpenShortcutPanel={() => void openShortcutPanel()}
+        onReplayOnboarding={() => setReplaySignal((n) => n + 1)}
+        onThemeCommand={(cmd) => {
+          session.commit(cmd);
+          bump();
         }}
-      >
-        <button type="button" onClick={() => void onNew()} data-onboarding-anchor="app.new">
-          新建
-        </button>
-        <button type="button" onClick={() => void onOpen()} data-onboarding-anchor="app.open">
-          打开…
-        </button>
-        <button type="button" onClick={() => void onSave()} data-onboarding-anchor="app.save">
-          保存
-        </button>
-        <button type="button" onClick={() => void onSaveAs()}>
-          另存为…
-        </button>
-        <button
-          type="button"
-          onClick={onOrganize}
-          data-onboarding-anchor="app.organize"
-          title="整理为垂直树（⌘⇧L）"
-        >
-          整理
-        </button>
-        <button type="button" onClick={() => setExportPanel((v) => !v)} aria-expanded={exportPanel}>
-          导出
-        </button>
-        <ThemeToggle
-          currentTheme={theme}
-          onCommand={(cmd) => {
-            session.commit(cmd);
-            bump();
-          }}
-        />
-        <button type="button" onClick={() => setReplaySignal((n) => n + 1)}>
-          重放引导
-        </button>
-        <button type="button" onClick={() => void openShortcutPanel()} title="全局唤起热键设置">
-          热键…
-        </button>
-        <span aria-live="polite" style={{ marginLeft: "auto", fontSize: 12, opacity: 0.75 }}>
-          {`${session.isDirty ? "未保存" : "已保存"} · ${ports.isBrowserDev ? "浏览器 dev（fake 端口）" : "桌面"}`}
-        </span>
-      </header>
-
-      {notice ? (
-        <div
-          role="status"
-          data-testid="app-notice"
-          style={{
-            padding: "6px 10px",
-            background: notice.tone === "error" ? "#b62324" : "#1f6feb",
-            color: "#fff",
-            fontSize: 13,
-          }}
-        >
-          {notice.text}
-          <button
-            type="button"
-            aria-label="关闭提示"
-            onClick={() => setNotice(null)}
-            style={{ marginLeft: 8 }}
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
+      />
 
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
         <EditorCanvas
@@ -616,8 +806,141 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           revision={revision}
           quickCreateSignal={quickCreateSignal}
           fitViewSignal={fitViewSignal}
-          positionTransitionMs={320}
+          organizeSignal={organizeSignal}
+          organizeDirection={organizeDirection}
+          onOrganizeResult={handleOrganizeResult}
         />
+
+        <AppNotice
+          notice={notice}
+          theme={theme}
+          onDismiss={() => setNotice(null)}
+        />
+
+        {/* bootstrap report-pending（W2R R3）：动作已完成但终态回报未送达
+            host——显式一次重报；不自动 timer、不重跑 action。 */}
+        {pendingReports.length > 0 ? (
+          <div
+            role="alert"
+            data-testid="pending-reports"
+            style={{
+              position: "absolute",
+              top: 12,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 35,
+              maxWidth: "80%",
+              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+              borderRadius: 10,
+              padding: "9px 14px",
+              background: "#6b4f00",
+              color: "#fff",
+              fontSize: 13,
+              display: "grid",
+              gap: 6,
+            }}
+          >
+            {pendingReports.map((report) => (
+              <div key={report.deliveryId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span data-testid={`pending-report-${report.deliveryId}`}>
+                  {`启动回报待重发（${report.deliveryId}）：${report.outcomeText}`}
+                </span>
+              </div>
+            ))}
+            <div>
+              <button
+                type="button"
+                data-testid="retry-bootstrap-report"
+                onClick={() => void onRetryPendingReports()}
+              >
+                重试启动回报
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* host launch retryable 错误（MRT-004 Wave 2 §5D2）：最小功能性
+            错误 UI——reason + 重试/放弃；不自动重试、不自旋。 */}
+        {launchErrors.length > 0 ? (
+          <div
+            role="alert"
+            data-testid="launch-errors"
+            style={{
+              position: "absolute",
+              top: 12,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 35,
+              maxWidth: "80%",
+              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+              borderRadius: 10,
+              padding: "9px 14px",
+              background: "#5a2119",
+              color: "#fff",
+              fontSize: 13,
+              display: "grid",
+              gap: 6,
+            }}
+          >
+            {launchErrors.map((error) => (
+              <div key={error.intentId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span data-testid={`launch-error-${error.intentId}`}>
+                  {`打开操作失败：${error.reason}`}
+                </span>
+                <button
+                  type="button"
+                  aria-label="重试打开"
+                  onClick={() => void onRetryLaunchError(error.intentId)}
+                >
+                  重试
+                </button>
+                <button
+                  type="button"
+                  aria-label="放弃打开"
+                  onClick={() => void onDismissLaunchError(error.intentId)}
+                >
+                  放弃
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* post-commit recovery（§4.3）：已写入目标文件、窗口状态恢复待
+            完成——不显示为保存失败；提供一次显式恢复。 */}
+        {pendingRecovery ? (
+          <div
+            role="status"
+            data-testid="pending-recovery"
+            style={{
+              position: "absolute",
+              top: 12,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 35,
+              maxWidth: "80%",
+              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+              borderRadius: 10,
+              padding: "9px 14px",
+              background: "#6b4f00",
+              color: "#fff",
+              fontSize: 13,
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <span>{`已保存 ${pendingRecovery.displayPath}；${pendingRecovery.cause}。完成恢复前本窗口暂不能再次保存。`}</span>
+            <button
+              type="button"
+              data-testid="resolve-recovery"
+              onClick={() => void onResolveRecovery()}
+            >
+              完成恢复
+            </button>
+          </div>
+        ) : null}
+
         {exportPanel ? (
           <div
             role="dialog"
@@ -628,12 +951,14 @@ export function MindMapApp({ ports }: MindMapAppProps) {
               right: 12,
               top: 12,
               padding: 12,
-              border: "1px solid rgba(127,127,127,0.5)",
-              background: theme === "dark" ? "#0d1117" : "#fff",
-              color: theme === "dark" ? "#e6edf3" : "#1f2328",
+              border: `1px solid ${theme === "dark" ? "#35312A" : "#E3DFD5"}`,
+              background: theme === "dark" ? "#211E18" : "#FFFDF9",
+              color: theme === "dark" ? "#EFEAE0" : "#3B372F",
               borderRadius: 8,
               display: "grid",
               gap: 8,
+              zIndex: 35,
+              boxShadow: "0 8px 24px rgba(0,0,0,.18)",
             }}
           >
             <strong>导出当前脑图</strong>
