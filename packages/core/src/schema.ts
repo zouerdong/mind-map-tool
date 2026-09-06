@@ -1,10 +1,13 @@
-// V1 schema：类型、上限与校验。平台无关；不依赖任何运行时环境。
+// V1/V2 schema：类型、上限与校验。平台无关；不依赖任何运行时环境。
 // PRD §8.1 / ADR 0003：selection/viewport/history/path/target handle/onboarding
 // 一律不入文件。shape/font 为 [from-user] G1 后新增的产品字段（PRD §5.1）。
+// schemaVersion 2（ADR 0010，G-SCHEMA 2026-09-06 批准）：节点 kicker/emphasis、
+// 边 lineStyle；v1 读取按缺省呈现（不改坐标/尺寸、不 dirty），保存（=新写）输出 v2。
 
 export type ThemeName = "light" | "dark";
 export type FontToken = "noto-sans-sc" | "lxgw-wenkai";
 export type NodeShape = "card" | "ellipse";
+export type LineStyle = "solid" | "dashed" | "dotted";
 
 export interface Point {
   x: number;
@@ -36,12 +39,18 @@ export interface MindNode {
   shape?: NodeShape;
   /** 可选的富文本样式区间（无则整段使用节点默认排版） */
   runs?: TextRun[];
+  /** [ADR 0010 v2] 可选单行眉题；空串等价缺省（归一化后不落盘）；≤ LIMITS.maxKickerLength */
+  kicker?: string;
+  /** [ADR 0010 v2] 强调角色（用户手动设置）；缺省 false（归一化后不落盘） */
+  emphasis?: boolean;
 }
 
 export interface MindEdge {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
+  /** [ADR 0010 v2] 线型外观（solid/dashed/dotted）；缺省 solid（归一化后不落盘）；不影响布局/层级语义 */
+  lineStyle?: LineStyle;
 }
 
 export interface MindMapDocumentData {
@@ -55,7 +64,8 @@ export interface MindMapDocumentData {
 }
 
 export interface MindMapDocumentV1 {
-  schemaVersion: 1;
+  /** 读取来源版本（1 或 2）；保存（新写）恒输出 2（ADR 0010） */
+  schemaVersion: 1 | 2;
   document: MindMapDocumentData;
 }
 
@@ -68,6 +78,7 @@ export const LIMITS = {
   minSize: 1,
   maxSize: 100_000,
   maxInputBytes: 50 * 1024 * 1024, // 50 MB 读取前置上限
+  maxKickerLength: 40, // [ADR 0010 v2] 眉题长度上限
 } as const;
 
 export type SchemaError =
@@ -78,6 +89,9 @@ export type SchemaError =
   | { code: "BAD_SHAPE"; actual: unknown }
   | { code: "BAD_FRAMES_VISIBLE"; actual: unknown }
   | { code: "BAD_DOCUMENT" }
+  | { code: "NODE_BAD_KICKER"; index: number; reason: string }
+  | { code: "NODE_BAD_EMPHASIS"; index: number }
+  | { code: "EDGE_BAD_LINE_STYLE"; index: number; actual: unknown }
   | { code: "NODES_NOT_ARRAY" }
   | { code: "EDGES_NOT_ARRAY" }
   | { code: "NODE_MISSING_FIELD"; index: number; field: string }
@@ -106,8 +120,9 @@ export function validateDocument(
   if (typeof input !== "object" || input === null)
     return { ok: false, error: { code: "NOT_OBJECT" } };
   const root = input as Record<string, unknown>;
-  if (root.schemaVersion !== 1)
+  if (root.schemaVersion !== 1 && root.schemaVersion !== 2)
     return { ok: false, error: { code: "BAD_SCHEMA_VERSION", actual: root.schemaVersion } };
+  const sourceVersion: 1 | 2 = root.schemaVersion;
   const doc = root.document;
   if (typeof doc !== "object" || doc === null)
     return { ok: false, error: { code: "BAD_DOCUMENT" } };
@@ -172,6 +187,17 @@ export function validateDocument(
       return { ok: false, error: { code: "NODE_BAD_SIZE", index: i } };
     if (n.shape !== undefined && n.shape !== "card" && n.shape !== "ellipse")
       return { ok: false, error: { code: "NODE_BAD_SHAPE", index: i } };
+    // [ADR 0010 v2] kicker/emphasis 校验（v1 文件不含，自然跳过）
+    if (n.kicker !== undefined) {
+      if (typeof n.kicker !== "string")
+        return { ok: false, error: { code: "NODE_BAD_KICKER", index: i, reason: "not-string" } };
+      if (n.kicker.includes("\n"))
+        return { ok: false, error: { code: "NODE_BAD_KICKER", index: i, reason: "newline" } };
+      if (n.kicker.length > LIMITS.maxKickerLength)
+        return { ok: false, error: { code: "NODE_BAD_KICKER", index: i, reason: "too-long" } };
+    }
+    if (n.emphasis !== undefined && typeof n.emphasis !== "boolean")
+      return { ok: false, error: { code: "NODE_BAD_EMPHASIS", index: i } };
     if (n.runs !== undefined) {
       if (!Array.isArray(n.runs))
         return { ok: false, error: { code: "RUNS_BAD", index: i, reason: "not-array" } };
@@ -232,13 +258,23 @@ export function validateDocument(
         error: { code: "DUPLICATE_EDGE_DIRECTION", source: e.sourceNodeId, target: e.targetNodeId },
       };
     directions.add(dirKey);
+    // [ADR 0010 v2] lineStyle 校验
+    if (
+      e.lineStyle !== undefined &&
+      e.lineStyle !== "solid" &&
+      e.lineStyle !== "dashed" &&
+      e.lineStyle !== "dotted"
+    )
+      return { ok: false, error: { code: "EDGE_BAD_LINE_STYLE", index: i, actual: e.lineStyle } };
   }
 
-  // 深拷贝以隔离调用方（canonical 化前的规范化在这里做，见 canonical.ts）
+  // 深拷贝以隔离调用方（canonical 化前的规范化在这里做，见 canonical.ts）。
+  // [ADR 0010 v2] 缺省值归一：空 kicker、emphasis false、lineStyle "solid" 均不设置——
+  // 内存表示唯一，保证 decode(encode(doc)) ≡ doc 与 v1 文件逐字节兼容的升级路径。
   return {
     ok: true,
     doc: {
-      schemaVersion: 1,
+      schemaVersion: sourceVersion,
       document: {
         theme: d.theme,
         font: d.font,
@@ -261,11 +297,15 @@ export function validateDocument(
               ...(r.underline !== undefined ? { underline: r.underline } : {}),
               ...(r.fontSize !== undefined ? { fontSize: r.fontSize } : {}),
             }));
+          if (typeof n.kicker === "string" && n.kicker.length > 0) node.kicker = n.kicker;
+          if (n.emphasis === true) node.emphasis = true;
           return node;
         }),
         edges: d.edges.map((raw) => {
           const e = raw as MindEdge;
-          return { id: e.id, sourceNodeId: e.sourceNodeId, targetNodeId: e.targetNodeId };
+          const edge: MindEdge = { id: e.id, sourceNodeId: e.sourceNodeId, targetNodeId: e.targetNodeId };
+          if (e.lineStyle === "dashed" || e.lineStyle === "dotted") edge.lineStyle = e.lineStyle;
+          return edge;
         }),
       },
     },
@@ -274,7 +314,7 @@ export function validateDocument(
 
 export function emptyDocument(): MindMapDocumentV1 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2, // 新文档即新写（ADR 0010）
     document: {
       theme: "light",
       font: "noto-sans-sc",

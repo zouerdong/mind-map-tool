@@ -1,7 +1,8 @@
-// Canonical UTF-8 JSON 编解码（ADR 0003）：
+// Canonical UTF-8 JSON 编解码（ADR 0003；v2 字段序 ADR 0010）：
 // 无 BOM、两空格缩进、LF、末尾一个换行、固定键顺序；
 // 数值最多 3 位小数、-0 归一为 0；对 locale/timezone 不敏感。
 // decode(encode(doc)) ≡ doc；同 doc 的 encode bytes 恒定（可 hash/golden）。
+// 保存（=新写）恒输出 schemaVersion 2（ADR 0010：读旧写新）。
 
 import {
   LIMITS,
@@ -29,7 +30,7 @@ function esc(s: string): string {
 export function encodeDocument(doc: MindMapDocumentV1): Uint8Array {
   const d = doc.document;
   const parts: string[] = [];
-  parts.push('{\n  "schemaVersion": 1,');
+  parts.push('{\n  "schemaVersion": 2,');
   parts.push(`  "document": {`);
   parts.push(`    "theme": ${esc(d.theme)},`);
   parts.push(`    "font": ${esc(d.font)},`);
@@ -61,6 +62,9 @@ function nodeLine(n: MindNode, last: boolean): string {
     `"size": { "width": ${fmt(n.size.width)}, "height": ${fmt(n.size.height)} }`,
   ];
   if (n.shape !== undefined) fields.push(`"shape": ${esc(n.shape)}`);
+  // [ADR 0010 v2] kicker/emphasis 紧随 shape（缺省不输出；空串/false 已在 schema 层归一）
+  if (n.kicker !== undefined && n.kicker.length > 0) fields.push(`"kicker": ${esc(n.kicker)}`);
+  if (n.emphasis === true) fields.push(`"emphasis": true`);
   if (n.runs !== undefined && n.runs.length > 0) {
     const runParts = n.runs.map((r) => {
       const rf = [`"start": ${r.start}`, `"end": ${r.end}`];
@@ -75,7 +79,10 @@ function nodeLine(n: MindNode, last: boolean): string {
 }
 
 function edgeLine(e: MindEdge, last: boolean): string {
-  return `{ "id": ${esc(e.id)}, "sourceNodeId": ${esc(e.sourceNodeId)}, "targetNodeId": ${esc(e.targetNodeId)} }${last ? "" : ","}`;
+  // [ADR 0010 v2] lineStyle 紧随 targetNodeId（solid 缺省不输出）
+  const style =
+    e.lineStyle === "dashed" || e.lineStyle === "dotted" ? `, "lineStyle": ${esc(e.lineStyle)}` : "";
+  return `{ "id": ${esc(e.id)}, "sourceNodeId": ${esc(e.sourceNodeId)}, "targetNodeId": ${esc(e.targetNodeId)}${style} }${last ? "" : ","}`;
 }
 
 export type DecodeError =
@@ -112,12 +119,13 @@ export function decodeDocument(
       error: { code: "NOT_JSON", message: String((e as Error).message).slice(0, 200) },
     };
   }
-  // 未来主版本：只读拒绝（调用方提示升级，不允许覆盖原文件）
+  // 未来主版本：只读拒绝（调用方提示升级，不允许覆盖原文件）。v1/v2 可读（ADR 0010）。
   if (
     typeof parsed === "object" &&
     parsed !== null &&
     typeof (parsed as Record<string, unknown>).schemaVersion === "number" &&
-    (parsed as Record<string, unknown>).schemaVersion !== 1
+    (parsed as Record<string, unknown>).schemaVersion !== 1 &&
+    (parsed as Record<string, unknown>).schemaVersion !== 2
   ) {
     return {
       ok: false,

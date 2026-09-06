@@ -15,7 +15,9 @@ import type {
   ThemeName,
   FontToken,
   TextRun,
+  LineStyle,
 } from "./schema.js";
+import { LIMITS } from "./schema.js";
 import { nextIdentity, type StateIdentity } from "./identity.js";
 
 export interface StateNode {
@@ -39,6 +41,17 @@ export type Command =
     }
   | { kind: "EditNodeText"; id: string; text: string; size: Size; runs?: TextRun[] }
   | { kind: "SetNodeShape"; id: string; shape: NodeShape | null } // null = 清除覆盖，继承文档默认
+  // [ADR 0010 v2] 眉题/强调/线型三条单命令（各自可撤销、触发 dirty、进入历史）。
+  // SetNodeKicker 的 measured 为调用方经共享 FontResolver 测得的权威尺寸——
+  // 眉题增删改变节点高度，内容/样式与 size 作为同一条历史原子提交（ADR 0010 §4）。
+  | {
+      kind: "SetNodeKicker";
+      id: string;
+      kicker: string; // 空串 = 清除（等价缺省）
+      measured?: Size; // 眉题增删后的新尺寸；未提供则 size 不变（无高度影响的调用场景）
+    }
+  | { kind: "SetNodeEmphasis"; id: string; emphasis: boolean }
+  | { kind: "SetEdgeLineStyle"; id: string; lineStyle: LineStyle }
   | { kind: "MoveNodes"; moves: Array<{ id: string; position: Point }> }
   | { kind: "DeleteSelection"; nodeIds: string[]; edgeIds: string[] }
   | { kind: "CreateEdge"; id: string; sourceNodeId: string; targetNodeId: string }
@@ -59,7 +72,9 @@ export type CommandError =
   | { code: "EDGE_NOT_FOUND"; id: string }
   | { code: "EDGE_ALREADY_EXISTS"; id: string }
   | { code: "SELF_LOOP" }
-  | { code: "DUPLICATE_EDGE_DIRECTION"; source: string; target: string };
+  | { code: "DUPLICATE_EDGE_DIRECTION"; source: string; target: string }
+  | { code: "BAD_KICKER"; reason: string } // [ADR 0010 v2]
+  | { code: "BAD_SIZE"; id: string }; // [ADR 0010 v2] measured 尺寸非法
 
 export type Effect =
   | { kind: "nodes-created"; ids: string[] }
@@ -74,7 +89,7 @@ export type ApplyResult =
 
 function cloneDocument(doc: MindMapDocumentV1): MindMapDocumentV1 {
   return {
-    schemaVersion: 1,
+    schemaVersion: doc.schemaVersion, // [ADR 0010] 保留来源版本（保存时由 encode 输出 2）
     document: {
       theme: doc.document.theme,
       font: doc.document.font,
@@ -87,6 +102,8 @@ function cloneDocument(doc: MindMapDocumentV1): MindMapDocumentV1 {
         size: { ...n.size },
         ...(n.shape !== undefined ? { shape: n.shape } : {}),
         ...(n.runs !== undefined ? { runs: n.runs.map((r) => ({ ...r })) } : {}),
+        ...(n.kicker !== undefined ? { kicker: n.kicker } : {}),
+        ...(n.emphasis !== undefined ? { emphasis: n.emphasis } : {}),
       })),
       edges: doc.document.edges.map((e) => ({ ...e })),
     },
@@ -140,6 +157,53 @@ export function applyCommand(stateNode: StateNode, command: Command): ApplyResul
       inverse = { kind: "SetNodeShape", id: command.id, shape: node.shape ?? null };
       if (command.shape === null) delete node.shape;
       else node.shape = command.shape;
+      break;
+    }
+    case "SetNodeKicker": {
+      // [ADR 0010 v2] 眉题 + 权威 size 原子提交；命令层校验（fail-closed，非法命令不动文档）
+      if (typeof command.kicker !== "string" || command.kicker.includes("\n"))
+        return { ok: false, error: { code: "BAD_KICKER", reason: "invalid" } };
+      if (command.kicker.length > LIMITS.maxKickerLength)
+        return { ok: false, error: { code: "BAD_KICKER", reason: "too-long" } };
+      if (command.measured !== undefined) {
+        const m = command.measured;
+        if (
+          !Number.isFinite(m.width) ||
+          !Number.isFinite(m.height) ||
+          m.width < LIMITS.minSize ||
+          m.height < LIMITS.minSize ||
+          m.width > LIMITS.maxSize ||
+          m.height > LIMITS.maxSize
+        )
+          return { ok: false, error: { code: "BAD_SIZE", id: command.id } };
+      }
+      const node = findNode(command.id);
+      if (!node) return { ok: false, error: { code: "NODE_NOT_FOUND", id: command.id } };
+      inverse = {
+        kind: "SetNodeKicker",
+        id: command.id,
+        kicker: node.kicker ?? "",
+        measured: { ...node.size },
+      };
+      if (command.kicker.length === 0) delete node.kicker;
+      else node.kicker = command.kicker;
+      if (command.measured !== undefined) node.size = { ...command.measured };
+      break;
+    }
+    case "SetNodeEmphasis": {
+      const node = findNode(command.id);
+      if (!node) return { ok: false, error: { code: "NODE_NOT_FOUND", id: command.id } };
+      inverse = { kind: "SetNodeEmphasis", id: command.id, emphasis: node.emphasis === true };
+      if (command.emphasis) node.emphasis = true;
+      else delete node.emphasis;
+      break;
+    }
+    case "SetEdgeLineStyle": {
+      const edge = d.edges.find((e) => e.id === command.id);
+      if (!edge) return { ok: false, error: { code: "EDGE_NOT_FOUND", id: command.id } };
+      inverse = { kind: "SetEdgeLineStyle", id: command.id, lineStyle: edge.lineStyle ?? "solid" };
+      if (command.lineStyle === "solid") delete edge.lineStyle;
+      else edge.lineStyle = command.lineStyle;
       break;
     }
     case "MoveNodes": {

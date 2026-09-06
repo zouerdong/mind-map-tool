@@ -111,19 +111,29 @@ describe("canonical encode/decode", () => {
     expect(out.ok && out.doc.document.nodes[0]!.text).toBe("引号“”\n制表\t结束");
   });
 
-  it("拒绝 BOM 与未来主版本", () => {
+  it("拒绝 BOM 与未来主版本（≥3；v2 可读——ADR 0010）", () => {
     const good = encodeDocument(sampleDoc());
     const withBom = new Uint8Array(3 + good.length);
     withBom.set([0xef, 0xbb, 0xbf], 0);
     withBom.set(good, 3);
     expect(decodeDocument(withBom).ok).toBe(false);
 
-    const future = new TextDecoder()
-      .decode(good)
-      .replace('"schemaVersion": 1', '"schemaVersion": 2');
+    // v2 是当前写出版本：可读
+    const v2 = new TextDecoder().decode(good);
+    expect(v2).toContain('"schemaVersion": 2'); // encode 恒输出 v2
+    const r2 = decodeDocument(new TextEncoder().encode(v2));
+    expect(r2.ok).toBe(true);
+
+    const future = v2.replace('"schemaVersion": 2', '"schemaVersion": 3');
     const r = decodeDocument(new TextEncoder().encode(future));
     expect(r.ok).toBe(false);
-    if (!r.ok && r.error.code === "FUTURE_VERSION") expect(r.error.actual).toBe(2);
+    if (!r.ok && r.error.code === "FUTURE_VERSION") expect(r.error.actual).toBe(3);
+
+    // v1（历史文件）仍可读：读旧写新（ADR 0010）
+    const v1 = v2.replace('"schemaVersion": 2', '"schemaVersion": 1');
+    const r1 = decodeDocument(new TextEncoder().encode(v1));
+    expect(r1.ok).toBe(true);
+    if (r1.ok) expect(r1.doc.schemaVersion).toBe(1);
   });
 
   it("富文本 runs：round-trip、有序区间、canonical 稳定", () => {
