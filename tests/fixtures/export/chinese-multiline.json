@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "document": {
     "theme": "light",
     "font": "noto-sans-sc",
@@ -14,8 +14,8 @@
           "y": 0
         },
         "size": {
-          "width": 177.5,
-          "height": 70
+          "width": 212,
+          "height": 77.2
         },
         "runs": [
           {
@@ -43,8 +43,8 @@
           "y": 120
         },
         "size": {
-          "width": 170.92,
-          "height": 58
+          "width": 204.48,
+          "height": 68.8
         }
       }
     ],

@@ -50,22 +50,29 @@ function mulberry32(seed: number) {
 
 export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>> {
   const renderer = await createExportRenderer({ fonts: await loadFonts(), resvgWasm: wasm });
+  // 节点权威 size 一律走 VRA-040 共同绘制契约（kicker + runs，16px 正文）。
   const mk = (
     id: string,
     text: string,
     runs?: TextRun[],
     pos: { x: number; y: number } = { x: 0, y: 0 },
     mut?: (doc: MindMapDocumentV1) => void,
+    visual?: { kicker?: string; emphasis?: boolean },
   ) => {
     const doc = emptyDocument();
-    const box = renderer.measureNodeBox(text, runs, doc.document.font);
-    doc.document.nodes.push({
+    const node = {
       id,
       text,
       position: { ...pos },
-      size: box,
+      size: renderer.measureNodeVisual(
+        { text, runs, ...(visual?.kicker !== undefined ? { kicker: visual.kicker } : {}) },
+        doc.document.font,
+      ),
       ...(runs ? { runs } : {}),
-    });
+      ...(visual?.kicker !== undefined && visual.kicker.length > 0 ? { kicker: visual.kicker } : {}),
+      ...(visual?.emphasis ? { emphasis: true } : {}),
+    };
+    doc.document.nodes.push(node);
     mut?.(doc);
     return doc;
   };
@@ -125,7 +132,7 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
     id: "n-2",
     text: "单点卡片",
     position: { x: 240, y: 100 },
-    size: renderer.measureNodeBox("单点卡片", undefined, "noto-sans-sc"),
+    size: renderer.measureNodeVisual({ text: "单点卡片" }, "noto-sans-sc"),
     shape: "card", // 单节点覆盖
   });
   ellipse.document.edges.push({ id: "e-1", sourceNodeId: "n-1", targetNodeId: "n-2" });
@@ -136,9 +143,8 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
   });
   const lxgwRuns: TextRun[] = [{ start: 0, end: 4, bold: true }]; // 文楷模拟粗体
   lxgw.document.nodes[0]!.runs = lxgwRuns;
-  lxgw.document.nodes[0]!.size = renderer.measureNodeBox(
-    "文楷手写·文楷手写",
-    lxgwRuns,
+  lxgw.document.nodes[0]!.size = renderer.measureNodeVisual(
+    { text: "文楷手写·文楷手写", runs: lxgwRuns },
     "lxgw-wenkai",
   );
   fixtures["lxgw-font"] = lxgw;
@@ -162,7 +168,7 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
       "idea spark structure memory link focus expand refine rhythm edge tension anchor trace";
     for (let i = 1; i <= NODES; i++) {
       const text = `${zh[i % zh.length]}·${en[(i * 7) % en.length]}-${i}`;
-      const box = renderer.measureNodeBox(text, undefined, "noto-sans-sc");
+      const box = renderer.measureNodeVisual({ text }, "noto-sans-sc");
       const col = (i - 1) % COLS,
         row = Math.floor((i - 1) / COLS);
       doc.document.nodes.push({
@@ -196,6 +202,115 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
       doc.document.edges.push({ id: `e-${ei++}`, sourceNodeId: a!, targetNodeId: b! });
     }
     fixtures["dense-300-450"] = doc;
+  }
+
+  // visual-style-v2（VRA-040）：G-VIS 12 节点参考 DAG 的 canonical 横向终态。
+  // 覆盖：kicker（含长中文眉题）、emphasis、dashed/dotted 两种线型、多行正文、
+  // 多入边端口、跨层长边（内部直连 + 贴边通道）、孤立节点。
+  {
+    const doc = emptyDocument();
+    // 横向五列（层沿 x 递增，同层沿 y 堆叠）；孤立节点主图下方成行、首项左齐第一列。
+    const POS: Record<string, { x: number; y: number }> = {
+      "n-capture": { x: 0, y: 0 },
+      "n-notes": { x: 0, y: 160 },
+      "n-review-loop": { x: 0, y: 320 },
+      "n-hooks": { x: 0, y: 480 },
+      "n-skills": { x: 320, y: 0 },
+      "n-subtasks": { x: 320, y: 160 },
+      "n-evals": { x: 320, y: 320 },
+      "n-design": { x: 640, y: 0 },
+      "n-peer": { x: 640, y: 200 },
+      "n-cicd": { x: 960, y: 200 },
+      "n-close": { x: 1240, y: 200 },
+      "n-inbox": { x: 0, y: 640 }, // 孤立节点
+    };
+    const TEXT: Record<string, string> = {
+      "n-inbox": "收件箱 Inbox",
+      "n-capture": "捕捉灵感 Capture",
+      "n-notes": "知识库 Notes",
+      "n-review-loop": "反馈环 Review loop",
+      "n-hooks": "自动化 Hooks",
+      "n-skills": "技能 Skills",
+      "n-subtasks": "子任务 Subtasks",
+      "n-evals": "评估 Evals",
+      "n-design": "需求与设计\nRequirements & design",
+      "n-peer": "同伴审阅 Peer review",
+      "n-cicd": "持续集成 CI/CD",
+      "n-close": "闭环收尾\nClosing the loop",
+    };
+    const KICKER: Record<string, string> = {
+      "n-inbox": "入口 INBOX",
+      "n-capture": "灵感 IDEA",
+      "n-notes": "知识库长期沉淀 KNOWLEDGE BASE", // 长中文眉题（≤40 字符，ADR 0010）
+      "n-review-loop": "验证 TEST",
+      "n-hooks": "工具 TOOL",
+      "n-skills": "工具 TOOL",
+      "n-subtasks": "结构 STRUCT",
+      "n-evals": "验证 TEST",
+      "n-design": "设计 DESIGN",
+      "n-peer": "发布 SHIP",
+      "n-cicd": "发布 SHIP",
+      "n-close": "回顾 RETRO",
+    };
+    const EMPHASIS = new Set(["n-capture", "n-notes", "n-review-loop", "n-hooks", "n-inbox"]);
+    for (const [id, pos] of Object.entries(POS)) {
+      const text = TEXT[id]!;
+      doc.document.nodes.push({
+        id,
+        text,
+        position: { ...pos },
+        size: renderer.measureNodeVisual({ text, kicker: KICKER[id] }, doc.document.font),
+        kicker: KICKER[id]!,
+        ...(EMPHASIS.has(id) ? { emphasis: true } : {}),
+      });
+    }
+    const EDGES: Array<[string, string, string, "solid" | "dashed" | "dotted"]> = [
+      ["e-1", "n-capture", "n-design", "solid"],
+      ["e-2", "n-capture", "n-close", "solid"], // 跨层长边
+      ["e-3", "n-notes", "n-skills", "solid"],
+      ["e-4", "n-notes", "n-subtasks", "solid"],
+      ["e-5", "n-notes", "n-evals", "solid"],
+      ["e-6", "n-review-loop", "n-subtasks", "dotted"],
+      ["e-7", "n-review-loop", "n-evals", "solid"],
+      ["e-8", "n-hooks", "n-cicd", "solid"], // 跨层长边
+      ["e-9", "n-skills", "n-design", "solid"],
+      ["e-10", "n-skills", "n-peer", "dashed"],
+      ["e-11", "n-evals", "n-peer", "solid"],
+      ["e-12", "n-peer", "n-cicd", "solid"],
+      ["e-13", "n-cicd", "n-close", "solid"],
+    ];
+    for (const [id, s, t, lineStyle] of EDGES)
+      doc.document.edges.push({
+        id,
+        sourceNodeId: s,
+        targetNodeId: t,
+        ...(lineStyle === "solid" ? {} : { lineStyle }),
+      });
+    doc.document.nodes.push({
+      id: "n-mixed-runs",
+      text: "强调加粗与下划线\n第二行",
+      position: { x: 640, y: 420 },
+      size: renderer.measureNodeVisual(
+        {
+          text: "强调加粗与下划线\n第二行",
+          runs: [
+            { start: 0, end: 4, bold: true },
+            { start: 6, end: 9, underline: true },
+          ],
+        },
+        doc.document.font,
+      ),
+      runs: [
+        { start: 0, end: 4, bold: true },
+        { start: 6, end: 9, underline: true },
+      ],
+    });
+    doc.document.edges.push({
+      id: "e-14",
+      sourceNodeId: "n-peer",
+      targetNodeId: "n-mixed-runs",
+    });
+    fixtures["visual-style-v2"] = doc;
   }
 
   fixtures["large-bounds"] = (() => {

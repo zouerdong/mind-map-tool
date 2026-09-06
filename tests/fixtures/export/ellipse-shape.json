@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "document": {
     "theme": "light",
     "font": "noto-sans-sc",
@@ -14,8 +14,8 @@
           "y": 0
         },
         "size": {
-          "width": 76,
-          "height": 37
+          "width": 120,
+          "height": 46.4
         }
       },
       {
@@ -26,8 +26,8 @@
           "y": 100
         },
         "size": {
-          "width": 76,
-          "height": 37
+          "width": 120,
+          "height": 46.4
         },
         "shape": "card"
       }

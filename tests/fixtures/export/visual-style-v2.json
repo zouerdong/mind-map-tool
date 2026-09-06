@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 2,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "n-capture",
+        "text": "捕捉灵感 Capture",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 159.536,
+          "height": 66.7
+        },
+        "kicker": "灵感 IDEA",
+        "emphasis": true
+      },
+      {
+        "id": "n-notes",
+        "text": "知识库 Notes",
+        "position": {
+          "x": 0,
+          "y": 160
+        },
+        "size": {
+          "width": 222.355,
+          "height": 66.7
+        },
+        "kicker": "知识库长期沉淀 KNOWLEDGE BASE",
+        "emphasis": true
+      },
+      {
+        "id": "n-review-loop",
+        "text": "反馈环 Review loop",
+        "position": {
+          "x": 0,
+          "y": 320
+        },
+        "size": {
+          "width": 174.48,
+          "height": 66.7
+        },
+        "kicker": "验证 TEST",
+        "emphasis": true
+      },
+      {
+        "id": "n-hooks",
+        "text": "自动化 Hooks",
+        "position": {
+          "x": 0,
+          "y": 480
+        },
+        "size": {
+          "width": 130.944,
+          "height": 66.7
+        },
+        "kicker": "工具 TOOL",
+        "emphasis": true
+      },
+      {
+        "id": "n-skills",
+        "text": "技能 Skills",
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 66.7
+        },
+        "kicker": "工具 TOOL"
+      },
+      {
+        "id": "n-subtasks",
+        "text": "子任务 Subtasks",
+        "position": {
+          "x": 320,
+          "y": 160
+        },
+        "size": {
+          "width": 151.568,
+          "height": 66.7
+        },
+        "kicker": "结构 STRUCT"
+      },
+      {
+        "id": "n-evals",
+        "text": "评估 Evals",
+        "position": {
+          "x": 320,
+          "y": 320
+        },
+        "size": {
+          "width": 120,
+          "height": 66.7
+        },
+        "kicker": "验证 TEST"
+      },
+      {
+        "id": "n-design",
+        "text": "需求与设计\nRequirements & design",
+        "position": {
+          "x": 640,
+          "y": 0
+        },
+        "size": {
+          "width": 204.592,
+          "height": 89.1
+        },
+        "kicker": "设计 DESIGN"
+      },
+      {
+        "id": "n-peer",
+        "text": "同伴审阅 Peer review",
+        "position": {
+          "x": 640,
+          "y": 200
+        },
+        "size": {
+          "width": 186.736,
+          "height": 66.7
+        },
+        "kicker": "发布 SHIP"
+      },
+      {
+        "id": "n-cicd",
+        "text": "持续集成 CI/CD",
+        "position": {
+          "x": 960,
+          "y": 200
+        },
+        "size": {
+          "width": 141.968,
+          "height": 66.7
+        },
+        "kicker": "发布 SHIP"
+      },
+      {
+        "id": "n-close",
+        "text": "闭环收尾\nClosing the loop",
+        "position": {
+          "x": 1240,
+          "y": 200
+        },
+        "size": {
+          "width": 152.752,
+          "height": 89.1
+        },
+        "kicker": "回顾 RETRO"
+      },
+      {
+        "id": "n-inbox",
+        "text": "收件箱 Inbox",
+        "position": {
+          "x": 0,
+          "y": 640
+        },
+        "size": {
+          "width": 125.584,
+          "height": 66.7
+        },
+        "kicker": "入口 INBOX",
+        "emphasis": true
+      },
+      {
+        "id": "n-mixed-runs",
+        "text": "强调加粗与下划线\n第二行",
+        "position": {
+          "x": 640,
+          "y": 420
+        },
+        "size": {
+          "width": 160,
+          "height": 68.8
+        },
+        "runs": [
+          {
+            "start": 0,
+            "end": 4,
+            "bold": true
+          },
+          {
+            "start": 6,
+            "end": 9,
+            "underline": true
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "sourceNodeId": "n-capture",
+        "targetNodeId": "n-design"
+      },
+      {
+        "id": "e-2",
+        "sourceNodeId": "n-capture",
+        "targetNodeId": "n-close"
+      },
+      {
+        "id": "e-3",
+        "sourceNodeId": "n-notes",
+        "targetNodeId": "n-skills"
+      },
+      {
+        "id": "e-4",
+        "sourceNodeId": "n-notes",
+        "targetNodeId": "n-subtasks"
+      },
+      {
+        "id": "e-5",
+        "sourceNodeId": "n-notes",
+        "targetNodeId": "n-evals"
+      },
+      {
+        "id": "e-6",
+        "sourceNodeId": "n-review-loop",
+        "targetNodeId": "n-subtasks",
+        "lineStyle": "dotted"
+      },
+      {
+        "id": "e-7",
+        "sourceNodeId": "n-review-loop",
+        "targetNodeId": "n-evals"
+      },
+      {
+        "id": "e-8",
+        "sourceNodeId": "n-hooks",
+        "targetNodeId": "n-cicd"
+      },
+      {
+        "id": "e-9",
+        "sourceNodeId": "n-skills",
+        "targetNodeId": "n-design"
+      },
+      {
+        "id": "e-10",
+        "sourceNodeId": "n-skills",
+        "targetNodeId": "n-peer",
+        "lineStyle": "dashed"
+      },
+      {
+        "id": "e-11",
+        "sourceNodeId": "n-evals",
+        "targetNodeId": "n-peer"
+      },
+      {
+        "id": "e-12",
+        "sourceNodeId": "n-peer",
+        "targetNodeId": "n-cicd"
+      },
+      {
+        "id": "e-13",
+        "sourceNodeId": "n-cicd",
+        "targetNodeId": "n-close"
+      },
+      {
+        "id": "e-14",
+        "sourceNodeId": "n-peer",
+        "targetNodeId": "n-mixed-runs"
+      }
+    ]
+  }
+}

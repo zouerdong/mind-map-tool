@@ -1,0 +1,273 @@
+// edge-geometry 契约测试（VRA-040）：端口方向、正交形态、通道绕行、箭头/端点 gap、
+// 形态插值接口、确定性，以及"整理后零共线重叠"程序化检测。
+
+import { describe, expect, it } from "vitest";
+import {
+  EDGE_GEOMETRY,
+  arrowD,
+  assignEdgePorts,
+  edgeAnchor,
+  edgePathD,
+  filletD,
+  findCollinearOverlaps,
+  formatNum,
+  planEdgeGeometry,
+  polylineD,
+  type EdgePlanInput,
+  type NodeBox,
+} from "../src/edge-geometry.js";
+
+const box = (x: number, y: number, width = 188, height = 68): NodeBox => ({ x, y, width, height });
+const edge = (id: string, sx: number, sy: number, tx: number, ty: number): EdgePlanInput => ({
+  id,
+  sourceId: `${sx},${sy}`,
+  targetId: `${tx},${ty}`,
+  source: box(sx, sy),
+  target: box(tx, ty),
+});
+
+describe("端口方向（§1.4：横向右出左入；纵向底出顶入）", () => {
+  it("horizontal：源锚在右缘、目标锚在左缘", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
+    expect(g.anchorSource.x).toBe(188);
+    expect(g.anchorTarget.x).toBe(270);
+    expect(g.anchorSource.y).toBeCloseTo(34, 6);
+  });
+
+  it("vertical：源锚在底缘、目标锚在顶缘（同构转置）", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 0, 175)], "vertical", 1).get("e")!;
+    expect(g.anchorSource.y).toBe(68);
+    expect(g.anchorTarget.y).toBe(175);
+    expect(g.anchorSource.x).toBeCloseTo(94, 6);
+  });
+
+  it("多入边沿卡边均分；参考卡高足够时间距 ≥ 18px（§1.4）", () => {
+    const edges: EdgePlanInput[] = [0, 1, 2].map((i) => ({
+      ...edge(`e${i}`, 0, i * 120, 300, 0),
+      target: box(300, 0, 188, 84), // 3 入边 → 84/4 = 21px 间距
+    }));
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    const ys = edges.map((e) => geoms.get(e.id)!.anchorTarget.y).sort((a, b) => a - b);
+    expect(ys[1]! - ys[0]!).toBeGreaterThanOrEqual(EDGE_GEOMETRY.portMinSpacing - 1e-6);
+    expect(ys[2]! - ys[1]!).toBeGreaterThanOrEqual(EDGE_GEOMETRY.portMinSpacing - 1e-6);
+  });
+
+  it("锚点不越出卡边：卡高不足 18×(n+1) 时按均分收紧（布局层负责给高）", () => {
+    const edges: EdgePlanInput[] = [0, 1, 2].map((i) => edge(`e${i}`, 0, i * 120, 300, 0));
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    const ys = edges.map((e) => geoms.get(e.id)!.anchorTarget.y).sort((a, b) => a - b);
+    expect(ys[0]).toBe(17); // 68/4
+    expect(ys[1]).toBe(34);
+    expect(ys[2]).toBe(51);
+  });
+
+  it("assignEdgePorts：槽位按边文档序，计数与序号一致", () => {
+    const ports = assignEdgePorts([edge("a", 0, 0, 100, 0), edge("b", 0, 0, 100, 50)]);
+    expect(ports.get("a")).toEqual({ sourceSlot: 0, sourceOf: 2, targetSlot: 0, targetOf: 1 });
+    expect(ports.get("b")).toEqual({ sourceSlot: 1, sourceOf: 2, targetSlot: 0, targetOf: 1 });
+  });
+
+  it("edgeAnchor 单边居中、多边均分", () => {
+    expect(edgeAnchor(box(0, 0), "out", 0, 1, "horizontal").y).toBe(34);
+    expect(edgeAnchor(box(0, 0), "out", 0, 2, "horizontal").y).toBeCloseTo(68 / 3, 6);
+  });
+});
+
+describe("端点 gap 与箭头（§1.4：gap 4px；实心三角 9×7）", () => {
+  it("主线起终点离卡边界 gap 4px", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
+    expect(g.start.x).toBeCloseTo(192, 6); // 188 + 4
+    expect(g.tip.x).toBeCloseTo(266, 6); // 270 - 4
+    expect(g.lineEnd.x).toBeCloseTo(266 - 9, 6); // 箭头长 9
+    const d = Math.hypot(g.tip.x - g.lineEnd.x, g.tip.y - g.lineEnd.y);
+    expect(d).toBeCloseTo(9, 6);
+    const half = Math.hypot(g.arrowBase[0].x - g.lineEnd.x, g.arrowBase[0].y - g.lineEnd.y);
+    expect(half).toBeCloseTo(3.5, 6);
+  });
+
+  it("箭头独立 path：闭合三角、方向指向目标", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
+    expect(arrowD(g)).toBe(`M 266 ${g.tip.y} L 257 ${g.tip.y + 3.5} L 257 ${g.tip.y - 3.5} Z`);
+    expect(arrowD(g).endsWith(" Z")).toBe(true);
+  });
+});
+
+describe("规整态正交形态（lineMorph=1，§1.4 全正交电路线）", () => {
+  it("折线段全部水平或垂直（零斜线）", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 212)], "horizontal", 1).get("e")!;
+    for (let i = 1; i < g.chain.length; i++) {
+      const a = g.chain[i - 1]!;
+      const b = g.chain[i]!;
+      expect(Math.abs(a.x - b.x) < 1e-6 || Math.abs(a.y - b.y) < 1e-6, `seg ${i}`).toBe(true);
+    }
+  });
+
+  it("近共线端点直连（内部直连优先，不绕圈）", () => {
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
+    expect(g.route.kind).toBe("straight");
+    expect(g.chain).toHaveLength(2);
+  });
+
+  it("转折落位目标列前（tip - 24 - rank×spacing），全缝唯一", () => {
+    const edges: EdgePlanInput[] = [
+      edge("e1", 0, 0, 270, 0),
+      edge("e2", 0, 106, 270, 212),
+    ];
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    const turns = [...geoms.values()]
+      .filter((g) => g.route.kind === "comb")
+      .map((g) => (g.route as { kind: "comb"; turn: number }).turn);
+    expect(turns.length).toBeGreaterThan(0);
+    expect(new Set(turns).size).toBe(turns.length); // 全缝唯一 → 垂直段零重叠
+  });
+
+  it("filletD 拐角半径 ≤ 12，且路径仍以 L/Q 表达", () => {
+    const d = filletD(
+      [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 200, y: 100 },
+      ],
+      12,
+    );
+    expect(d.startsWith("M 0 0")).toBe(true);
+    expect(d).toContain("Q 100 0");
+    expect(d).not.toContain("C ");
+  });
+});
+
+describe("跨层长边：贴边通道（§1.4 ②：边界外 56px、按序偏移 14px）", () => {
+  // 三条跨两层长边被中列高卡完全遮挡 → 通道绕行；源锚高度决定上/下侧
+  const sources = [box(0, 0), box(0, 200), box(0, 400)];
+  const targets = [box(600, 0), box(600, 200), box(600, 400)];
+  const obstacles: NodeBox[] = [box(300, 0, 188, 468), ...sources, ...targets];
+  const edges: EdgePlanInput[] = sources.map((s, i) => ({
+    id: `cross-${i}`,
+    sourceId: `s${i}`,
+    targetId: `t${i}`,
+    source: s,
+    target: targets[i]!,
+  }));
+
+  it("被挡的长边走通道，通道在图边界外 56px + 通道序×14px（上/下按源就近）", () => {
+    const geoms = planEdgeGeometry(edges, "horizontal", 1, { obstacles });
+    const minY = 0;
+    const maxY = 468;
+    for (const e of edges) {
+      const g = geoms.get(e.id)!;
+      expect(g.route.kind, e.id).toBe("channel");
+      const route = g.route as Extract<typeof g.route, { kind: "channel" }>;
+      const base = route.side === "up" ? minY - EDGE_GEOMETRY.channelOffset : maxY + EDGE_GEOMETRY.channelOffset;
+      expect(g.chain[2]!.y, e.id).toBeCloseTo(base + route.index * EDGE_GEOMETRY.channelSpacing, 6);
+    }
+  });
+
+  it("通道内同侧多边：走廊按序错开（零共线重叠）", () => {
+    const geoms = planEdgeGeometry(edges, "horizontal", 1, { obstacles });
+    const corridor = (id: string) => geoms.get(id)!.chain[2]!.y;
+    const down = [corridor("cross-1"), corridor("cross-2")].sort((a, b) => a - b);
+    expect(down[1]! - down[0]!).toBeCloseTo(EDGE_GEOMETRY.channelSpacing, 6);
+    expect(findCollinearOverlaps(geoms.values())).toEqual([]);
+  });
+
+  it("无遮挡时不绕通道（内部直连优先，走目标列前梳状转折）", () => {
+    const sparse: NodeBox[] = [sources[0]!, targets[2]!];
+    const single: EdgePlanInput = {
+      id: "cross",
+      sourceId: "s0",
+      targetId: "t2",
+      source: sources[0]!,
+      target: targets[2]!,
+    };
+    const g = planEdgeGeometry([single], "horizontal", 1, { obstacles: sparse }).get("cross")!;
+    expect(g.route.kind).toBe("comb");
+  });
+});
+
+describe("形态参数与插值接口（VRA-060）", () => {
+  const sample = [edge("e", 0, 0, 270, 212)];
+
+  it("lineMorph=0：散乱平滑贝塞尔（C 指令）", () => {
+    const g = planEdgeGeometry(sample, "horizontal", 0).get("e")!;
+    expect(edgePathD(g, 0)).toContain("C ");
+  });
+
+  it("lineMorph=1：规整圆角折线（L/Q，无 C）", () => {
+    const g = planEdgeGeometry(sample, "horizontal", 1).get("e")!;
+    const d = edgePathD(g, 1);
+    expect(d).not.toContain("C ");
+    expect(d).toContain("Q ");
+  });
+
+  it("lineMorph=0.5：插值折线端点与 lineEnd 一致，拓扑连续", () => {
+    const g = planEdgeGeometry(sample, "horizontal", 0.5).get("e")!;
+    const d = edgePathD(g, 0.5);
+    expect(d).not.toContain("C ");
+    expect(d.startsWith(`M ${formatNum(g.start.x)} ${formatNum(g.start.y)}`)).toBe(true);
+    expect(d.endsWith(`L ${formatNum(g.lineEnd.x)} ${formatNum(g.lineEnd.y)}`)).toBe(true);
+  });
+
+  it("lineMorph=0：语义贝塞尔（M..C），终点为箭头底心", () => {
+    const g = planEdgeGeometry(sample, "horizontal", 0).get("e")!;
+    const d = edgePathD(g, 0);
+    expect(d.startsWith(`M ${formatNum(g.start.x)} ${formatNum(g.start.y)} C`)).toBe(true);
+    expect(d.endsWith(`${formatNum(g.lineEnd.x)} ${formatNum(g.lineEnd.y)}`)).toBe(true);
+  });
+
+  it("polylineD 输出与格式化契约一致（3 位小数、-0 归零）", () => {
+    expect(polylineD([{ x: -0.00004, y: 1.0005 }])).toBe("M 0 1.001");
+  });
+});
+
+describe("零共线重叠检测（§1.4 布线硬规则）", () => {
+  it("共线并行段被识别", () => {
+    const a: EdgeGeometry = planEdgeGeometry([edge("a", 0, 0, 270, 100)], "horizontal", 1).get("a")!;
+    const b: EdgeGeometry = planEdgeGeometry([edge("b", 40, 100, 310, 100)], "horizontal", 1).get(
+      "b",
+    )!;
+    // b 的源锚高度与 a 的水平走廊同 y → 构造共线：把 b 的链整体平移到 a 的走廊上
+    const shifted: EdgeGeometry = {
+      ...b,
+      chain: b.chain.map((p) => ({ x: p.x, y: a.chain[1]!.y })),
+    };
+    const overlaps = findCollinearOverlaps([a, shifted]);
+    expect(overlaps.length).toBeGreaterThan(0);
+    expect(overlaps[0]!.axis).toBe("h");
+  });
+
+  it("同缝两边转折 x 唯一：垂直段零重叠（交叉允许，重叠禁止）", () => {
+    const edges: EdgePlanInput[] = [
+      edge("a", 0, 0, 270, 212),
+      edge("b", 0, 212, 270, 0), // 与 a 反向汇聚到同列 → 必然交叉
+    ];
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    const overlaps = findCollinearOverlaps(geoms.values());
+    expect(overlaps.filter((o) => o.axis === "v")).toEqual([]);
+    const turns = [...geoms.values()].map((g) => (g.route as { kind: "comb"; turn: number }).turn);
+    expect(new Set(turns).size).toBe(turns.length);
+  });
+
+  it("进入走廊 = 目标锚 y：同目标多边走廊唯一（按入边分配锚点）", () => {
+    const edges: EdgePlanInput[] = [0, 1, 2].map((i) => edge(`e${i}`, 0, i * 130, 400, 0));
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    const corridors = edges.map((e) => {
+      const g = geoms.get(e.id)!;
+      return g.chain[g.chain.length - 1]!.y;
+    });
+    expect(new Set(corridors).size).toBe(corridors.length);
+  });
+});
+
+describe("确定性", () => {
+  it("同输入多次规划结果完全一致", () => {
+    const edges: EdgePlanInput[] = [
+      edge("e1", 0, 0, 270, 0),
+      edge("e2", 0, 106, 270, 212),
+      edge("e3", 0, 0, 810, 106),
+    ];
+    const a = planEdgeGeometry(edges, "horizontal", 1);
+    const b = planEdgeGeometry(edges, "horizontal", 1);
+    expect([...a.values()]).toEqual([...b.values()]);
+  });
+});

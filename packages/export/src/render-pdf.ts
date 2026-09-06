@@ -1,7 +1,10 @@
 // PDF renderer（web-ts-wasm 分支唯一 owner；单页适合内容）。
 // Spike 已验证：pdf-lib 必须注册 @pdf-lib/fontkit，且内嵌字体对象不可跨文档复用。
+// VRA-040：从同一 scene primitives 绘制（圆角矩形/正交折线/箭头/线型 dash），
+// 不另猜曲线或圆角；scene 的 y-down 坐标经 drawSvgPath 的 translate+scale(1,-1) 映射进 PDF
+// （路径 y 直接用 scene 值，起点 y 传页高 —— 不再手工翻转，避免双重翻转到页外）。
 
-import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
+import { LineCapStyle, PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import fontkitForPdf from "@pdf-lib/fontkit";
 import type { ExportScene } from "./scene.js";
 import { THEME_TOKENS } from "./scene.js";
@@ -13,8 +16,15 @@ function hexToRgb(hex: string) {
   return rgb(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255);
 }
 
-/** y 翻转：scene 是 y-down，PDF 是 y-up。 */
-const flipY = (y: number, pageH: number) => pageH - y;
+/** 圆角矩形 path（局部坐标，左上为原点、y 向下；drawSvgPath 负责翻转）。 */
+function roundedRectPath(w: number, h: number, rx: number): string {
+  const r = Math.max(0, Math.min(rx, w / 2, h / 2));
+  if (r === 0) return `M 0 0 L ${w} 0 L ${w} ${h} L 0 ${h} Z`;
+  return (
+    `M ${r} 0 L ${w - r} 0 Q ${w} 0 ${w} ${r} L ${w} ${h - r} Q ${w} ${h} ${w - r} ${h}` +
+    ` L ${r} ${h} Q 0 ${h} 0 ${h - r} L 0 ${r} Q 0 0 ${r} 0 Z`
+  );
+}
 
 export async function renderPdf(
   scene: ExportScene,
@@ -31,6 +41,7 @@ export async function renderPdf(
   pdf.setModificationDate(new Date(0));
   const page = pdf.addPage([scene.width, scene.height]);
   const colors = THEME_TOKENS[scene.theme];
+  const pageH = scene.height;
 
   // 每文档重新内嵌（不跨文档复用——Spike 教训）。
   // 两条互斥路径（pdf-lib 的 CFF subsetter 与第二块 CJK 字体共存时会崩溃，
@@ -62,48 +73,46 @@ export async function renderPdf(
     y: 0,
     width: scene.width,
     height: scene.height,
-    color: hexToRgb(colors.bg),
+    color: hexToRgb(colors.canvas),
   });
 
   try {
     for (const item of scene.items) {
       switch (item.kind) {
         case "edge": {
-          // scene 路径为 y-down 绝对坐标（M x y C cx1 cy1, cx2 cy2, x y）→ 手动翻转为 PDF y-up
-          const nums = item.d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-          if (nums.length === 8) {
-            const f = (i: number) =>
-              Math.round((i % 2 === 1 ? scene.height - nums[i]! : nums[i]!) * 1000) / 1000;
-            const flipped = `M ${f(0)} ${f(1)} C ${f(2)} ${f(3)}, ${f(4)} ${f(5)}, ${f(6)} ${f(7)}`;
-            page.drawSvgPath(flipped, {
-              x: 0,
-              y: 0,
-              borderColor: hexToRgb(item.stroke),
-              borderWidth: LAYOUT.strokeWidth,
-            });
-          }
+          // scene 路径为 y-down 绝对坐标；drawSvgPath 内部 scale(1,-1)，起点 y = 页高即可
+          const dash = item.dash ? [...item.dash] : null;
+          page.drawSvgPath(item.d, {
+            x: 0,
+            y: pageH,
+            borderColor: hexToRgb(item.stroke),
+            borderWidth: item.width,
+            ...(dash ? { borderDashArray: dash } : {}),
+            borderLineCap: item.roundCap ? LineCapStyle.Round : LineCapStyle.Butt,
+          });
+          // 箭头：独立实心三角（与主线同色、同几何源）
+          page.drawSvgPath(item.arrowD, {
+            x: 0,
+            y: pageH,
+            color: hexToRgb(item.stroke),
+          });
           break;
         }
         case "frame-rect":
-          page.drawRectangle({
+          // 圆角矩形从共同 primitives 绘制（rx 与 SVG 同值）；实心卡无描边
+          page.drawSvgPath(roundedRectPath(item.w, item.h, item.rx), {
             x: item.x,
-            y: flipY(item.y + item.h, scene.height),
-            width: item.w,
-            height: item.h,
+            y: pageH - item.y,
             color: hexToRgb(item.fill),
-            borderColor: hexToRgb(item.stroke),
-            borderWidth: 1,
           });
           break;
         case "frame-ellipse":
           page.drawEllipse({
             x: item.cx,
-            y: flipY(item.cy, scene.height),
+            y: pageH - item.cy,
             xScale: item.rx,
             yScale: item.ry,
             color: hexToRgb(item.fill),
-            borderColor: hexToRgb(item.stroke),
-            borderWidth: 1,
           });
           break;
         case "text":
@@ -112,7 +121,7 @@ export async function renderPdf(
             const draw = (dx: number) =>
               page.drawText(seg.text, {
                 x: seg.x + dx,
-                y: flipY(seg.baselineY, scene.height),
+                y: pageH - seg.baselineY,
                 font,
                 size: seg.fontSize,
                 color: hexToRgb(item.color),
@@ -123,8 +132,8 @@ export async function renderPdf(
           break;
         case "underline":
           page.drawLine({
-            start: { x: item.x1, y: flipY(item.y1, scene.height) },
-            end: { x: item.x2, y: flipY(item.y2, scene.height) },
+            start: { x: item.x1, y: pageH - item.y1 },
+            end: { x: item.x2, y: pageH - item.y2 },
             thickness: LAYOUT.underlineThickness,
             color: hexToRgb(item.color),
           });

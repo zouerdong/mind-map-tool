@@ -76,13 +76,23 @@ function sameStyle(a: SegmentStyle, b: SegmentStyle): boolean {
   return a.bold === b.bold && a.underline === b.underline && a.fontSize === b.fontSize;
 }
 
+/** 排版 profile：覆盖默认字号/行高（visual-style 的 v2 排版由此注入，缺省沿用 LAYOUT）。
+ *  字号/行高只影响测量与几何，不改变 runs 解析与换行语义（仍只认显式 \n）。 */
+export interface TextLayoutProfile {
+  baseFontSize?: number;
+  lineHeightFactor?: number;
+}
+
 /** 布局一个节点的文本：text + runs → 行/段几何。 */
 export function layoutNodeText(
   text: string,
   runs: TextRun[] | undefined,
   fontId: FontToken,
   fonts: FontResolver,
+  profile: TextLayoutProfile = {},
 ): NodeLayout {
+  const baseFontSize = profile.baseFontSize ?? LAYOUT.baseFontSize;
+  const lineHeightFactor = profile.lineHeightFactor ?? LAYOUT.lineHeightFactor;
   const regular = fonts.regular(fontId);
   const bold = fonts.bold(fontId);
   const lines: LayoutLine[] = [];
@@ -97,7 +107,7 @@ export function layoutNodeText(
 
     const flush = (endExclusive: number) => {
       if (currentText.length === 0) return;
-      const fontSize = currentStyle.fontSize ?? LAYOUT.baseFontSize;
+      const fontSize = currentStyle.fontSize ?? baseFontSize;
       const useBold = currentStyle.bold === true && bold !== null;
       const metrics = currentStyle.bold === true ? (bold ?? regular) : regular;
       let width = 0;
@@ -133,13 +143,10 @@ export function layoutNodeText(
       x += seg.width;
     }
 
-    const maxFontSize = segments.reduce<number>(
-      (m, s) => Math.max(m, s.fontSize),
-      LAYOUT.baseFontSize,
-    );
+    const maxFontSize = segments.reduce<number>((m, s) => Math.max(m, s.fontSize), baseFontSize);
     const ascentRatio =
       segments.length > 0 ? maxAscentRatio(segments, regular, bold) : regular.ascentRatio;
-    const height = maxFontSize * LAYOUT.lineHeightFactor;
+    const height = maxFontSize * lineHeightFactor;
     const baselineOffset = (height - maxFontSize) / 2 + maxFontSize * ascentRatio;
     lines.push({ segments, height, baselineOffset, width: x });
     globalBase += raw.length + 1; // +1 跳过换行符
