@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>VRA-010 参考对齐原型（暖白/黑板 × 状态矩阵 × 800ms 整理动效）</title>
+<style>
+  /* ============ 设计 token（与 docs/product/visual-state-tokens-2026-09-06.md 同源） ============ */
+  :root, .theme-light {
+    --canvas: #F9F8F4;
+    --card-fill: #141412;      --card-text: #F5F2EA;  --card-kicker: #A8A296;
+    --accent-fill: #D97757;    --accent-text: #331708; --accent-kicker: #6B3A22;
+    --edge-primary: #4A4640;   --edge-secondary: #8A8478; --edge-candidate: #D97757;
+    --state: #D97757;
+    --shell-text: #3B372F;     --shell-subtle: #8A8478;
+    --shell-bar: #F1EFE9;      --shell-border: #E3DFD5;
+    --banner-bg: #FFF4EF;      --banner-border: #D97757;
+    --scrim: rgba(31,27,22,.42);
+    --menu-bg: #FFFDF9;
+  }
+  .theme-dark {
+    --canvas: #16140F;
+    --card-fill: #EFEAE0;      --card-text: #141412;  --card-kicker: #7A7264;
+    --accent-fill: #D97757;    --accent-text: #331708; --accent-kicker: #6B3A22;
+    --edge-primary: #A39C8E;   --edge-secondary: #6B655A; --edge-candidate: #D97757;
+    --state: #D97757;
+    --shell-text: #EFEAE0;     --shell-subtle: #8A8478;
+    --shell-bar: #211E18;      --shell-border: #35312A;
+    --banner-bg: #2A2018;      --banner-border: #D97757;
+    --scrim: rgba(0,0,0,.55);
+    --menu-bg: #211E18;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #2B2822; color: #EFEAE0; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  /* ============ 原型控制条（非产品 UI） ============ */
+  #controls {
+    flex: 0 0 auto; padding: 8px 12px; background: #1D1B16; border-bottom: 1px solid #3A362E;
+    font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center;
+  }
+  #controls .grp { display: flex; gap: 4px; align-items: center; }
+  #controls .lbl { color: #8A8478; }
+  #controls button {
+    font: inherit; padding: 3px 8px; border-radius: 6px; border: 1px solid #4A463C;
+    background: #2B2822; color: #EFEAE0; cursor: pointer;
+  }
+  #controls button.on { background: #D97757; border-color: #D97757; color: #331708; font-weight: 600; }
+  #controls select { font: inherit; padding: 3px 6px; border-radius: 6px; background: #2B2822; color: #EFEAE0; border: 1px solid #4A463C; }
+  #stage-wrap { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 14px; }
+  /* ============ 产品窗口模拟 ============ */
+  .app {
+    width: var(--win-w, 1280px); height: var(--win-h, 800px);
+    background: var(--canvas); position: relative; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); border-radius: 8px;
+    display: flex; flex-direction: column; color: var(--shell-text);
+  }
+  .app-bar {
+    flex: 0 0 40px; background: var(--shell-bar); border-bottom: 1px solid var(--shell-border);
+    display: flex; align-items: center; gap: 14px; padding: 0 14px; font-size: 13px; position: relative; z-index: 30;
+  }
+  .app-bar .file-menu { position: relative; }
+  .app-bar .file-menu > button {
+    font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .app-bar .file-menu.open > button { background: rgba(217,119,87,.16); }
+  .dropdown {
+    display: none; position: absolute; top: 30px; left: 0; min-width: 210px; background: var(--menu-bg);
+    border: 1px solid var(--shell-border); border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 40;
+  }
+  .file-menu.open .dropdown { display: block; }
+  .dropdown div { padding: 6px 10px; border-radius: 6px; display: flex; justify-content: space-between; gap: 18px; cursor: default; }
+  .dropdown div:hover { background: rgba(217,119,87,.12); }
+  .dropdown .kbd { color: var(--shell-subtle); font-size: 11px; }
+  .dropdown hr { border: none; border-top: 1px solid var(--shell-border); margin: 5px 4px; }
+  .doc-title { flex: 1; text-align: center; font-size: 13px; color: var(--shell-subtle); }
+  .doc-title b { color: var(--shell-text); font-weight: 600; }
+  .save-state { font-size: 12px; }
+  .save-state.saving::before { content: "● "; animation: blink 1s infinite; color: var(--shell-subtle); }
+  @keyframes blink { 50% { opacity: .2; } }
+  .app-bar .btn {
+    font: inherit; color: var(--shell-text); background: none; border: 1px solid var(--shell-border);
+    padding: 4px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .app-bar .btn.primary { background: #D97757; border-color: #D97757; color: #331708; font-weight: 600; }
+  .canvas-host { flex: 1 1 auto; position: relative; }
+  svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .blank-hint {
+    position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%);
+    color: var(--shell-subtle); font-size: 13px; pointer-events: none;
+  }
+  .banner {
+    position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+    background: var(--banner-bg); border: 1px solid var(--banner-border); border-radius: 10px;
+    padding: 9px 14px; font-size: 13px; display: flex; gap: 14px; align-items: center; z-index: 35; max-width: 80%;
+  }
+  .banner b { color: var(--shell-text); }
+  .banner .act {
+    font: inherit; border: 1px solid var(--banner-border); background: none; color: var(--banner-border);
+    border-radius: 7px; padding: 3px 10px; cursor: pointer;
+  }
+  .banner .act.solid { background: #D97757; color: #331708; font-weight: 600; }
+  .toast {
+    position: absolute; right: 16px; bottom: 16px; background: var(--menu-bg);
+    border: 1px solid var(--shell-border); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; color: var(--shell-text);
+    box-shadow: 0 6px 18px rgba(0,0,0,.12); z-index: 35;
+  }
+  .modal-scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 50; display: flex; align-items: center; justify-content: center; }
+  .modal {
+    background: var(--menu-bg); border-radius: 14px; padding: 22px 26px; min-width: 380px; color: var(--shell-text);
+    box-shadow: 0 18px 50px rgba(0,0,0,.3);
+  }
+  .modal h3 { font-size: 15px; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: var(--shell-subtle); margin-bottom: 18px; }
+  .modal .row { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal button { font: inherit; padding: 6px 14px; border-radius: 8px; cursor: pointer; border: 1px solid var(--shell-border); background: none; color: var(--shell-text); }
+  .modal button.primary { background: #D97757; border-color: #D97757; color: #331708; font-weight: 600; }
+  .coach {
+    position: absolute; background: var(--menu-bg); border: 1px solid var(--shell-border); border-radius: 12px;
+    padding: 12px 16px; font-size: 13px; color: var(--shell-text); box-shadow: 0 8px 24px rgba(0,0,0,.16); z-index: 34; max-width: 260px;
+  }
+  .coach .step { color: var(--shell-subtle); font-size: 11px; margin-bottom: 4px; }
+  .coach-skip { position: absolute; right: 16px; bottom: 16px; color: var(--shell-subtle); font-size: 12px; z-index: 34; cursor: pointer; }
+  .ime-window {
+    position: absolute; background: var(--menu-bg); border: 1px solid var(--shell-border); border-radius: 8px;
+    font-size: 13px; color: var(--shell-text); padding: 4px 6px; z-index: 36; box-shadow: 0 6px 16px rgba(0,0,0,.14);
+  }
+  .ime-window .cand { padding: 2px 8px; }
+  .ime-window .cand.first { background: #D97757; color: #331708; border-radius: 5px; }
+  .ctx-tools {
+    position: absolute; transform: translate(-50%, -100%); background: var(--menu-bg);
+    border: 1px solid var(--shell-border); border-radius: 10px; padding: 5px 7px; display: flex; gap: 4px; z-index: 33;
+    box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  }
+  .ctx-tools button { font: inherit; font-size: 12px; border: none; background: none; color: var(--shell-text); padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+  .ctx-tools button:hover { background: rgba(217,119,87,.14); }
+  .ctx-tools .sep { width: 1px; background: var(--shell-border); margin: 3px 2px; }
+  /* 节点 SVG */
+  .node rect.body { fill: var(--card-fill); }
+  .node.accent rect.body { fill: var(--accent-fill); }
+  .node text.kicker { fill: var(--card-kicker); font-size: 11px; letter-spacing: .06em; }
+  .node.accent text.kicker { fill: var(--accent-kicker); }
+  .node text.body-text { fill: var(--card-text); font-size: 16px; }
+  .node.accent text.body-text { fill: var(--accent-text); }
+  .node .sel-ring { fill: none; stroke: var(--state); stroke-width: 2; }
+  .node .focus-ring { fill: none; stroke: var(--state); stroke-width: 2; }
+  .node .corner-tick { stroke: var(--state); stroke-width: 2.5; fill: none; }
+  .node .port { fill: var(--state); }
+  .node .caret { stroke: var(--card-text); stroke-width: 1.6; }
+  .edge path.line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .edge.solid path.line { stroke: var(--edge-primary); }
+  .edge.dashed path.line { stroke: var(--edge-secondary); stroke-dasharray: 5 4; }
+  .edge.dotted path.line { stroke: var(--edge-secondary); stroke-dasharray: 0.1 5; stroke-linecap: round; }
+  .edge.candidate path.line { stroke: var(--edge-candidate); stroke-dasharray: 4 4; }
+  .edge.selected path.line { stroke: var(--state); stroke-width: 3; }
+  .edge.selected path.arrow { fill: var(--state); }
+  .line-tools {
+    position: absolute; transform: translate(-50%, -100%); background: var(--menu-bg);
+    border: 1px solid var(--shell-border); border-radius: 10px; padding: 5px 7px; display: flex; gap: 4px; z-index: 33;
+    box-shadow: 0 6px 18px rgba(0,0,0,.12); font-size: 12px; color: var(--shell-text);
+  }
+  .line-tools button { font: inherit; border: none; background: none; color: var(--shell-text); padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+  .line-tools button.on { background: #D97757; color: #331708; font-weight: 600; }
+  .edge path.arrow { stroke: none; }
+  .edge.solid path.arrow { fill: var(--edge-primary); }
+  .edge.dashed path.arrow, .edge.dotted path.arrow { fill: var(--edge-secondary); }
+  #timeline {
+    flex: 0 0 auto; display: none; padding: 6px 12px; background: #1D1B16; border-top: 1px solid #3A362E;
+    font-size: 12px; color: #8A8478; gap: 8px; align-items: center;
+  }
+  #timeline.show { display: flex; }
+  #timeline .tinfo { min-width: 300px; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <span class="grp"><span class="lbl">场景</span>
+    <button data-scene="states" class="on">① 状态矩阵（12 节点工作态）</button>
+    <button data-scene="motion12">② 整理动效 12 节点</button>
+    <button data-scene="motion17">③ 整理动效 17 节点</button>
+  </span>
+  <span class="grp"><span class="lbl">状态</span>
+    <select id="state-select"></select>
+  </span>
+  <span class="grp"><span class="lbl">主题</span>
+    <button data-theme="light" class="on">暖白</button>
+    <button data-theme="dark">黑板</button>
+  </span>
+  <span class="grp"><span class="lbl">窗口</span>
+    <button data-win="1280x800" class="on">1280×800</button>
+    <button data-win="800x600">800×600</button>
+  </span>
+  <span class="grp"><span class="lbl">动效</span>
+    <span class="grp"><span class="lbl">整理方向</span>
+      <button data-dir="h" class="on">横向（默认）</button>
+      <button data-dir="v">纵向（可选）</button>
+    </span>
+    <button id="btn-play">播放 整理</button>
+    <button id="btn-interrupt">中途打断</button>
+    <button id="btn-undo">undo</button>
+    <label><input type="checkbox" id="chk-reduced"> reduced-motion</label>
+    <span class="grp"><span class="lbl">关键帧</span>
+      <button data-kf="0">0%</button><button data-kf="0.25">25%</button><button data-kf="0.5">50%</button>
+      <button data-kf="0.75">75%</button><button data-kf="1">100%</button>
+    </span>
+  </span>
+</div>
+
+<div id="stage-wrap"><div class="app theme-light" id="app">
+  <div class="app-bar">
+    <div class="file-menu" id="file-menu">
+      <button id="file-btn">文件 ▾</button>
+      <div class="dropdown">
+        <div>新建文档 <span class="kbd">⌘N</span></div>
+        <div>打开… <span class="kbd">⌘O</span></div>
+        <hr>
+        <div>保存 <span class="kbd">⌘S</span></div>
+        <div>另存为… <span class="kbd">⌘⇧S</span></div>
+        <hr>
+        <div>导出 SVG</div>
+        <div>导出 PNG（2x）</div>
+        <div>导出 PDF</div>
+        <hr>
+        <div>偏好设置… <span class="kbd">⌘,</span></div>
+      </div>
+    </div>
+    <div class="doc-title"><b>未命名思维图</b> · <span id="save-label" class="save-state">已保存</span></div>
+    <button class="btn primary" id="btn-organize">整理 ⌘⇧L</button>
+    <button class="btn">☰ 视图</button>
+    <button class="btn" id="btn-theme">◐</button>
+  </div>
+  <div class="canvas-host" id="canvas-host">
+    <svg class="scene" id="scene"></svg>
+    <div class="blank-hint" id="blank-hint" hidden>双击任意处创建 · 方向键移动焦点 · ⌥Space 唤起</div>
+  </div>
+</div></div>
+
+<div id="timeline"><span class="tinfo" id="tinfo">t = 0%</span></div>
+
+<script>
+/* ============ 数据：与 tests/fixtures/visual/ 同源 ============ */
+const VISUAL = {
+  kickers: {
+    "n-inbox":"入口 INBOX","n-capture":"灵感 IDEA","n-notes":"依据 FACT","n-review-loop":"验证 TEST",
+    "n-hooks":"工具 TOOL","n-skills":"工具 TOOL","n-subtasks":"结构 STRUCT","n-evals":"验证 TEST",
+    "n-design":"设计 DESIGN","n-peer":"发布 SHIP","n-cicd":"发布 SHIP","n-close":"回顾 RETRO"
+  },
+  emphasis: ["n-capture","n-notes","n-review-loop","n-hooks","n-inbox"],
+  edgeStyles: { "e-6":"dotted", "e-10":"dashed" },
+  outerArc: { "e-2":"left", "e-8":"right" },
+  rows: [["n-capture","n-notes","n-review-loop","n-hooks","n-inbox"],["n-skills","n-subtasks","n-evals"],
+         ["n-design","n-peer"],["n-cicd"],["n-close"]]
+};
+const REF_POS = {
+  "n-inbox":{x:848,y:54},"n-capture":{x:27,y:54},"n-notes":{x:233,y:54},"n-review-loop":{x:438,y:54},"n-hooks":{x:643,y:54},
+  "n-skills":{x:175,y:228},"n-subtasks":{x:405,y:228},"n-evals":{x:635,y:228},
+  "n-design":{x:80,y:405},"n-peer":{x:635,y:405},"n-cicd":{x:635,y:580},"n-close":{x:614,y:755}
+};
+const SCAT_POS = {
+  "n-inbox":{x:640,y:660},"n-capture":{x:-140,y:60},"n-notes":{x:620,y:-90},"n-review-loop":{x:150,y:320},"n-hooks":{x:960,y:190},
+  "n-skills":{x:40,y:540},"n-subtasks":{x:480,y:430},"n-evals":{x:990,y:330},
+  "n-design":{x:810,y:580},"n-peer":{x:100,y:730},"n-cicd":{x:-80,y:400},"n-close":{x:420,y:750}
+};
+/* 产品默认整理终态（G-VIS 2026-09-06：默认横向 + 可选纵向）——横向五列，层沿 x 递增，同层沿 y 堆叠；
+   孤立节点在主图下方成行、首项左齐第一列。坐标为示意校准值，产品由 VRA-030 尺寸感知算法产出。 */
+const REF_POS_H = {
+  "n-capture":{x:0,y:0},"n-notes":{x:0,y:106},"n-review-loop":{x:0,y:212},"n-hooks":{x:0,y:318},
+  "n-skills":{x:270,y:0},"n-subtasks":{x:270,y:106},"n-evals":{x:270,y:212},
+  "n-design":{x:540,y:0},"n-peer":{x:540,y:106},
+  "n-cicd":{x:810,y:106},"n-close":{x:1080,y:106},
+  "n-inbox":{x:0,y:470}
+};
+const NODE_TEXT = {
+  "n-inbox":"收件箱 Inbox","n-capture":"捕捉灵感 Capture","n-notes":"知识库 Notes","n-review-loop":"反馈环 Review loop",
+  "n-hooks":"自动化 Hooks","n-skills":"技能 Skills","n-subtasks":"子任务 Subtasks","n-evals":"评估 Evals",
+  "n-design":"需求与设计\nRequirements & design","n-peer":"同伴审阅 Peer review","n-cicd":"持续集成 CI/CD","n-close":"闭环收尾\nClosing the loop"
+};
+/* 长文本卡自适应增高（brief §2：长内容可增大，不强制塞同一小框） */
+const NODE_SIZE = id => ({ width: (id==="n-design"||id==="n-close")?230:188, height:(id==="n-design"||id==="n-close")?84:68 });
+const EDGES12 = [
+  ["e-1","n-capture","n-design"],["e-2","n-capture","n-close"],["e-3","n-notes","n-skills"],
+  ["e-4","n-notes","n-subtasks"],["e-5","n-notes","n-evals"],["e-6","n-review-loop","n-subtasks"],
+  ["e-7","n-review-loop","n-evals"],["e-8","n-hooks","n-cicd"],["e-9","n-skills","n-design"],
+  ["e-10","n-skills","n-peer"],["e-11","n-evals","n-peer"],["e-12","n-peer","n-cicd"],["e-13","n-cicd","n-close"]
+];
+const T17 = {
+  /* 终态 = MOV 横向形态（用户 2026-09-06 校准）：root 最左、hub 其右（同一水平中心线 y=384）、15 叶右侧一列（x=620，间距 52，列中心对齐主干） */
+  nodes: [
+    { id:"m-root", text:"年度计划 Annual plan", w:200, h:68, scat:{x:-60,y:40},    to:{x:0, y:350} },
+    { id:"m-hub",  text:"行动主线 Key thread", w:200, h:68, scat:{x:420,y:260},   to:{x:300, y:350} },
+    ...Array.from({length:15}, (_,i)=>({
+      id:`m-leaf-${String(i+1).padStart(2,"0")}`, text:`要点 ${String(i+1).padStart(2,"0")} Point`, w:150, h:40,
+      scat:[{x:60,y:520},{x:900,y:120},{x:700,y:620},{x:-120,y:700},{x:350,y:40},{x:560,y:480},{x:820,y:380},
+            {x:130,y:260},{x:480,y:720},{x:950,y:540},{x:-40,y:160},{x:680,y:-60},{x:240,y:600},{x:880,y:240},{x:100,y:420}][i],
+      to:{x:620, y:i*52}
+    }))
+  ],
+  edges: [ ["me-root-hub","m-root","m-hub"], ...Array.from({length:15},(_,i)=>[`me-hub-l${i+1}`,"m-hub",`m-leaf-${String(i+1).padStart(2,"0")}`]) ]
+};
+
+/* ============ SVG 渲染（节点/边每帧消费同一份显示坐标） ============ */
+const svg = document.getElementById("scene");
+const NS = "http://www.w3.org/2000/svg";
+const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const GAP = 4, ARROW = 9;
+let SHOWN_POS = {}; // 当前显示坐标（打断/undo 从这里接续）
+
+/* ============ 线形态：散乱态平滑曲线 (m=0) ↔ 规整态圆角折线 (m=1)——G-VIS 2026-09-06 校准 ============ */
+const MORPH_N = 24;
+function bezPts(p0, c1, c2, p3, n = MORPH_N) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) { const t = i/n, u = 1-t;
+    pts.push({ x: u*u*u*p0.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*p3.x,
+               y: u*u*u*p0.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*p3.y }); }
+  return pts;
+}
+function resamplePts(src, n = MORPH_N) {
+  let L = 0; const segs = [];
+  for (let i = 1; i < src.length; i++) { const s = Math.hypot(src[i].x-src[i-1].x, src[i].y-src[i-1].y); segs.push(s); L += s; }
+  if (L === 0) return src.slice(0, n+1).length === n+1 ? src : Array.from({length:n+1},()=>({...src[0]}));
+  const out = []; let acc = 0, seg = 0;
+  for (let i = 0; i <= n; i++) {
+    const d = i/n*L;
+    while (seg < segs.length-1 && acc + segs[seg] < d) { acc += segs[seg]; seg++; }
+    const r = segs[seg] ? (d-acc)/segs[seg] : 0;
+    out.push({ x: src[seg].x + (src[seg+1].x-src[seg].x)*r, y: src[seg].y + (src[seg+1].y-src[seg].y)*r });
+  }
+  return out;
+}
+function lerpPts(A, B, m) { return A.map((p,i) => ({ x: p.x + (B[i].x-p.x)*m, y: p.y + (B[i].y-p.y)*m })); }
+/* 规整态折线拐点用小弧度圆角（fillet），呈现"偏直线 + 小圆弯折" */
+function filletPath(pts, r = 12) {
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i], a = pts[i-1], b = pts[i+1];
+    const v1 = { x: p.x-a.x, y: p.y-a.y }, v2 = { x: b.x-p.x, y: b.y-p.y };
+    const l1 = Math.hypot(v1.x, v1.y) || 1, l2 = Math.hypot(v2.x, v2.y) || 1;
+    const rr = Math.min(r, l1/2, l2/2);
+    const pA = { x: p.x - v1.x/l1*rr, y: p.y - v1.y/l1*rr };
+    const pB = { x: p.x + v2.x/l2*rr, y: p.y + v2.y/l2*rr };
+    d += ` L ${pA.x.toFixed(1)} ${pA.y.toFixed(1)} Q ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${pB.x.toFixed(1)} ${pB.y.toFixed(1)}`;
+  }
+  const e = pts[pts.length-1];
+  d += ` L ${e.x.toFixed(1)} ${e.y.toFixed(1)}`;
+  return d;
+}
+/* 规整态布线（G-VIS 2026-09-06 定稿）：全正交"电路线" + **目标侧梳状**通道分配。
+   硬规则：整理后零共线重叠——
+   - 每条普通边独占水平走廊（= 其目标锚 y，锚点按入边唯一分配）；
+   - 垂直转折统一放在目标列前 x = tip.x - 24 - rank*spacing，rank = 同缝（同目标列）按目标 y 升序名次 → 转折 x 全缝唯一，垂直段零重叠；
+   - 跨层边走贴边总线通道（图边界外 56px，通道内按边序偏移）。
+   交叉（拓扑必需）允许，重叠禁止。 */
+const EDGE_CHANNEL = 56;
+function planRoutes(edges, anchorXY, horiz, ch, seamWidth, nodesPos, sizeOf) {
+  const byId = {};
+  const seam = Math.max(40, seamWidth);
+  const laneEdges = {}; // 目标列（缝）分组
+  const chanEdges = {};
+  // 卡矩形（用于内部直连走廊遮挡检测）
+  const cards = Object.keys(nodesPos).map(nid => { const p = nodesPos[nid], s = sizeOf(nid);
+    return { x: p.x, y: p.y, w: s.width, h: s.height }; });
+  for (const [id, s, t] of edges) {
+    const a = anchorXY(id, s, "s"), b = anchorXY(id, t, "t");
+    const span = horiz ? Math.abs(b.x - a.x) : Math.abs(b.y - a.y);
+    let useChannel = span > seam * 1.6;
+    if (useChannel) {
+      // 跨层边先测内部直连走廊：源锚高度到目标列前无卡遮挡 → 不绕通道（G-VIS：避免不必要的大圈）
+      const blocked = cards.some(c => horiz
+        ? (a.y > c.y + 2 && a.y < c.y + c.h - 2 && c.x + c.w > a.x + 4 && c.x < b.x - 4)
+        : (a.x > c.x + 2 && a.x < c.x + c.w - 2 && c.y + c.h > a.y + 4 && c.y < b.y - 4));
+      if (!blocked) useChannel = false;
+    }
+    if (useChannel) {
+      const side = horiz ? (a.y < (ch.top + ch.bottom) / 2 ? "up" : "down")
+                         : (a.x < (ch.left + ch.right) / 2 ? "left" : "right");
+      (chanEdges[side] = chanEdges[side] || []).push(id);
+      byId[id] = { kind: "channel", side };
+    } else {
+      const lane = horiz ? b.x : b.y; // 目标列入口坐标
+      (laneEdges[lane] = laneEdges[lane] || []).push({ id, ty: horiz ? b.y : b.x });
+    }
+  }
+  for (const lane in laneEdges) {
+    const list = laneEdges[lane].sort((p, q) => p.ty - q.ty); // 目标 y 升序：目标更高的边转折更近目标列
+    const spacing = Math.min(18, Math.max(6, Math.floor((seam - 24) / (list.length + 1))));
+    list.forEach((e, i) => { byId[e.id] = { kind: "ordinary", rank: i, spacing }; });
+  }
+  for (const side in chanEdges) {
+    chanEdges[side].forEach((id, i) => { byId[id].chanIdx = i; byId[id].spacing = 14; });
+  }
+  return byId;
+}
+function elbowPts(p1, tip, horiz, route, ch) {
+  if (route.kind === "channel") {
+    const off = EDGE_CHANNEL + (route.chanIdx ?? 0) * (route.spacing ?? 14);
+    if (horiz) {
+      const k = route.side === "up" ? ch.top - off : ch.bottom + off;
+      return [p1,
+        { x: p1.x+24, y: p1.y }, { x: p1.x+24, y: k },
+        { x: tip.x-24, y: k }, { x: tip.x-24, y: tip.y },
+        tip];
+    }
+    const k = route.side === "left" ? ch.left - off : ch.right + off;
+    return [p1,
+      { x: p1.x, y: p1.y+24 }, { x: k, y: p1.y+24 },
+      { x: k, y: tip.y-24 }, { x: tip.x, y: tip.y-24 },
+      tip];
+  }
+  const xt = Math.max(tip.x - 24 - (route.rank ?? 0) * (route.spacing ?? 18), p1.x + 8); // 转折在目标列前，全缝唯一且不回退
+  if (horiz) {
+    if (Math.abs(p1.y - tip.y) < 8) return [p1, tip];
+    return [p1, { x: xt, y: p1.y }, { x: xt, y: tip.y }, tip];
+  }
+  if (Math.abs(p1.x - tip.x) < 8) return [p1, tip];
+  const yt = Math.max(tip.y - 24 - (route.rank ?? 0) * (route.spacing ?? 18), p1.y + 8);
+  return [p1, { x: p1.x, y: yt }, { x: tip.x, y: yt }, tip];
+}
+
+function frozenAnchors(edges) {
+  /* 动作开始时冻结锚点序：同卡多出边在底边均分、多入边在顶边均分（间距自然 ≥18px 由卡宽保证） */
+  const outCnt = {}, inCnt = {}, outIdx = {}, inIdx = {}, anchor = {};
+  edges.forEach(([id,s,t]) => { outCnt[s]=(outCnt[s]||0)+1; inCnt[t]=(inCnt[t]||0)+1; });
+  edges.forEach(([id,s,t]) => {
+    anchor[id] = { s: { slot: outIdx[s]=(outIdx[s]??-1)+1, of: outCnt[s] },
+                   t: { slot: inIdx[t]=(inIdx[t]??-1)+1, of: inCnt[t] } };
+  });
+  return anchor;
+}
+
+function drawDoc(nodesPos, opts) {
+  SHOWN_POS = nodesPos;
+  svg.innerHTML = "";
+  const { edges, sizeOf, textOf } = opts;
+  if (opts.selectedEdge) { /* 边选中态在 class 上叠加 */ }
+  const gE = el("g", {}); svg.appendChild(gE); // 边在下层
+  const gN = el("g", {}); svg.appendChild(gN);
+  const anchor = frozenAnchors(edges);
+  const horiz = !!opts.horizontal; // 横向布局：主边右出左入；纵向：底出顶入
+  const anchorXY = (id, nid, side) => {
+    const {x,y} = nodesPos[nid], {width:w, height:h} = sizeOf(nid);
+    const a = anchor[id][side];
+    if (horiz) {
+      const ay = a.of === 1 ? y + h/2 : y + h*((a.slot+1)/(a.of+1));
+      return { x: side === "s" ? x + w : x, y: ay };
+    }
+    const ax = a.of === 1 ? x + w/2 : x + w*((a.slot+1)/(a.of+1));
+    return { x: ax, y: side === "s" ? y + h : y };
+  };
+  const lineM = opts.lineMorph ?? 0; // 0 = 散乱态曲线；1 = 规整态圆角折线
+  // 全图边界：贴边通道与散乱态外弧的基准
+  let topY = Infinity, botY = -Infinity, leftX = Infinity, rightX = -Infinity;
+  for (const nid in nodesPos) { const {x,y} = nodesPos[nid], sz = sizeOf(nid);
+    topY = Math.min(topY, y); botY = Math.max(botY, y + sz.height);
+    leftX = Math.min(leftX, x); rightX = Math.max(rightX, x + sz.width); }
+  const ch = { top: topY, bottom: botY, left: leftX, right: rightX };
+  const routes = planRoutes(edges, anchorXY, horiz, ch, 80, nodesPos, sizeOf);
+  for (const [id, s, t] of edges) {
+    const a = anchorXY(id, s, "s"), b = anchorXY(id, t, "t");
+    const dx = b.x-a.x, dy = b.y-a.y, len = Math.hypot(dx,dy)||1;
+    const p1 = { x: a.x + dx/len*GAP, y: a.y + dy/len*GAP };
+    const tip = { x: b.x - dx/len*GAP, y: b.y - dy/len*GAP };
+    const p2 = { x: tip.x - dx/len*ARROW, y: tip.y - dy/len*ARROW };
+    let cls = opts.edgeStyles?.[id] || "solid";
+    if (opts.candidateEdge === id) cls = "candidate";
+    if (opts.selectedEdge === id) cls += " selected";
+    const rawArc = opts.outerArc?.[id];
+    // 曲线控制点（散乱/自由态形态）
+    let c1, c2;
+    if (horiz && rawArc) {
+      const k = a.y < 250 ? ch.top - 120 : ch.bottom + 120;
+      c1 = { x: p1.x+120, y: k }; c2 = { x: p2.x-120, y: k };
+    } else if (rawArc === "left") {
+      const k = ch.left - 120;
+      c1 = { x: k, y: p1.y+120 }; c2 = { x: k, y: p2.y-120 };
+    } else if (rawArc === "right") {
+      const k = ch.right + 120;
+      c1 = { x: k, y: p1.y+120 }; c2 = { x: k, y: p2.y-120 };
+    } else if (horiz) {
+      const k = Math.max(40, Math.min(160, Math.abs(p2.x-p1.x)*0.4));
+      c1 = { x: p1.x+k, y: p1.y }; c2 = { x: p2.x-k, y: p2.y };
+    } else {
+      const k = Math.max(40, Math.min(160, Math.abs(p2.y-p1.y)*0.4));
+      c1 = { x: p1.x, y: p1.y+k }; c2 = { x: p2.x, y: p2.y-k };
+    }
+    // 折线拐点（规整态形态，梳状通道分配）；曲线与折线按 lineMorph 插值，保证动画期间连续无跳形
+    const curve = bezPts(p1, c1, c2, p2);
+    const elbowRaw = elbowPts(p1, p2, horiz, routes[id], ch);
+    const elbow = resamplePts(elbowRaw);
+    let d, lastRef;
+    if (lineM >= 0.999) { // 规整终态：显式小弧度圆角折线
+      d = filletPath(elbowRaw, 12);
+      lastRef = elbowRaw[elbowRaw.length-2] || p2;
+    } else {
+      const pts = lineM <= 0 ? curve : lerpPts(curve, elbow, lineM);
+      d = "M " + pts.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" L ");
+      lastRef = pts[pts.length-2] || p2;
+    }
+    const g = el("g", { class: `edge ${cls}` });
+    g.appendChild(el("path", { class: "line", d }));
+    const last = lastRef;
+    const dir = Math.atan2(tip.y-last.y, tip.x-last.x);
+    const base = p2, nX = -Math.sin(dir)*3.5, nY = Math.cos(dir)*3.5;
+    g.appendChild(el("path", { class: "arrow",
+      d: `M ${tip.x} ${tip.y} L ${base.x+nX} ${base.y+nY} L ${base.x-nX} ${base.y-nY} Z` }));
+    gE.appendChild(g);
+  }
+  for (const nid in nodesPos) {
+    const {x,y} = nodesPos[nid], {width:w, height:h} = sizeOf(nid);
+    const g = el("g", { class: "node" + (opts.isAccent?.(nid) ? " accent" : ""), transform: `translate(${x},${y})` });
+    g.appendChild(el("rect", { class: "body", x:0, y:0, width:w, height:h, rx:12 }));
+    const kicker = opts.kickerOf?.(nid);
+    let ty = 12;
+    if (kicker) { const kt = el("text", { class:"kicker", x:16, y: ty+9.5 }); kt.textContent = kicker; g.appendChild(kt); ty += 17; }
+    const lines = String(textOf(nid)).split("\n");
+    lines.forEach((line, i) => {
+      const bt = el("text", { class:"body-text", x:16, y: ty+15+i*22 }); bt.textContent = line; g.appendChild(bt);
+    });
+    if (opts.selection?.includes(nid)) g.appendChild(el("rect", { class:"sel-ring", x:-3, y:-3, width:w+6, height:h+6, rx:15 }));
+    if (opts.primary === nid || opts.focus === nid) {
+      g.appendChild(el("rect", { class:"focus-ring", x:-6, y:-6, width:w+12, height:h+12, rx:17 }));
+      const T = 9, X0 = -6, Y0 = -6, X1 = w+6, Y1 = h+6;
+      [[X0,Y0,1,1],[X1,Y0,-1,1],[X0,Y1,1,-1],[X1,Y1,-1,-1]].forEach(([cx,cy,sx,sy]) =>
+        g.appendChild(el("path", { class:"corner-tick", d: `M ${cx+sx*T} ${cy} L ${cx} ${cy} L ${cx} ${cy+sy*T}` })));
+    }
+    if (opts.editing === nid) {
+      const caretX = 16 + (opts.caretPos ?? 0.55) * (w-32);
+      const caretY = (kicker ? 29 : 12) + 2;
+      g.appendChild(el("line", { class:"caret", x1:caretX, y1:caretY, x2:caretX, y2:caretY+18 }));
+    }
+    if (opts.portsFor?.has(nid)) {
+      const mid = w/2;
+      g.appendChild(el("circle", { class:"port", cx:mid, cy:h, r:5.5 }));
+      g.appendChild(el("circle", { class:"port", cx:mid, cy:0, r:5.5 }));
+    }
+    gN.appendChild(g);
+  }
+}
+
+/* ============ 视口：前后边界并集 + 安全边距，一次协调 ============ */
+function boundsOf(list, posOf, sizeOf) {
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for (const id of list) { const {x,y}=posOf(id), s=sizeOf(id);
+    minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x+s.width); maxY=Math.max(maxY,y+s.height); }
+  return {minX,minY,maxX,maxY};
+}
+function fitViewMix(posA, posB, sizeOf) {
+  const host = document.getElementById("canvas-host");
+  const W = host.clientWidth, H = host.clientHeight, PAD = 80;
+  const ids = [...new Set([...Object.keys(posA), ...Object.keys(posB)])];
+  const ba = boundsOf(ids, id => posA[id] ?? posB[id], sizeOf);
+  const bb = boundsOf(ids, id => posB[id] ?? posA[id], sizeOf);
+  const minX = Math.min(ba.minX, bb.minX), minY = Math.min(ba.minY, bb.minY);
+  const maxX = Math.max(ba.maxX, bb.maxX), maxY = Math.max(ba.maxY, bb.maxY);
+  const k = Math.min(1, W/(maxX-minX+PAD*2), H/(maxY-minY+PAD*2));
+  return { k, tx: (W-(maxX-minX)*k)/2 - minX*k, ty: (H-(maxY-minY)*k)/2 - minY*k };
+}
+function applyView(v) {
+  svg.setAttribute("viewBox", `${-v.tx/v.k} ${-v.ty/v.k} ${svg.clientWidth/v.k} ${svg.clientHeight/v.k}`);
+}
+
+/* ============ 动效协调者（一个 rAF 时钟；每帧同一份显示坐标） ============ */
+const EASE = t => 1 - Math.pow(1 - t, 3);
+const MOTION = { running:false, t0:0, dur:800, from:null, to:null, order:null, edges:null, meta:null, raf:0, done:null,
+  morphFrom:0, morphTo:0, lastM:0 };
+
+function planOrder(nodeIds, rowsOf) {
+  /* 叶子（层深大）先动、主干最后归位；错峰 25ms/层，总 ≤120ms */
+  const depth = {};
+  rowsOf.forEach((row, i) => row.forEach(id => depth[id] = i));
+  const maxD = Math.max(0, ...Object.values(depth));
+  const order = {};
+  nodeIds.forEach(id => { order[id] = (maxD - (depth[id] ?? 0)) * 25; });
+  return order;
+}
+function sampleAt(elapsed, from, to, order) {
+  const pos = {};
+  for (const id in from) {
+    const delay = order[id] || 0;
+    const lt = Math.max(0, Math.min(1, (elapsed - delay) / 600)); // 主运动 600ms
+    const f = EASE(lt);
+    pos[id] = { x: from[id].x + (to[id].x - from[id].x) * f,
+                y: from[id].y + (to[id].y - from[id].y) * f };
+  }
+  return pos;
+}
+function playOrganize(toPos, order, edges, meta, sizeOf, onDone, morphTo = null) {
+  cancelOrganize();
+  const fromPos = { ...SHOWN_POS }; // 从当前显示位置接续
+  const morphFrom = MOTION.lastM ?? 0;
+  const targetM = morphTo === null ? (MOTION.lastM ?? 0) : morphTo;
+  const reduced = document.getElementById("chk-reduced").checked;
+  if (reduced) {
+    applyView(fitViewMix(fromPos, toPos, sizeOf));
+    drawDoc(toPos, { ...meta, lineMorph: targetM });
+    MOTION.lastM = targetM;
+    setTinfo("reduced-motion：直接终态（终态仍是一条 MoveNodes 历史）");
+    onDone && onDone();
+    return;
+  }
+  Object.assign(MOTION, { running:true, t0:performance.now(), dur:800, from:fromPos, to:{...toPos},
+    order, edges, meta, raf:0, done:onDone, morphFrom, morphTo: targetM });
+  applyView(fitViewMix(fromPos, toPos, sizeOf)); // 视口一次协调，之后不动
+  MOTION.raf = requestAnimationFrame(tick);
+}
+function tick(now) {
+  if (!MOTION.running) return;
+  const elapsed = now - MOTION.t0;
+  const pos = sampleAt(elapsed, MOTION.from, MOTION.to, MOTION.order);
+  const m = MOTION.morphFrom + (MOTION.morphTo - MOTION.morphFrom) * EASE(Math.max(0, Math.min(1, elapsed/600)));
+  MOTION.lastM = m;
+  drawDoc(pos, { ...MOTION.meta, lineMorph: m });
+  setTinfo(`t = ${Math.min(100, Math.round(elapsed/MOTION.dur*100))}%（节点/线/箭头同帧坐标；线形态过渡 ${Math.round(m*100)}%）`);
+  if (elapsed < MOTION.dur + 200) MOTION.raf = requestAnimationFrame(tick);
+  else {
+    MOTION.running = false;
+    MOTION.lastM = MOTION.morphTo;
+    drawDoc(MOTION.to, { ...MOTION.meta, lineMorph: MOTION.morphTo });
+    setTinfo("t = 100%（稳定；canonical 终态已就位；规整态为圆角折线）");
+    MOTION.done && MOTION.done();
+  }
+}
+function cancelOrganize() { if (MOTION.raf) cancelAnimationFrame(MOTION.raf); MOTION.running = false; }
+
+/* ============ 场景 ①：状态矩阵 ============ */
+const STATES = [
+  ["blank","空白文档"],["work","12 节点工作态"],["single","单选"],["multi","多选"],["focus","键盘焦点"],
+  ["editing","编辑中"],["ime","IME 组合"],["linking","连线候选"],["edge-style","边选中·改线型"],["menu","文件菜单"],["saving","保存中"],
+  ["conflict","保存冲突"],["recovery","恢复提示"],["close","dirty close"],["onboarding","首次引导"],["success","成功浮层"]
+];
+const sel = document.getElementById("state-select");
+STATES.forEach(([v,l]) => { const o = document.createElement("option"); o.value=v; o.textContent=l; sel.appendChild(o); });
+sel.value = "work";
+
+function meta12(horiz = false) {
+  return { edges: EDGES12, edgeStyles: VISUAL.edgeStyles, outerArc: VISUAL.outerArc, horizontal: horiz,
+    kickerOf: id => VISUAL.kickers[id], isAccent: id => VISUAL.emphasis.includes(id),
+    sizeOf: NODE_SIZE, textOf: id => NODE_TEXT[id] };
+}
+function renderState(state) {
+  clearOverlays();
+  document.getElementById("blank-hint").hidden = state !== "blank";
+  const sl = document.getElementById("save-label");
+  sl.className = "save-state" + (state==="saving" ? " saving" : "");
+  sl.textContent = state==="saving" ? "保存中…" : state==="conflict" ? "保存冲突" : state==="recovery" ? "可恢复更改" :
+    (["multi","editing","ime","linking","close"].includes(state)) ? "已修改" : "已保存";
+  document.getElementById("file-menu").classList.toggle("open", state === "menu");
+  if (state === "blank") { svg.innerHTML = ""; SHOWN_POS = {}; return; }
+  const pos = { ...REF_POS_H }; // 工作态 = 产品默认横向规整构图（G-VIS 2026-09-06）
+  const meta = meta12(true);
+  meta.lineMorph = 1; // 规整态：圆角折线
+  if (state === "single") { meta.selection = ["n-subtasks"]; meta.primary = "n-subtasks"; meta.portsFor = new Set(["n-subtasks"]); addCtxTools(); }
+  if (state === "multi") { meta.selection = ["n-subtasks","n-evals","n-peer"]; meta.primary = "n-evals"; meta.portsFor = new Set(["n-subtasks","n-evals","n-peer"]); addCtxTools(); }
+  if (state === "focus") { meta.selection = ["n-subtasks"]; meta.focus = "n-evals"; meta.primary = "n-evals"; }
+  if (state === "editing") { meta.editing = "n-design"; meta.selection = ["n-design"]; meta.primary = "n-design"; }
+  if (state === "ime") { meta.editing = "n-design"; meta.selection = ["n-design"]; meta.primary = "n-design"; meta.caretPos = .8; addImeWindow(); }
+  if (state === "linking") { meta.selection = ["n-review-loop"]; meta.primary = "n-review-loop"; meta.candidateEdge = "e-6"; meta.portsFor = new Set(["n-review-loop","n-subtasks"]); }
+  if (state === "edge-style") { meta.selectedEdge = "e-6"; addLineTools(); }
+  drawDoc(pos, meta);
+  if (state === "conflict") addBanner("保存冲突", "文件已被其他程序修改。", [["保留我的版本",""],["另存为…","solid"],["了解详情",""]]);
+  if (state === "recovery") addBanner("检测到未保存的更改", "上次会话意外退出，可恢复自动快照。", [["恢复","solid"],["丢弃",""]]);
+  if (state === "close") addCloseModal();
+  if (state === "onboarding") { addCoach(1); addSkip(); }
+  if (state === "success") addToast("已导出 reference-dag-12.svg");
+  applyView(fitViewMix(pos, pos, NODE_SIZE));
+}
+
+/* 浮层 */
+function clearOverlays() { document.querySelectorAll(".banner,.modal-scrim,.coach,.coach-skip,.toast,.ime-window,.ctx-tools").forEach(e => e.remove()); }
+function addBanner(title, body, acts) {
+  const b = document.createElement("div"); b.className = "banner";
+  b.innerHTML = `<span><b>${title}</b> — ${body}</span>` + acts.map(([l,c]) => `<button class="act ${c}">${l}</button>`).join("");
+  document.getElementById("canvas-host").appendChild(b);
+}
+function addCloseModal() {
+  const m = document.createElement("div"); m.className = "modal-scrim";
+  m.innerHTML = `<div class="modal" role="alertdialog" aria-label="未保存更改">
+    <h3>要保存对「未命名思维图」的更改吗？</h3>
+    <p>你的更改如果不保存将会丢失。Esc = 取消；焦点围栏在本对话框内。</p>
+    <div class="row"><button>取消</button><button>不保存</button><button class="primary">保存…</button></div></div>`;
+  document.getElementById("canvas-host").appendChild(m);
+}
+function addCoach(step) {
+  const c = document.createElement("div"); c.className = "coach";
+  c.innerHTML = `<div class="step">引导 ${step}/3</div>` + ["双击画布任意处，创建节点并直接输入。","从卡片的圆点端口拖到另一张卡，建立关系。","随时点「整理」，杂乱关系会归位成层次。"][step-1];
+  c.style.left = "40px"; c.style.top = "80px";
+  document.getElementById("canvas-host").appendChild(c);
+}
+function addSkip() { const s = document.createElement("div"); s.className="coach-skip"; s.textContent="跳过引导 ›"; document.getElementById("canvas-host").appendChild(s); }
+function addToast(text) { const t = document.createElement("div"); t.className="toast"; t.textContent=text; document.getElementById("canvas-host").appendChild(t); }
+function addImeWindow() {
+  const w = document.createElement("div"); w.className="ime-window";
+  w.innerHTML = ["灵感选题","灵感主题","灵感清单"].map((s,i) => `<div class="cand ${i===0?"first":""}">${i+1}. ${s}</div>`).join("");
+  w.style.left = "300px"; w.style.top = "470px";
+  document.getElementById("canvas-host").appendChild(w);
+}
+function addLineTools() {
+  const t = document.createElement("div"); t.className = "line-tools";
+  t.innerHTML = `<button>实线</button><button>虚线</button><button class="on">点线</button><span style="width:1px;background:var(--shell-border);margin:3px 2px;"></span><button>反向 ⇅</button><button>删除</button>`;
+  t.style.left = "42%"; t.style.top = "300px";
+  document.getElementById("canvas-host").appendChild(t);
+}
+function addCtxTools() {  const t = document.createElement("div"); t.className="ctx-tools";
+  t.innerHTML = `<button>角色</button><button>字体</button><button>A−</button><button>A+</button>
+    <button><b>B</b></button><button><u>U</u></button><span class="sep"></span>
+    <button>形状</button><button>框线</button><button>删除</button>`;
+  t.style.left = "50%"; t.style.top = "210px";
+  document.getElementById("canvas-host").appendChild(t);
+}
+function setTinfo(s) { document.getElementById("tinfo").textContent = s; }
+
+/* ============ 场景与控制 ============ */
+let scene = "states";
+let organDir = "h"; // G-VIS 2026-09-06：整理默认横向，可选纵向
+document.querySelectorAll("#controls [data-dir]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#controls [data-dir]").forEach(x => x.classList.remove("on")); b.classList.add("on");
+  organDir = b.dataset.dir;
+  if (scene === "motion12") sceneMotion12(); // 重置到散乱起点，用新方向
+});
+document.querySelectorAll("#controls [data-scene]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#controls [data-scene]").forEach(x => x.classList.remove("on")); b.classList.add("on");
+  scene = b.dataset.scene; cancelOrganize();
+  document.getElementById("timeline").classList.toggle("show", scene !== "states");
+  sel.disabled = scene !== "states";
+  if (scene === "states") renderState(sel.value);
+  if (scene === "motion12") sceneMotion12();
+  if (scene === "motion17") sceneMotion17();
+});
+document.querySelectorAll("#controls [data-theme]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#controls [data-theme]").forEach(x => x.classList.remove("on")); b.classList.add("on");
+  document.getElementById("app").className = "app theme-" + b.dataset.theme;
+});
+document.querySelectorAll("#controls [data-win]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#controls [data-win]").forEach(x => x.classList.remove("on")); b.classList.add("on");
+  const [w,h] = b.dataset.win.split("x");
+  const app = document.getElementById("app");
+  app.style.setProperty("--win-w", w+"px"); app.style.setProperty("--win-h", h+"px");
+  requestAnimationFrame(() => { if (scene==="states") renderState(sel.value); else if (scene==="motion12") sceneMotion12(true); else sceneMotion17(true); });
+});
+sel.onchange = () => renderState(sel.value);
+document.getElementById("btn-theme").onclick = () => {
+  const app = document.getElementById("app");
+  const dark = app.classList.toggle("theme-dark"); app.classList.toggle("theme-light", !dark);
+  document.querySelectorAll("#controls [data-theme]").forEach(x => x.classList.toggle("on", x.dataset.theme === (dark?"dark":"light")));
+};
+document.getElementById("file-btn").onclick = (e) => {
+  e.stopPropagation();
+  const to = sel.value === "menu" ? "work" : "menu";
+  sel.value = to; renderState(to);
+};
+document.getElementById("btn-organize").onclick = () => { if (scene==="motion12") play12(); else if (scene==="motion17") play17(); };
+
+/* 场景 ②：12 节点 散乱 → 整理终态（方向可切，默认横向） */
+const dirPos = () => organDir === "h" ? REF_POS_H : REF_POS;
+const dirMeta = () => meta12(organDir === "h");
+function sceneMotion12(keepShown) {
+  clearOverlays(); document.getElementById("blank-hint").hidden = true;
+  if (!keepShown) { SHOWN_POS = { ...SCAT_POS }; MOTION.lastM = 0; }
+  drawDoc({ ...SHOWN_POS }, { ...dirMeta(), lineMorph: MOTION.lastM });
+  applyView(fitViewMix(SCAT_POS, dirPos(), NODE_SIZE));
+  setTinfo(`散乱起点（整理方向：${organDir === "h" ? "横向（默认）" : "纵向（可选）"}；线为曲线，整理后过渡为圆角折线）`);
+}
+function play12() {
+  playOrganize(dirPos(), planOrder(Object.keys(dirPos()), VISUAL.rows), EDGES12, dirMeta(), NODE_SIZE,
+    () => { SHOWN_POS = { ...dirPos() }; }, 1); // 整理 → 规整态折线 (m=1)
+}
+/* 场景 ③：17 节点 根→汇聚→15 叶 */
+const T17_IDS = T17.nodes.map(n => n.id);
+const T17_POS = which => Object.fromEntries(T17.nodes.map(n => [n.id, { ...n[which] }]));
+const T17_SIZE = id => { const n = T17.nodes.find(x => x.id === id); return { width: n.w, height: n.h }; };
+const T17_TEXT = id => T17.nodes.find(x => x.id === id).text;
+function meta17() {
+  return { edges: T17.edges, edgeStyles: {}, outerArc: {}, horizontal: true, isAccent: id => id === "m-hub",
+    sizeOf: T17_SIZE, textOf: T17_TEXT };
+}
+function sceneMotion17(keepShown) {
+  clearOverlays(); document.getElementById("blank-hint").hidden = true;
+  if (!keepShown) { SHOWN_POS = T17_POS("scat"); MOTION.lastM = 0; }
+  drawDoc({ ...SHOWN_POS }, { ...meta17(), lineMorph: MOTION.lastM });
+  applyView(fitViewMix(T17_POS("scat"), T17_POS("to"), T17_SIZE));
+  setTinfo("散乱起点（根→汇聚→15 叶；线为曲线，整理后过渡为圆角折线）");
+}
+function play17() {
+  const rows = [["m-root"], ["m-hub"], ...Array.from({length:15},(_,i)=>[`m-leaf-${String(i+1).padStart(2,"0")}`])];
+  playOrganize(T17_POS("to"), planOrder(T17_IDS, rows), T17.edges, meta17(), T17_SIZE,
+    () => { SHOWN_POS = T17_POS("to"); }, 1);
+}
+
+/* 动效控制 */
+document.getElementById("btn-play").onclick = () => { if (scene==="motion12") play12(); else if (scene==="motion17") play17(); };
+document.getElementById("btn-interrupt").onclick = () => {
+  if (!MOTION.running) return;
+  const elapsed = performance.now() - MOTION.t0;
+  const pos = sampleAt(elapsed, MOTION.from, MOTION.to, MOTION.order);
+  const drag = scene === "motion12" ? "n-subtasks" : "m-hub";
+  pos[drag] = { x: pos[drag].x + 160, y: pos[drag].y - 60 }; // 模拟拖动接管
+  cancelOrganize();
+  drawDoc(pos, { ...MOTION.meta, lineMorph: MOTION.lastM }); // 线形态冻结在当前过渡值
+  setTinfo("中途打断：该节点交给拖动（边跟随当帧坐标，锚点保持冻结，无跳线）");
+};
+document.getElementById("btn-undo").onclick = () => {
+  if (scene === "states") { renderState(sel.value); return; }
+  const target = scene === "motion12" ? SCAT_POS : T17_POS("scat");
+  const order = Object.fromEntries(Object.keys(target).map(id => [id, 0])); // undo：全体同时接续
+  playOrganize(target, order, scene==="motion12" ? EDGES12 : T17.edges,
+    scene==="motion12" ? dirMeta() : meta17(), scene==="motion12" ? NODE_SIZE : T17_SIZE, null, 0); // undo → 散乱态曲线 (m=0)
+  setTinfo("undo：一次恢复全部旧坐标（从当前显示位置接续；线回到曲线）");
+};
+document.querySelectorAll("#controls [data-kf]").forEach(b => b.onclick = () => {
+  if (scene === "states") return;
+  cancelOrganize();
+  const p = parseFloat(b.dataset.kf);
+  const from = scene==="motion12" ? SCAT_POS : T17_POS("scat");
+  const to = scene==="motion12" ? dirPos() : T17_POS("to");
+  const order = scene==="motion12" ? planOrder(Object.keys(to), VISUAL.rows)
+    : planOrder(T17_IDS, [["m-root"],["m-hub"], ...Array.from({length:15},(_,i)=>[`m-leaf-${String(i+1).padStart(2,"0")}`])]);
+  const pos = sampleAt(p * 800, from, to, order);
+  const m = EASE(Math.max(0, Math.min(1, p * 800 / 600)));
+  MOTION.lastM = m;
+  drawDoc(pos, { ...(scene==="motion12" ? dirMeta() : meta17()), lineMorph: m });
+  applyView(fitViewMix(from, to, scene==="motion12" ? NODE_SIZE : T17_SIZE));
+  setTinfo(`关键帧 t = ${Math.round(p*100)}%（线形态 ${Math.round(m*100)}%）`);
+});
+window.addEventListener("resize", () => { if (scene === "states") renderState(sel.value); });
+
+/* init */
+renderState("work");
+</script>
+</body>
+</html>

@@ -382,19 +382,23 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     }
   }, [ports.globalShortcut, shortcutValue]);
 
-  // 一键整理（MM-085）：纯函数布局 → 单条 MoveNodes（可 undo、进历史）。
+  // 一键整理（VRA-030：DAG 分层、默认横向）：纯函数布局 → 单条 MoveNodes（可 undo、进历史）。
+  // 三态：moved / no-op / 结构化失败（COORD_LIMIT 不动文档与历史）。
   // bump 驱动画布重投影（外部 revision 信号——session.commit 不经画布内部通道）。
   const onOrganize = useCallback(() => {
-    const cmd = organizeCommand(session.current.document);
-    if (cmd) {
-      session.commit(cmd);
+    const result = organizeCommand(session.current.document);
+    if (result.status === "moved") {
+      session.commit(result.command);
       bump();
+      setNotice({ tone: "info", text: "已整理为分层布局（⌘Z 可撤销）" });
+    } else if (result.status === "no-op") {
+      setNotice({ tone: "info", text: "已经是整理好的布局" });
+    } else {
+      setNotice({
+        tone: "error",
+        text: `整理失败：文档规模超出画布坐标上限（${result.error.span.toFixed(0)} > ${result.error.max}），未改动文档`,
+      });
     }
-    setNotice(
-      cmd
-        ? { tone: "info", text: "已整理为垂直树（⌘Z 可撤销）" }
-        : { tone: "info", text: "已经是整理好的布局" },
-    );
   }, [bump, session]);
 
   // ---- 全局快捷键（输入/IME 隔离见 keyboard.ts） ----

@@ -8,15 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目现状（首要约束）
 
-仓库处于**产品发现阶段**：工程骨架与 Ralplan 规划共识已完成，但 G0/G1/G2 决策门均未获项目负责人批准，**产品代码尚未开始**。目前没有 `package.json`，不存在任何安装、构建、lint 或测试命令。
+仓库处于**实现阶段**（VRA-000 对账更正，2026-09-06，用户已批准）：G0 与 G1 已于 2026-08-26 由项目负责人批准（证据：`docs/decisions/decision-register.json`、`docs/quality/mm-000-review.md`），G2 仍 pending。技术栈已定并固化为 Accepted ADR 0001–0006/0008：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。MM-010～MM-090 已执行完毕（含 MRT-001..003V 整改）。
 
-在此阶段以下操作一律未授权，遇到即停止并按任务卡 STOP/BLOCKED 规则回报，不得自行扩权：
+**当前派发入口是 2026-09-06 参考对齐批次（VRA-000～VRA-090）**：见 `docs/planning/README.md`、[行动指南](./docs/planning/visual-alignment-development-guide-2026-09-06.md) 与 [任务卡](./docs/planning/visual-alignment-task-cards-2026-09-06.md)。旧 MM 卡不再直接派发，剩余工作已逐项归属（映射清单：`.omx/reviews/2026-09-06-vra-000-baseline-reconciliation.md` §4）；VRA-000 已完成（G-BASE 达成），VRA-020 起的实现卡须按各自 Gate（G-PLAN/G-VIS/G-SCHEMA/G-NATIVE）解锁。
 
-- 安装正式产品依赖、创建占位实现或桌面骨架（G1 批准前禁止，见 MM-020）
-- 派发 MM-010 Spike 或任何实现任务卡（需 G0 批准；规划共识完成≠批准）
+以下操作仍一律未授权，遇到即停止并按任务卡 STOP/BLOCKED 规则回报，不得自行扩权：
+
+- 未经对应 Gate 批准的 schema/文件格式变更、生产 UI 重构或新运行时依赖
 - 签名、公证、凭据访问、上传 GitHub、公开发布（G2 范围也不包含这些）
 
-当前唯一合法工作是文档与规划维护。收到"实现某功能"类请求时，先确认对应 Gate 状态，再决定执行还是回报 BLOCKED。
+收到"实现某功能"类请求时，先查对应 VRA 卡与 Gate 状态，再决定执行还是回报 BLOCKED。
 
 ## 权威文档与阅读顺序
 
@@ -43,13 +44,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 当前验证命令
 
-技术栈未定，**文档结构与链接完整性是最低验证项**：
+标准命令以根 `README.md` 为唯一来源：`pnpm typecheck` / `pnpm lint` / `pnpm test:unit` / `pnpm build` / `pnpm quality`；结构实现卡另有 scoped tests、`pnpm test:export`、`pnpm test:a11y` 与架构边界检查。文档类任务的最低验证项：
 
 ```bash
 git diff --check   # 无空白错误
 ```
-
-任务卡中出现的 `node scripts/runtime-spike/verify-decision.mjs`、`scripts/quality/*`、`pnpm lint/test/build` 等是 G1/MM-020 之后才创建的未来命令，当前不可运行也不要提前创建。规划包管理器预期为 pnpm workspace，同样尚未建立。
 
 ## 架构原则（约束未来实现）
 

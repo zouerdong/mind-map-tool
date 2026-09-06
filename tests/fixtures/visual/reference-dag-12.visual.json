@@ -1,0 +1,42 @@
+{
+  "fixture": "reference-dag-12",
+  "note": "VRA-010 原型过渡标注。kicker/emphasis/edgeStyle/routing 尚未进入 core schema（G-SCHEMA 后由 VRA-020 定义字段与持久化）；本文件仅供原型与静态对照使用，不得被生产代码读取。",
+  "kickers": {
+    "n-inbox": "入口 INBOX",
+    "n-capture": "灵感 IDEA",
+    "n-notes": "依据 FACT",
+    "n-review-loop": "验证 TEST",
+    "n-hooks": "工具 TOOL",
+    "n-skills": "工具 TOOL",
+    "n-subtasks": "结构 STRUCT",
+    "n-evals": "验证 TEST",
+    "n-design": "设计 DESIGN",
+    "n-peer": "发布 SHIP",
+    "n-cicd": "发布 SHIP",
+    "n-close": "回顾 RETRO"
+  },
+  "emphasisNodes": ["n-capture", "n-notes", "n-review-loop", "n-hooks", "n-inbox"],
+  "emphasisNote": "参考首行全为橙卡；夹具照做仅为复刻外观。产品语义（D2）：强调是用户设置的角色，不按行/入度自动变色。",
+  "edgeStyles": {
+    "e-6": "dotted",
+    "e-10": "dashed",
+    "default": "solid"
+  },
+  "routingHints": {
+    "e-2": "left-outer-arc",
+    "e-8": "right-outer-arc",
+    "default": "bottom-to-top bezier"
+  },
+  "referenceReading": {
+    "rows": [
+      { "rowTopY": 54, "nodes": ["n-capture", "n-notes", "n-review-loop", "n-hooks", "n-inbox"] },
+      { "rowTopY": 228, "nodes": ["n-skills", "n-subtasks", "n-evals"] },
+      { "rowTopY": 405, "nodes": ["n-design", "n-peer"] },
+      { "rowTopY": 580, "nodes": ["n-cicd"] },
+      { "rowTopY": 755, "nodes": ["n-close"] }
+    ],
+    "rowPitch": 175,
+    "isolatedNode": "n-inbox",
+    "multiInbound": ["n-design", "n-subtasks", "n-evals", "n-peer", "n-cicd", "n-close"]
+  }
+}

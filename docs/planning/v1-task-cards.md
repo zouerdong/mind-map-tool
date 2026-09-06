@@ -1,6 +1,8 @@
 # 极简自由脑图工具：开发任务卡
 
 > 状态：Ralplan 共识任务集；G0 尚未批准，当前不授权派发 Spike 或实现。
+>
+> 更正（VRA-000 对账，2026-09-06）：G0/G1 已于 2026-08-26 批准，上句为写入时的历史状态。MM-010～MM-090 已执行完毕（MM-085/088/089 为 G1 后 [from-user 2026-08-27] 增补，git `f6e7590`）。本文件不再直接派发新任务：旧卡的剩余工作已按 [visual-alignment-development-guide-2026-09-06.md](./visual-alignment-development-guide-2026-09-06.md) §5 迁移表逐项归属到 VRA 批次或保留 MRT 卡，映射清单见 `.omx/reviews/2026-09-06-vra-000-baseline-reconciliation.md`。
 
 > 用途：用户可把单卡独立交给其他 Agent。本文不派发 Agent、不授权公开发布。所有 Agent 先读根 `AGENTS.md` 与本卡依赖产物；遇到用户确认门槛必须停止。
 

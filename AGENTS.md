@@ -2,9 +2,9 @@
 
 ## 项目阶段
 
-当前处于产品发现阶段。目标是构建一款可在 macOS 与 Windows 轻量运行、界面极简的桌面思维导图工具。
+当前处于实现阶段（VRA-000 对账更正，2026-09-06）：G0 与 G1 已于 2026-08-26 由项目负责人批准，G2 仍 pending。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。MM-010～MM-090 已执行，当前整改与视觉对齐批次并行推进。
 
-在产品规格和验收标准明确前，不锁定桌面框架、渲染方案、数据格式、包管理器或发布渠道。会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。
+会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-06 参考对齐批次（VRA-000～VRA-090）的登记为准，见 `docs/planning/README.md` 与 [visual-alignment-development-guide-2026-09-06.md](./docs/planning/visual-alignment-development-guide-2026-09-06.md)。
 
 ## 工程原则
 
@@ -51,7 +51,7 @@
 4. 添加与风险相称的测试，并运行项目定义的格式化、静态检查、测试和构建命令。
 5. macOS/Windows 行为可能分叉时，至少提供两个平台的验证说明；无法实机验证时明确标记缺口。
 
-在技术栈尚未确定的当前阶段，文档结构与链接完整性是最低验证项。技术栈确定后，应在根 `README.md` 和本文件中补充唯一、可复制的标准命令。
+技术栈已确定（G1，2026-08-26）。标准命令以根 `README.md` 为唯一来源（`pnpm typecheck` / `lint` / `test:unit` / `build` / `quality` 等）；文档类任务的最低验证项仍是文档结构与链接完整性（`git diff --check`）。
 
 ## 清理周期与责任
 

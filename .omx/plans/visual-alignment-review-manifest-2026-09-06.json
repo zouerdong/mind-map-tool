@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "batch": "visual-alignment-2026-09-06",
+  "reviewMethod": "independent-peer-review",
+  "contentReviewStatus": "pass",
+  "recordedAt": "2026-09-06",
+  "sourceHead": "8394f106924eec9b9a193a19aae2698770081023",
+  "workingTree": "dirty-existing-lifecycle-remediation-reviewed-in-place",
+  "authorization": {
+    "userRequest": "audit-and-follow-up-plan-only",
+    "visualDirection": "user-selected-JPG-appearance-and-MOV-motion",
+    "productionImplementation": "not-authorized-by-this-manifest",
+    "schemaChange": "pending-G-SCHEMA",
+    "publicRelease": "not-authorized"
+  },
+  "artifacts": [
+    {
+      "role": "visual-target-brief",
+      "snapshotPath": ".omx/plans/visual-target-brief-2026-09-06.md",
+      "mirrorPath": "docs/product/visual-target-brief-2026-09-06.md",
+      "sha256": "9f490e69aae84cd437d43975c0940b2c0fa1a40e82b17864f83adaece12d1610"
+    },
+    {
+      "role": "visual-alignment-audit",
+      "snapshotPath": ".omx/plans/visual-alignment-audit-2026-09-06.md",
+      "mirrorPath": "docs/planning/visual-alignment-audit-2026-09-06.md",
+      "sha256": "fd4d1af46df81e0fae9658ff6ee52204a40d198ac52057154cc5fa17a069f81f"
+    },
+    {
+      "role": "visual-alignment-development-guide",
+      "snapshotPath": ".omx/plans/visual-alignment-development-guide-2026-09-06.md",
+      "mirrorPath": "docs/planning/visual-alignment-development-guide-2026-09-06.md",
+      "sha256": "0daf85b35661954b889395aa253e30d0ea8de75c757a803e4746967d6c75107e"
+    },
+    {
+      "role": "visual-alignment-task-cards",
+      "snapshotPath": ".omx/plans/visual-alignment-task-cards-2026-09-06.md",
+      "mirrorPath": "docs/planning/visual-alignment-task-cards-2026-09-06.md",
+      "sha256": "b87e70dd3c664312eee0880a3e794405b3cf4547c47c9b8a14ecbb49516624b7"
+    }
+  ],
+  "entrypoints": [
+    {
+      "path": "docs/planning/README.md",
+      "sha256": "7dbe412a72493476741ff56164e225ace2b020964888c801d7529c7d9d753719"
+    },
+    {
+      "path": "docs/product/README.md",
+      "sha256": "3d2ae4086e0d9a01495cd41ad48da9d3bd45438c29a8966a5e954c3beb3783e0"
+    }
+  ],
+  "reviewRecord": {
+    "path": ".omx/reviews/2026-09-06-visual-alignment-peer-review.md",
+    "sha256": "1911e6ba6b2bb1c29925177b3ae018cdff7c61f92cc901cef61cd6194563ed67",
+    "reviewers": [
+      {
+        "agent": "/root/implementation_audit",
+        "verdict": "PASS"
+      },
+      {
+        "agent": "/root/planning_audit",
+        "verdict": "PASS"
+      }
+    ]
+  },
+  "legacyBaseline": {
+    "manifestPath": ".omx/plans/ralplan-consensus-minimal-mind-map-tool.json",
+    "manifestSha256": "00f63fd1533d5e16dc2a17522e75d9022bc39e76c1da80d98d805bf4ef015ff7",
+    "recordedArtifactsAndReviews": [
+      {
+        "path": ".omx/plans/prd-minimal-mind-map-tool.md",
+        "sha256": "0f8b6a126fa6eb69c18d5958bcf292f679cb49a563c11ff4fca62a601c2ef7b9",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/architecture-minimal-mind-map-tool.md",
+        "sha256": "9bb22f847077e56706870b12bf217f8d6f7453255d57132fd5c63e8d32beb0ec",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/test-spec-minimal-mind-map-tool.md",
+        "sha256": "f5f7b89e20a9379ac48ebada378cc444e8ea9b53cf8bfa436457b081061d7fc5",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/task-cards-minimal-mind-map-tool.md",
+        "sha256": "709c98befe15929d82f5553502d5d770d23e93e102dd22fc546aa662180d0f06",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/risk-register-minimal-mind-map-tool.md",
+        "sha256": "e870dc8a469eea7f9c65c3cbf9d9f682d10cf2fdc04c10ca4f5697cda0a90f47",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/decision-register-template-minimal-mind-map-tool.json",
+        "sha256": "caaeac370969145a71636145888f846a94f511d6ee23ac652551c55c60d207e2",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/planner-summary-minimal-mind-map-tool.md",
+        "sha256": "add064a1d4e7db5868b402ea82b1cdf6ee73f3c250980c74ab642b3fc809798d",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/reviews/architect-review-5-minimal-mind-map-tool.md",
+        "sha256": "bc3426a4e8daef1efd84b73ef31191c0ef20367291cb97432b00c696e35fb074",
+        "matchesRecorded": true
+      },
+      {
+        "path": ".omx/plans/reviews/critic-review-3-minimal-mind-map-tool.md",
+        "sha256": "64c9fd4366c11737ca2f2769225a5f530d030f7efa5ad93d4c5c2ac2fcc14e5c",
+        "matchesRecorded": true
+      }
+    ],
+    "mirrorDrift": [
+      {
+        "snapshotPath": ".omx/plans/prd-minimal-mind-map-tool.md",
+        "snapshotSha256": "0f8b6a126fa6eb69c18d5958bcf292f679cb49a563c11ff4fca62a601c2ef7b9",
+        "mirrorPath": "docs/product/v1-product-spec.md",
+        "mirrorSha256": "ab250166aef6f339f0ff19a8f51c25c824ea260d171aa53a33943ec61c914e94",
+        "equal": false,
+        "differenceKind": "substantive-product-platform-and-p0-amendments",
+        "resolution": "pending-VRA-000"
+      },
+      {
+        "snapshotPath": ".omx/plans/architecture-minimal-mind-map-tool.md",
+        "snapshotSha256": "9bb22f847077e56706870b12bf217f8d6f7453255d57132fd5c63e8d32beb0ec",
+        "mirrorPath": "docs/planning/v1-architecture-proposal.md",
+        "mirrorSha256": "09c43ed830c52b84c5f09746e0620c5e063ddf9d3036d62319e0ede5a930231a",
+        "equal": false,
+        "differenceKind": "status-heading-only",
+        "resolution": "pending-VRA-000"
+      },
+      {
+        "snapshotPath": ".omx/plans/test-spec-minimal-mind-map-tool.md",
+        "snapshotSha256": "f5f7b89e20a9379ac48ebada378cc444e8ea9b53cf8bfa436457b081061d7fc5",
+        "mirrorPath": "docs/quality/v1-test-spec.md",
+        "mirrorSha256": "84482e6459fdca6e342411e8d9fa63656ab78b288410deb32fc68d336c5de3b0",
+        "equal": false,
+        "differenceKind": "status-heading-only",
+        "resolution": "pending-VRA-000"
+      },
+      {
+        "snapshotPath": ".omx/plans/task-cards-minimal-mind-map-tool.md",
+        "snapshotSha256": "709c98befe15929d82f5553502d5d770d23e93e102dd22fc546aa662180d0f06",
+        "mirrorPath": "docs/planning/v1-task-cards.md",
+        "mirrorSha256": "eec6cc42d8f29634ca9d5d1043b13e48655d8137f762e3578049bfe20a48b378",
+        "equal": false,
+        "differenceKind": "substantive-task-amendments",
+        "resolution": "pending-VRA-000"
+      },
+      {
+        "snapshotPath": ".omx/plans/risk-register-minimal-mind-map-tool.md",
+        "snapshotSha256": "e870dc8a469eea7f9c65c3cbf9d9f682d10cf2fdc04c10ca4f5697cda0a90f47",
+        "mirrorPath": "docs/quality/v1-risk-register.md",
+        "mirrorSha256": "877ce19d41a4a9c05806f8df99f02e512d613f10e0ebf5989f1307945273ed70",
+        "equal": false,
+        "differenceKind": "status-heading-only",
+        "resolution": "pending-VRA-000"
+      }
+    ],
+    "dispatchRule": "Do not dispatch from legacy mirrors; perform VRA-000 reconciliation. Existing approved decisions are not automatically revoked."
+  },
+  "referenceMedia": [
+    {
+      "path": "input/样式参考.JPG",
+      "sha256": "2df66de2ef0d40f48ad2bcdc15a6cee1b835f42e1d5bedd678b5e83be9595628",
+      "use": "local-design-reference-not-redistribution-authorization"
+    },
+    {
+      "path": "input/动态样式参考.mov",
+      "sha256": "af0cd073eff6e017717303aa5b328ca8330723a50ce7a530a71adff5fb4d776b",
+      "use": "local-design-reference-not-redistribution-authorization"
+    }
+  ],
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "unitTests": {
+      "status": "pass",
+      "files": 29,
+      "tests": 280
+    },
+    "frontendBuild": "pass-with-large-chunk-warning",
+    "nativeTauri": "not-run",
+    "windowsDevice": "not-run",
+    "fullQuality": "not-run",
+    "runtimeFindings": "read-only-memory-reproduced"
+  },
+  "localEvidence": [
+    {
+      "path": "artifacts/visual-audit-2026-09-06/01-current-onboarding.png",
+      "sha256": "65ab32ede67c5fd0334cd72f768ed378d4721b8f17904c65952701955851133c",
+      "bytes": 24021,
+      "availability": "local-ignored-regenerable",
+      "width": 65536,
+      "height": 4292542531
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/02-current-edit.png",
+      "sha256": "a63834ab22a07625fcfec091b7bd6c70bb4bc55072d90cbe3c390ccc4edb0dbd",
+      "bytes": 20605,
+      "availability": "local-ignored-regenerable",
+      "width": 65536,
+      "height": 4292542531
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/03-current-connected.png",
+      "sha256": "9d8860790105347a195b3a92b97101b72d4ced21707f9b7095610334261a5070",
+      "bytes": 25892,
+      "availability": "local-ignored-regenerable",
+      "width": 65536,
+      "height": 4292542531
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/04-current-organized.png",
+      "sha256": "1162e76b8cde0d0428a58ab2b9ac07da07706acfd4315de764ae8c1182b7d1f1",
+      "bytes": 28650,
+      "availability": "local-ignored-regenerable",
+      "width": 65536,
+      "height": 4292542531
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/05-current-organized-settled.png",
+      "sha256": "9ee23e2ca18db4ca577629ab69b168b0a6777a874efde7250633199df8d3439d",
+      "bytes": 29019,
+      "availability": "local-ignored-regenerable",
+      "width": 65536,
+      "height": 4292542531
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/README.md",
+      "sha256": "19f12d14021260ddbdc6f4d0eec4a1d9de6182729d0a40380b4f6b39517181c2",
+      "bytes": 429,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/build.log",
+      "sha256": "e898f2a3dcdf9ce299f79621e8a15b9289c7cd8d2c229aff1e9e7c53456b05fb",
+      "bytes": 1292,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/lint.log",
+      "sha256": "219bfa99e534a1496f975e6bbbb997342410ced5ff4c6a4b6729be7fe869cf72",
+      "bytes": 418,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-analysis.md",
+      "sha256": "9474903692c93c72fdfd0e4b0ce832e1f966cd0e030220d345f7c3762c7870e8",
+      "bytes": 11784,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-contact-sheet.jpg",
+      "sha256": "6bba354e3b58e6225e0ff956ef2d7f496e0527ea3476eb9ffb441a623cdea6f1",
+      "bytes": 257466,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-01.png",
+      "sha256": "fe8894cd5cc3d3f5aa34923512270fa65968df37818a048e479811c4e7db1e55",
+      "bytes": 679596,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-02.png",
+      "sha256": "d0169ce65444aea72302ad48584aece0171dae2ca6a7675f8b6dd04931a91158",
+      "bytes": 682503,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-03.png",
+      "sha256": "636b8347ad2915e5aba781b0aa47bddad2fc14f8f76381ab31d215f4175cb902",
+      "bytes": 685227,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-04.png",
+      "sha256": "8433d32b351042922356e0c962aaf7f82cd2f08d9c7a58b65a712788a9c6bf2a",
+      "bytes": 700509,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-05.png",
+      "sha256": "f12619d16066cbe85bb34e4d346193131146bd13e0868055c7d53869008eb7e2",
+      "bytes": 708100,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-06.png",
+      "sha256": "6021f895d0bb563875fe8584080c4a8b5e15d7b683ac6ffeceedd6ca84d85872",
+      "bytes": 707872,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-07.png",
+      "sha256": "9f0af1c0ffb6441b41ac9ba9af62f2f0ee15427d4b823bba8db632e0b27b60e3",
+      "bytes": 703070,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-08.png",
+      "sha256": "4c5d1d0904e6cb54cf880f0798bba53eb4a5a1f7ac15ff1099700592723b9fac",
+      "bytes": 706854,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-09.png",
+      "sha256": "ebc681b9b774c51af5604738f4effed4081efa7e897b0e36b345445b0a06c760",
+      "bytes": 702973,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-10.png",
+      "sha256": "2c7707e015de3eb5cf988695895f777ab17809d61a3f3e35fe9880a77d9415fb",
+      "bytes": 682205,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-11.png",
+      "sha256": "675ed20af09904dbdd848d749536dbab5c3c56d9977712f8db54b7fd93876b7f",
+      "bytes": 685478,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-12.png",
+      "sha256": "2c43607ef77adf62792d47cb694ed45e3de1f41c64a3307a1f4dde9c660dfac9",
+      "bytes": 691198,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-13.png",
+      "sha256": "2325bf08140655b08bd859454311bc94382c0ccdc0c50f3a0891f27c08e595e6",
+      "bytes": 695554,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-14.png",
+      "sha256": "f146395837c1eba7cbc4db7c55e1f7b31132fff480b118990f5d6944b48f0d0a",
+      "bytes": 698674,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-15.png",
+      "sha256": "44cf89707e930b69025fec7ef67d7faaa84b0bc3ebdda94cd7157c9f8c7b0baf",
+      "bytes": 701330,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-16.png",
+      "sha256": "39ae365676c6f26a283c19eca5f7786702d0fdad122064931c287c6ba53fd45b",
+      "bytes": 702522,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-17.png",
+      "sha256": "8808072f455a3a7d858540a8ee434a0c3d72ddd4e6cc8e2178f6f2c01a714b15",
+      "bytes": 705574,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-detail-18.png",
+      "sha256": "fd9557b4e31e37ae12fb5fdc18e8d5fc96c82c6f977afab8a3bf632f5124526f",
+      "bytes": 706935,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-opening.png",
+      "sha256": "51137dfe8dbefc67ed6612fed7eaf515910abf452dadc7e3669cfb3a044cde02",
+      "bytes": 297381,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-scattered.png",
+      "sha256": "74491c5c7aea87499af1a72afe311b121d643dd549162c15b537006cb352b9a7",
+      "bytes": 611472,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-settled.png",
+      "sha256": "163173997ba7c1e6de65d8318e587a2b00aae90b286dc6f54fc5579938a76e66",
+      "bytes": 707868,
+      "availability": "local-ignored-regenerable",
+      "width": 1180,
+      "height": 658
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/motion-transition-contact.jpg",
+      "sha256": "94fa1b27425b01046f93f5c1150e18f8b026aafba69d66ac3259772d92d664e7",
+      "bytes": 223501,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/reproduce-findings.mjs",
+      "sha256": "bcb489e616626d1a17a5e8a0d3bed445daa9a8b373cdc7bc292ba1b9c3e7b8ab",
+      "bytes": 3006,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/reproduced-findings.json",
+      "sha256": "7f28e0e6ac8b5ef6336652a0d2c47688e39208b7b6b95fb7b48ce199dfb77bcd",
+      "bytes": 769,
+      "availability": "local-ignored-regenerable"
+    },
+    {
+      "path": "artifacts/visual-audit-2026-09-06/unit-tests.log",
+      "sha256": "829da1e13abb43a87c1427eb05a42b5e3d9d222366f1d69922461ade0dd95e4c",
+      "bytes": 6092,
+      "availability": "local-ignored-regenerable"
+    }
+  ]
+}

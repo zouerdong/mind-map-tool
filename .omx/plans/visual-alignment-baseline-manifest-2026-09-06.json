@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "batch": "visual-alignment-2026-09-06",
+  "recordType": "vra-000-baseline-reconciliation",
+  "recordedAt": "2026-09-06",
+  "sourceHead": "8394f106924eec9b9a193a19aae2698770081023",
+  "workingTree": "dirty-w2r2-lifecycle-remediation-plus-vra-docs",
+  "reviewRecord": ".omx/reviews/2026-09-06-vra-000-baseline-reconciliation.md",
+  "gate": {
+    "id": "G-BASE",
+    "status": "achieved",
+    "peerReview": { "agent": "vra-000-peer-review", "verdict": "PASS", "reviewedAt": "2026-09-06", "record": ".omx/reviews/2026-09-06-vra-000-baseline-reconciliation.md#6" },
+    "meaning": "All legacy drift items have a documented conclusion; every legacy open item has exactly one owner; no recorded hash silently invalidated; batch mirrors match snapshots byte-for-byte. Independent peer review PASS. Does not grant production implementation (G-PLAN/G-VIS/G-SCHEMA/G-NATIVE remain separate)."
+  },
+  "dispatchPrecondition": "G-SCHEMA dispatch must first name a single integration owner for the MRT-005 x VRA-020 schema/commands boundary (peer-review observation, adopted).",
+  "hashVerification": {
+    "method": "shasum -a 256 recomputed 2026-09-06; cmp for byte equality",
+    "legacyBaseline": "all 9 recorded artifacts/reviews plus the legacy manifest itself MATCH",
+    "g1Bindings": "ADR 0001/0002/0004/0005 (Accepted 1.0.0) and runtime-spike-decision.json MATCH; ADR 0003/0006/0008 Accepted, 0007 Proposed, consistent with register",
+    "batchSnapshotsAndMirrors": "4 snapshots MATCH manifest; 4 mirrors byte-equal; entry READMEs, peer review record, and both reference media MATCH"
+  },
+  "mirrorDriftResolution": [
+    {
+      "mirrorPath": "docs/product/v1-product-spec.md",
+      "previousResolution": "pending-VRA-000",
+      "resolution": "accepted-amended-prd",
+      "conclusion": "All substantive amendments carry [from-user 2026-08-26/27] markers with git approval chain (26c221b, f6e7590) and decision-register G0/G1 records. Mirror (with amendments) is the live PRD; snapshot remains the historical baseline.",
+      "sha256AfterReconciliation": "ab250166aef6f339f0ff19a8f51c25c824ea260d171aa53a33943ec61c914e94"
+    },
+    {
+      "mirrorPath": "docs/planning/v1-task-cards.md",
+      "previousResolution": "pending-VRA-000",
+      "resolution": "accepted-with-status-correction",
+      "conclusion": "MM-085/088/089 amendments approved (f6e7590) and implemented; stale 'G0 not yet approved' heading corrected by VRA-000; dispatch authority superseded by VRA batch mapping.",
+      "sha256AfterReconciliation": "d9182a14867f592647c15e8964d31a4b2dead747516db1e07235bb790ad2bfbc"
+    },
+    {
+      "mirrorPath": "docs/planning/v1-architecture-proposal.md",
+      "previousResolution": "pending-VRA-000",
+      "resolution": "accepted-historical-proposal",
+      "conclusion": "Heading-only drift was legitimate; VRA-000 added G1-approved annotation; file demoted to historical proposal, superseded by Accepted ADRs.",
+      "sha256AfterReconciliation": "f2635f9c2dd1e4ecc63e2a8c558cfa458168a226ab27c58c1e857a5648b4c3a1"
+    },
+    {
+      "mirrorPath": "docs/quality/v1-test-spec.md",
+      "previousResolution": "pending-VRA-000",
+      "resolution": "accepted-heading-only",
+      "conclusion": "Heading-only drift confirmed; mirror valid; scale/threshold refresh owned by MRT-010/VRA-080.",
+      "sha256AfterReconciliation": "84482e6459fdca6e342411e8d9fa63656ab78b288410deb32fc68d336c5de3b0"
+    },
+    {
+      "mirrorPath": "docs/quality/v1-risk-register.md",
+      "previousResolution": "pending-VRA-000",
+      "resolution": "accepted-heading-only",
+      "conclusion": "Heading-only drift confirmed; mirror valid; risk status refresh owned by MRT-010/VRA-090.",
+      "sha256AfterReconciliation": "877ce19d41a4a9c05806f8df99f02e512d613f10e0ebf5989f1307945273ed70"
+    }
+  ],
+  "statusCorrections": [
+    { "path": "AGENTS.md", "change": "product-discovery-stage wording replaced with implementation-stage facts; standard commands anchored to root README", "sha256": "299c10ab1c1ef8c2a78fae82706bb37c4a4ca85d995008a20d69bc8f1dafc36a" },
+    { "path": "docs/planning/v1-development-guide.md", "change": "G0/G1-approved annotation added under original status line (original text preserved)", "sha256": "1f05f949d94c4a528c15ec140b28358d1f4eea33d9dc9a1bf8233cae45c71095" },
+    { "path": "docs/planning/v1-task-cards.md", "change": "stale G0 heading corrected with annotation pointing to VRA mapping", "sha256": "d9182a14867f592647c15e8964d31a4b2dead747516db1e07235bb790ad2bfbc" },
+    { "path": "docs/planning/v1-architecture-proposal.md", "change": "G1-approved annotation added; demoted to historical proposal", "sha256": "f2635f9c2dd1e4ecc63e2a8c558cfa458168a226ab27c58c1e857a5648b4c3a1" },
+    { "path": "CLAUDE.md", "change": "User-approved correction (2026-09-06): project-status and verification-commands sections rewritten to implementation-stage facts; safety red lines preserved", "note": "out of original VRA-000 card scope; executed only after explicit user approval via AskUserQuestion" }
+  ],
+  "supersededRule": {
+    "rule": "All production UI waits for MRT-004 (UXD-001 strategy card, 2026-08-30)",
+    "source": ".omx/reviews/2026-08-30-frontend-design-strategy-and-uxd-001-task-card.md",
+    "replacement": "Visual prototypes, pure layout and shared geometry (VRA-010/020/030/040 and isolated-fixture parts of VRA-050/060) do not depend on MRT-004W2R2; production mindmap-app.tsx shell integration (VRA-070) and any product-deliverable claims remain gated by G-NATIVE."
+  },
+  "pendingUserDecisions": [
+    "C-1/C-2 warm-white solid-card vs pure-white/pure-black outlined-card — decide at G-VIS",
+    "C-4/C-5/C-6 kicker / arrow+line-style / emphasis-role semantics — decide at G-VIS",
+    "C-3 PRD wording vertical-tree -> layered-DAG after G-VIS via VRA-020 amendment flow"
+  ],
+  "resolvedUserDecisions": [
+    "CLAUDE.md project-status correction — approved and executed 2026-09-06"
+  ],
+  "nextCard": "VRA-010 (dispatched by user 2026-09-06; prototype scope within card limits)",
+  "entrypointsAfterReconciliation": [
+    { "path": "docs/planning/README.md", "sha256": "aa84d208f2464b95da037188044c29aee03e1fbf273a7ff49628a0302c9ad50d", "note": "updated to register VRA-000 completion; supersedes 7dbe412a recorded by the batch manifest" },
+    { "path": "docs/product/README.md", "sha256": "3d2ae4086e0d9a01495cd41ad48da9d3bd45438c29a8966a5e954c3beb3783e0", "note": "unchanged by VRA-000" }
+  ]
+}

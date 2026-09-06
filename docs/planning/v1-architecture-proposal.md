@@ -1,6 +1,8 @@
 # 极简自由脑图工具：架构与技术决策草案
 
 > 状态：Ralplan 共识架构提案。技术栈、文件格式和兼容承诺必须经用户 G1 确认并正式写入 `docs/decisions/` 后才能实施。
+>
+> 更正（VRA-000 对账，2026-09-06）：G1 已于 2026-08-26 批准，四轨选型（Tauri 2 / React Flow / web-ts-wasm / Noto Sans SC + LXGW WenKai）已固化为 Accepted ADR 0001–0006、0008；本文件降级为历史提案，架构事实以 `docs/decisions/` 与 `docs/architecture/` 为准。
 
 ## 1. RALPLAN-DR
 

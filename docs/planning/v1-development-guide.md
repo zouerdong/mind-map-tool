@@ -1,6 +1,8 @@
 # V1 开发指导
 
 > 状态：Ralplan 规划共识已完成；产品尚未实现，G0/G1/G2 均未批准。
+>
+> 更正（VRA-000 对账，2026-09-06）：G0 与 G1 已于 2026-08-26 由项目负责人批准（证据：`docs/decisions/decision-register.json` gates 段、`docs/quality/mm-000-review.md`、git `26c221b`），G2 仍 pending；产品实现已推进至 MM-090 之后（含 MRT-001..003V）。本文件为历史规划镜像，正文不再逐项维护；当前阶段定义与派发顺序以 [visual-alignment-development-guide-2026-09-06.md](./visual-alignment-development-guide-2026-09-06.md) 为准，技术事实以 Accepted ADR 为准。
 
 ## 1. 交付结论
 

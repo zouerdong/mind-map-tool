@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "batch": "visual-alignment-2026-09-06",
+  "recordType": "vra-010-prototype-delivery",
+  "recordedAt": "2026-09-06",
+  "sourceHead": "8394f106924eec9b9a193a19aae2698770081023",
+  "workingTree": "dirty-w2r2-lifecycle-plus-vra-000-and-vra-010-docs",
+  "gateStatus": {
+    "G-BASE": "achieved (VRA-000 reconciliation, peer review PASS)",
+    "G-VIS": "achieved (2026-09-06 user confirmed all decisions in live prototype demonstration)",
+    "gvisDecisions": [
+      "D1/C-1/C-2: warm-white #F9F8F4 + solid dark cards #141412 + accent #D97757; dark-board proposal accepted; ellipse shape kept as option; supersedes old pure-white/black + outlined-default PRD clauses",
+      "D3/C-4: optional single-line kicker, default empty",
+      "D4/C-5: arrows by default + solid/dashed/dotted line styles",
+      "D2/C-6, D5, D6: manual emphasis role; no layer numbers/category system; free canvas + DAG organize (no forced single-parent tree)",
+      "Motion contract: 800ms accepted after live demonstration",
+      "D7 (new): organize defaults HORIZONTAL (root left, layers rightward), vertical optional, direction remembered per document",
+      "D8 (new): line-form language - scattered smooth curves vs organized fully orthogonal rounded-elbow 'circuit' lines (no diagonals except r~12px corner arcs), continuous morph during animation; routing finalized after 3 user calibration rounds: internal direct corridor first (no detour when unobstructed), edge channel only when blocked, target-side comb transitions; HARD RULE zero collinear overlap (programmatic check: 0 overlaps / 0 card pierces on both fixtures)"
+    ],
+    "note": "PRD wording updates (AC-15 vertical-tree -> default-horizontal layered layout; theme/shape rows per D1) flow through the VRA-020 PRD amendment process."
+  },
+  "artifacts": [
+    { "path": "docs/product/visual-state-tokens-2026-09-06.md", "role": "state-and-tokens-spec", "sha256": "5d9f9e041860796b14f731843faa0b71adfb0effb769a9b3879e769de982d891" },
+    { "path": "docs/product/visual-motion-contract-2026-09-06.md", "role": "motion-contract", "sha256": "cd1b02ab5f1ce888cde600c2c653734048c9a4e9e660c18b8501653e230e0b3a" },
+    { "path": "tests/fixtures/visual/README.md", "role": "fixture-rules", "sha256": "821b1d9976f68f6af5f7610e58eb180132154312fb6425c0f5640f7992e5a9d6" },
+    { "path": "tests/fixtures/visual/reference-dag-12.json", "role": "fixture-reference-coords", "sha256": "594e9b1f48b6367ae5e197e84b672ebc370f6fb982d2a778bee714b6c02f8748", "schemaValidated": true },
+    { "path": "tests/fixtures/visual/reference-dag-12-scattered.json", "role": "fixture-scattered-coords", "sha256": "02ad830a7e569a365e26bbdad867c4f8d99dfb901ccbfcfb28161b2c91890ce9", "schemaValidated": true },
+    { "path": "tests/fixtures/visual/reference-dag-12.visual.json", "role": "fixture-visual-sidecar-pre-schema", "sha256": "53ff2060c4860eaebcabb185813768a06bb27b2e81a0dc039469b272b1251d98" },
+    { "path": "tests/fixtures/visual/motion-tree-17.json", "role": "fixture-motion-tree", "sha256": "64c717d5ca0dfd4456cd4db8bc84b78f9ce1edc2af6d17315d78c98280650828", "schemaValidated": true },
+    { "path": "tests/visual-prototype/README.md", "role": "prototype-rules", "sha256": "18589013f1ec0fb0c76b601cd2a5f300d5a4eaca617422e53a4ec9067aa9632d" },
+    { "path": "tests/visual-prototype/reference-prototype.html", "role": "isolated-prototype", "sha256": "b262a8a9548337db838ade223d00d3d9c7f7b8cdcfa3a5b908e1a5bc54c6a200" },
+    { "path": ".omx/reviews/2026-09-06-vra-010-prototype-delivery.md", "role": "delivery-record", "sha256": "ea07564085e9c86e0a88ab32552c1bda3650ed20425ecf2d11d007a0cff9205c" }
+  ],
+  "entrypointUpdates": [
+    { "path": "docs/product/README.md", "sha256": "160088e508729020bf9d738b42262017af0d5cecfa2eb93b67cbc507e77bc507", "note": "registers VRA-010 spec docs; supersedes 3d2ae408 recorded by the batch manifest and the 'unchanged' note in the VRA-000 baseline manifest" }
+  ],
+  "evidence": {
+    "dir": "artifacts/visual-prototype-2026-09-06/",
+    "availability": "local-ignored-regenerable",
+    "screenshots": 17,
+    "videos": ["motion12-organize.webm", "motion17-organize.webm"],
+    "verification": {
+      "gitDiffCheck": "pass",
+      "unitTests": "29 files / 280 tests pass",
+      "fixtureSchemaValidation": "3/3 pass",
+      "prototypeDomCheck": "12 nodes / 13 edges / 5 accent / dotted+dashed rendered",
+      "visionCrossCheck": "direction consistent with reference; long-text overflow found and fixed (multiline + 84px height)",
+      "videoCrossCheck": "continuous motion, edges follow, stagger+ease-out, converges to reference composition"
+    }
+  },
+  "notAuthorizedByThisRecord": ["production implementation", "schema changes", "public release"]
+}
