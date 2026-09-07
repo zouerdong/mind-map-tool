@@ -2,13 +2,16 @@
 // 与允许清单对照；未知/受限许可 fail-closed。每次新增运行时依赖必须通过本扫描。
 // 用法：node scripts/quality/scan-dependency-licenses.mjs
 
-import { readFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
+const outputIdx = process.argv.indexOf("--output");
+const output = outputIdx === -1 ? null : process.argv[outputIdx + 1];
 
 // 允许清单：宽松/署名型许可。GPL/AGPL/SSPL/未知 → FAIL（需项目负责人决定）。
 const ALLOWED = new Set([
@@ -38,12 +41,21 @@ const norm = (s) =>
     .trim()
     .replace(/\s+/g, " ");
 
-// SPDX 简易求值：仅处理 " OR "（任一允许即通过）与 " AND "（全部允许才通过）。
+// SPDX 简易求值：处理 OR/AND、旧式 slash 分隔以及 WITH exception。
 function licenseAllowed(expr) {
-  const andParts = norm(expr).split(/\s+AND\s+/i);
+  const andParts = norm(expr)
+    .replaceAll("/", " OR ")
+    .split(/\s+AND\s+/i);
   return andParts.every((andPart) => {
     const orParts = andPart.split(/\s+OR\s+/i);
-    return orParts.some((p) => ALLOWED.has(p.replace(/[()]/g, "").trim()));
+    return orParts.some((p) => {
+      const atom = p
+        .replace(/[()]/g, "")
+        .trim()
+        .replace(/\s+WITH\s+[^\s()]+.*$/i, "")
+        .trim();
+      return ALLOWED.has(atom);
+    });
   });
 }
 
@@ -108,6 +120,48 @@ for (const [name, meta] of workspaceDeps) {
     failures.push(`${name}: 许可 "${info.license}" 不在允许清单（需项目负责人决定）`);
 }
 
+// Cargo 的完整解析图也必须参与门禁。仅读 Cargo.lock 不够，因为 lockfile
+// 没有许可证字段；cargo metadata 从已锁定解析图返回每个包的 SPDX 声明。
+const cargoResults = [];
+const cargoManifest = resolve(ROOT, "apps/desktop/src-tauri/Cargo.toml");
+if (!existsSync(cargoManifest)) {
+  failures.push("Cargo.toml 缺失，无法完成 Rust 依赖许可证审计");
+} else {
+  try {
+    const raw = execFileSync(
+      "cargo",
+      ["metadata", "--manifest-path", cargoManifest, "--locked", "--format-version", "1"],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const metadata = JSON.parse(raw);
+    for (const pkg of metadata.packages ?? []) {
+      const item = {
+        name: pkg.name,
+        version: pkg.version,
+        license: norm(pkg.license) || "UNKNOWN",
+        source: pkg.source ?? "workspace",
+      };
+      cargoResults.push(item);
+      if (item.source === "workspace") continue;
+      if (item.license === "UNKNOWN") {
+        failures.push(`(cargo) ${item.name}@${item.version}: package license 缺失（人工审阅）`);
+      } else if (!licenseAllowed(item.license)) {
+        failures.push(
+          `(cargo) ${item.name}@${item.version}: 许可 "${item.license}" 不在允许清单（没有可选的允许许可证）`,
+        );
+      }
+    }
+  } catch (error) {
+    const detail = error?.stderr ? String(error.stderr).trim().split("\n").at(-1) : String(error);
+    failures.push(`(cargo) cargo metadata --locked 失败：${detail}`);
+  }
+}
+
 // also scan the full .pnpm store (transitive) for hard-forbidden copyleft
 const storeDir = resolve(ROOT, "node_modules/.pnpm");
 if (existsSync(storeDir)) {
@@ -136,8 +190,36 @@ if (existsSync(storeDir)) {
   }
 }
 
-console.log(`scanned ${results.length} direct dependencies (+transitive copyleft scan)`);
+console.log(
+  `scanned ${results.length} direct JS dependencies + ${cargoResults.length} Cargo packages (+transitive copyleft scan)`,
+);
 for (const r of results) console.log(`  ${r.name.padEnd(32)} ${r.license}`);
+if (cargoResults.length) {
+  const cargoFailures = new Set(failures.filter((f) => f.startsWith("(cargo)")).map((f) => f));
+  console.log(`  cargo: ${cargoResults.length} packages (${cargoFailures.size} failures)`);
+}
+
+if (output) {
+  const outputPath = resolve(ROOT, output);
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(
+    outputPath,
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        generatedAt: new Date().toISOString(),
+        allowedLicenses: [...ALLOWED].sort(),
+        javascript: results,
+        cargo: cargoResults,
+        failures,
+        overall: failures.length ? "FAIL" : "PASS",
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  console.log(`license evidence -> ${output}`);
+}
 
 if (failures.length) {
   console.error("scan-dependency-licenses: FAIL");

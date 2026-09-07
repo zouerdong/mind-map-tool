@@ -11,7 +11,10 @@ import { chromium } from "playwright";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
-const EVIDENCE_DIR = resolve(ROOT, "docs/quality/evidence/visual-alignment");
+const isCapture = process.argv.includes("--capture");
+const EVIDENCE_DIR = isCapture
+  ? resolve(ROOT, "docs/quality/evidence/visual-alignment")
+  : resolve(ROOT, ".tmp/quality/visual-alignment");
 const HARNESS = resolve(ROOT, "tests/visual/harness");
 
 mkdirSync(EVIDENCE_DIR, { recursive: true });
@@ -68,18 +71,25 @@ async function main() {
   const pub = resolve(HARNESS, "public");
   mkdirSync(resolve(pub, "fonts"), { recursive: true });
   mkdirSync(resolve(pub, "fixtures"), { recursive: true });
-  for (const f of ["noto-sans-sc-regular.otf", "noto-sans-sc-bold.otf", "lxgw-wenkai-regular.ttf"]) {
+  for (const f of [
+    "noto-sans-sc-regular.otf",
+    "noto-sans-sc-bold.otf",
+    "lxgw-wenkai-regular.ttf",
+  ]) {
     copyFileSync(resolve(ROOT, "assets/fonts", f), resolve(pub, "fonts", f));
   }
-  for (const f of ["reference-dag-12.json", "reference-dag-12-scattered.json", "motion-tree-17.json"]) {
+  for (const f of [
+    "reference-dag-12.json",
+    "reference-dag-12-scattered.json",
+    "motion-tree-17.json",
+  ]) {
     copyFileSync(resolve(ROOT, "tests/fixtures/visual", f), resolve(pub, "fixtures", f));
   }
 
-  execFileSync(
-    "pnpm",
-    ["--dir", resolve(ROOT, "apps/desktop"), "exec", "vite", "build", HARNESS],
-    { cwd: ROOT, stdio: "inherit" },
-  );
+  execFileSync("pnpm", ["--dir", resolve(ROOT, "apps/desktop"), "exec", "vite", "build", HARNESS], {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
   console.log("  ✓ Harness 构建完成\n");
 
   // -------------------------------------------------------------
@@ -182,7 +192,8 @@ async function main() {
     browserCaptured = true;
   } catch (err) {
     browserCaptured = false;
-    browserNotice = "Sandbox isolated: Chromium MachPort rendezvous blocked; headless logic verified.";
+    browserNotice =
+      "Sandbox isolated: Chromium MachPort rendezvous blocked; headless logic verified.";
     console.log(`  ℹ [Notice] ${browserNotice}`);
   } finally {
     if (server) {
@@ -208,10 +219,7 @@ async function main() {
       layer1_static: {
         name: "1080×864 参考静态外观",
         status: "PASS",
-        files: [
-          "layer1-static-reference-1080x864.png",
-          "layer1-static-dark-1080x864.png",
-        ],
+        files: ["layer1-static-reference-1080x864.png", "layer1-static-dark-1080x864.png"],
         paletteTokens: {
           lightCanvas: "#F9F8F4",
           lightCard: "#141412",

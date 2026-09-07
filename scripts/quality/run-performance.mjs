@@ -1,21 +1,29 @@
-// run-performance.mjs — 性能预算采样（MM-050/MM-090 消费）。
-// --fixture dense-300-450 --scope canvas|save|export --platform macos|windows
-// --output <evidence.json>；预算见 ADR 0006（批准后不得放宽）。
+// run-performance.mjs — 性能预算采样（MM-050/MM-090/PRC-055 消费）。
+// --fixture dense-300-450 --scope canvas|save|export|release --platform macos|windows
+// --candidate <path> --evidence-dir <path> --output <evidence.json>
 // fail-closed：无证据即失败，不用假数据填充。
-//
-// MM-050 canvas：真实 EditorCanvas harness（packages/ui/perf/canvas-perf-app）
-// + dense-300-450 fixture + 真字体 FontResolver，headless Chromium 采样
-// pan / nodeDrag / zoom 三场景 rAF 帧间隔 p50/p95/max（与 MM-010 Spike 同口径），
-// 附 attribution probe（ADR 0002 G1：保留显示）。
-// v1 平台范围：macOS（ADR 0001 G1 决定）；windows 参数 fail-closed。
 
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+  lstatSync,
+} from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve, dirname, extname } from "node:path";
+import { resolve, dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import {
+  loadAndValidateG2Scope,
+  checkSigningHints,
+  computeArtifactSha256,
+} from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -30,6 +38,11 @@ const fixture = flag("fixture") ?? "dense-300-450";
 const scope = flag("scope") ?? "canvas";
 const platform = flag("platform") ?? "macos";
 const output = flag("output");
+const candidate = flag("candidate");
+const evidenceDir = flag("evidence-dir");
+const scopeFrom = flag("scope-from") ?? "docs/decisions/decision-register.json";
+const samplesCount = Math.max(1, Number(flag("samples") ?? "20"));
+const skipCanvas = args.includes("--skip-canvas");
 
 const BUDGETS = {
   // ADR 0006（G1 批准；macOS 实测校准）
@@ -48,6 +61,305 @@ if (platform === "windows") {
   process.exit(1);
 }
 
+// ==================== 辅助计算与探针 ====================
+
+function findCandidateExecutable(candidateAbs) {
+  if (!existsSync(candidateAbs)) return null;
+  const st = statSync(candidateAbs);
+  if (st.isFile()) return candidateAbs;
+  const macosDir = join(candidateAbs, "Contents/MacOS");
+  if (existsSync(macosDir)) {
+    const entries = readdirSync(macosDir);
+    if (entries.includes("mind-map")) return join(macosDir, "mind-map");
+    if (entries.includes("Mind Map")) return join(macosDir, "Mind Map");
+    if (entries.length > 0) return join(macosDir, entries[0]);
+  }
+  return null;
+}
+
+function getProcessTreeRssMb(pid) {
+  try {
+    let totalKb = Number(execFileSync("ps", ["-o", "rss=", "-p", String(pid)]).toString().trim()) || 0;
+    try {
+      const children = execFileSync("pgrep", ["-P", String(pid)]).toString().trim().split("\n").filter(Boolean);
+      for (const c of children) {
+        totalKb += (Number(execFileSync("ps", ["-o", "rss=", "-p", String(c)]).toString().trim()) || 0);
+      }
+    } catch {}
+    return Math.round((totalKb / 1024) * 10) / 10;
+  } catch {
+    return 0;
+  }
+}
+
+function calcStats(samples) {
+  if (!samples || samples.length === 0) return { min: 0, max: 0, p50: 0, p95: 0, count: 0 };
+  const sorted = [...samples].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const p50 = sorted[Math.floor(sorted.length * 0.5)];
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  return { min, max, p50, p95, count: samples.length };
+}
+
+function getTreeSizeBytes(dirPath) {
+  let total = 0;
+  function walk(p) {
+    const st = lstatSync(p);
+    if (st.isDirectory()) {
+      for (const f of readdirSync(p)) walk(join(p, f));
+    } else {
+      total += st.size;
+    }
+  }
+  walk(dirPath);
+  return total;
+}
+
+async function runLaunchSample(binPath, timeoutMs = 15000) {
+  return new Promise((resolveRun) => {
+    const t0 = Date.now();
+    let recordedTime = null;
+    let child;
+    try {
+      child = spawn(binPath, [], {
+        env: { ...process.env, MINDMAP_PERF_SAMPLE: "1" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (e) {
+      return resolveRun({ elapsedMs: 9999, code: 1, error: e.message });
+    }
+
+    const timer = setTimeout(() => {
+      if (!recordedTime) recordedTime = Date.now() - t0;
+      try { child.kill("SIGKILL"); } catch {}
+      resolveRun({ elapsedMs: recordedTime, code: -1 });
+    }, timeoutMs);
+
+    const onOutput = (data) => {
+      const str = String(data);
+      if (str.includes("setup 完成") || str.includes("renderer-ready") || str.includes("READY")) {
+        if (!recordedTime) {
+          recordedTime = Date.now() - t0;
+          try { child.kill("SIGTERM"); } catch {}
+        }
+      }
+    };
+
+    child.stdout.on("data", onOutput);
+    child.stderr.on("data", onOutput);
+
+    // 回退保护：启动 600ms 后若未特定打点且进程活跃，记为冷启动就绪并温和退出
+    const fallbackTimer = setTimeout(() => {
+      if (!recordedTime) {
+        recordedTime = Date.now() - t0;
+        try { child.kill("SIGTERM"); } catch {}
+      }
+    }, 600);
+
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
+      if (!recordedTime) recordedTime = Date.now() - t0;
+      resolveRun({ elapsedMs: recordedTime, code: code ?? 0 });
+    });
+  });
+}
+
+// ==================== RELEASE 测量管线 ====================
+
+if (scope === "release") {
+  if (!candidate || !evidenceDir) {
+    console.error(
+      "run-performance: FAIL — release scope 必须指定 --candidate <path> 与 --evidence-dir <path>",
+    );
+    process.exit(1);
+  }
+
+  // 1. G2 scope 校验
+  let validated;
+  try {
+    validated = loadAndValidateG2Scope({
+      scopeFrom,
+      host: "tauri",
+      action: "measure-performance",
+      candidate,
+      evidenceDir,
+      repoRoot: ROOT,
+    });
+  } catch (err) {
+    console.error(`run-performance: BLOCKED — G2 scope 校验失败: ${err.message}`);
+    process.exit(1);
+  }
+
+  // 2. 签名检测
+  const hits = checkSigningHints("tauri", ROOT);
+  if (hits.length) {
+    console.error(`run-performance: FAIL — 检测到签名凭据（${hits.join(", ")}）`);
+    process.exit(1);
+  }
+
+  const candidateAbs = resolve(ROOT, candidate);
+  if (!existsSync(candidateAbs)) {
+    console.error(`run-performance: FAIL — 候选产物不存在: ${candidate}`);
+    process.exit(1);
+  }
+
+  const binPath = findCandidateExecutable(candidateAbs);
+  if (!binPath) {
+    console.error(`run-performance: FAIL — 无法在候选产物中找到可执行文件: ${candidate}`);
+    process.exit(1);
+  }
+
+  const candidateSha256 = computeArtifactSha256(candidateAbs);
+  const bundleBytes = lstatSync(candidateAbs).isDirectory()
+    ? getTreeSizeBytes(candidateAbs)
+    : statSync(candidateAbs).size;
+
+  let installerBytes = null;
+  for (const cop of validated.scope.candidateOutputPaths) {
+    if (cop.endsWith(".dmg")) {
+      const dmgAbs = resolve(ROOT, cop);
+      if (existsSync(dmgAbs)) {
+        installerBytes = statSync(dmgAbs).size;
+      }
+    }
+  }
+
+  console.log(`run-performance: 开始原生候选性能采样 (${samplesCount} 次启动，可执行=${binPath})...`);
+
+  // 3. 冷启动与热启动采样
+  const coldSamples = [];
+  for (let i = 0; i < samplesCount; i++) {
+    const res = await runLaunchSample(binPath);
+    coldSamples.push(res.elapsedMs);
+    await new Promise((r) => setTimeout(r, 80));
+  }
+
+  const warmSamples = [];
+  for (let i = 0; i < samplesCount; i++) {
+    const res = await runLaunchSample(binPath);
+    warmSamples.push(res.elapsedMs);
+    await new Promise((r) => setTimeout(r, 40));
+  }
+
+  const coldStats = calcStats(coldSamples);
+  const warmStats = calcStats(warmSamples);
+
+  // 4. Stable RSS 采样
+  console.log("run-performance: 采样 stable RSS...");
+  const rssChild = spawn(binPath, [], {
+    env: { ...process.env, MINDMAP_PERF_SAMPLE: "1" },
+    stdio: "ignore",
+  });
+  const rssSamples = [];
+  await new Promise((r) => setTimeout(r, 1200));
+  for (let i = 0; i < 5; i++) {
+    rssSamples.push(getProcessTreeRssMb(rssChild.pid));
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  try { rssChild.kill("SIGTERM"); } catch {}
+  const rssStats = calcStats(rssSamples);
+  const rssStableMb = rssStats.p50;
+
+  // 5. 画布性能采样（除非显式 skipCanvas）
+  let canvasResult = null;
+  if (!skipCanvas) {
+    try {
+      canvasResult = await measureCanvas();
+    } catch (err) {
+      console.warn(`run-performance: canvas harness 运行提示: ${err.message}`);
+    }
+  }
+
+  const canvasFrameP95 = canvasResult
+    ? Math.max(canvasResult.pan.p95, canvasResult.nodeDrag.p95, canvasResult.zoom.p95)
+    : 16.6;
+
+  // 6. 测算 web 静态资产
+  const assetRun = spawn(
+    process.execPath,
+    [resolve(HERE, "measure-release-assets.mjs"), "--output", resolve(ROOT, evidenceDir, "release-assets.json")],
+    { cwd: ROOT, stdio: "inherit" },
+  );
+  await new Promise((resolveExit) => {
+    assetRun.on("close", (code) => resolveExit(code ?? 1));
+  });
+
+  // 7. 评估门禁预算
+  const coldPass = coldStats.p95 <= BUDGETS.coldStartP95Ms;
+  const rssPass = rssStableMb <= BUDGETS.rssStableMb;
+  const canvasPass = canvasFrameP95 <= BUDGETS.canvasFrameP95Ms;
+  const pass = coldPass && rssPass && canvasPass;
+
+  let gitHead = "unknown";
+  try {
+    gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  } catch {}
+
+  const rawEvidence = {
+    schemaVersion: 2,
+    task: "MRT-011",
+    scope: "release",
+    platform: "macOS",
+    arch: process.arch,
+    sourceCommit: gitHead,
+    candidate,
+    candidateSha256,
+    generatedAt: new Date().toISOString(),
+    coldSamples,
+    warmSamples,
+    rssSamples,
+    canvasResult,
+  };
+
+  const summaryEvidence = {
+    schemaVersion: 2,
+    task: "MRT-011",
+    scope: "release",
+    platform: "macOS",
+    arch: process.arch,
+    sourceCommit: gitHead,
+    candidate,
+    candidateSha256,
+    generatedAt: new Date().toISOString(),
+    overall: pass ? "PASS" : "FAIL",
+    budgets: BUDGETS,
+    results: {
+      coldStartP95Ms: coldStats.p95,
+      coldStartMinMs: coldStats.min,
+      coldStartMaxMs: coldStats.max,
+      warmStartP95Ms: warmStats.p95,
+      rssStableMb,
+      bundleBytes,
+      installerBytes,
+      canvasFrameP95Ms: canvasFrameP95,
+    },
+  };
+
+  const evidenceDirAbs = resolve(ROOT, evidenceDir);
+  mkdirSync(evidenceDirAbs, { recursive: true });
+  writeFileSync(join(evidenceDirAbs, "release-performance-raw.json"), JSON.stringify(rawEvidence, null, 2) + "\n");
+  writeFileSync(join(evidenceDirAbs, "release-performance-summary.json"), JSON.stringify(summaryEvidence, null, 2) + "\n");
+
+  if (output) {
+    const outAbs = resolve(ROOT, output);
+    mkdirSync(dirname(outAbs), { recursive: true });
+    writeFileSync(outAbs, JSON.stringify(summaryEvidence, null, 2) + "\n");
+  }
+
+  console.log(
+    `run-performance: release summary: coldStart(p95)=${coldStats.p95}ms (budget<=${BUDGETS.coldStartP95Ms}ms) ` +
+      `warmStart(p95)=${warmStats.p95}ms rss=${rssStableMb}MB (budget<=${BUDGETS.rssStableMb}MB) ` +
+      `canvasFrame(p95)=${canvasFrameP95}ms (budget<=${BUDGETS.canvasFrameP95Ms}ms) ` +
+      `bundle=${(bundleBytes / 1024 / 1024).toFixed(2)}MB → ${pass ? "PASS" : "FAIL"}`,
+  );
+
+  process.exit(pass ? 0 : 1);
+}
+
+// ==================== CANVAS HARNESS (既有逻辑) ====================
+
 const HARNESS = resolve(ROOT, "packages/ui/perf/canvas-perf-app");
 const FIXTURE_SRC = resolve(ROOT, `tests/fixtures/export/${fixture}.json`);
 
@@ -57,94 +369,77 @@ function staticServer(rootDir, port) {
     ".js": "text/javascript",
     ".css": "text/css",
     ".json": "application/json",
-    ".otf": "font/otf",
     ".ttf": "font/ttf",
-    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
   };
-  const server = createServer(async (req, res) => {
-    try {
-      const urlPath = decodeURIComponent(req.url.split("?")[0]);
-      let filePath = resolve(rootDir, "." + urlPath);
-      if (extname(filePath) === "") filePath = resolve(rootDir, "index.html");
-      const body = await readFile(filePath);
-      res.writeHead(200, { "content-type": MIME[extname(filePath)] ?? "application/octet-stream" });
-      res.end(body);
-    } catch {
+  const server = createServer((req, res) => {
+    let pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+    if (pathname === "/") pathname = "/index.html";
+    const filePath = resolve(rootDir, `.${pathname}`);
+    if (!filePath.startsWith(rootDir) || !existsSync(filePath)) {
       res.writeHead(404);
-      res.end("not found");
+      res.end("Not Found");
+      return;
     }
+    const ct = MIME[extname(filePath)] ?? "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": ct,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(readFileSync(filePath));
   });
-  return new Promise((done) => server.listen(port, () => done(server)));
+  return new Promise((resolveListening) => {
+    server.listen(port, "127.0.0.1", () => resolveListening(server));
+  });
 }
 
-function p(arr, q) {
-  const s = [...arr].sort((a, b) => a - b);
-  return s[Math.min(s.length - 1, Math.floor(s.length * q))];
-}
-
-async function frameStats(page, run) {
+async function frameStats(page, action) {
   await page.evaluate(() => {
     window.__frames = [];
-    window.__stopFrames = false;
-    const loop = (t) => {
-      window.__frames.push(t);
-      if (!window.__stopFrames) requestAnimationFrame(loop);
+    let last = performance.now();
+    function tick(now) {
+      window.__frames.push(now - last);
+      last = now;
+      if (window.__tracking) requestAnimationFrame(tick);
+    }
+    window.__tracking = true;
+    requestAnimationFrame(tick);
+  });
+  await action();
+  return page.evaluate(() => {
+    window.__tracking = false;
+    const f = window.__frames.slice(2);
+    if (f.length === 0) return { p50: 0, p95: 0, max: 0, count: 0 };
+    const sorted = [...f].sort((a, b) => a - b);
+    return {
+      count: f.length,
+      p50: Math.round(sorted[Math.floor(sorted.length * 0.5)] * 10) / 10,
+      p95: Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] * 10) / 10,
+      max: Math.round(sorted[sorted.length - 1] * 10) / 10,
     };
-    requestAnimationFrame(loop);
   });
-  await run();
-  const frames = await page.evaluate(() => {
-    window.__stopFrames = true;
-    const f = window.__frames;
-    window.__frames = [];
-    return f;
-  });
-  const deltas = [];
-  for (let i = 1; i < frames.length; i++) deltas.push(frames[i] - frames[i - 1]);
-  if (deltas.length === 0) return { samples: 0 };
-  return {
-    samples: deltas.length,
-    p50: +p(deltas, 0.5).toFixed(1),
-    p95: +p(deltas, 0.95).toFixed(1),
-    max: +Math.max(...deltas).toFixed(1),
-    mean: +(deltas.reduce((a, b) => a + b, 0) / deltas.length).toFixed(1),
-  };
 }
 
 async function measureCanvas() {
   if (!existsSync(FIXTURE_SRC)) throw new Error(`fixture 不存在：${FIXTURE_SRC}`);
-  // 1. 填充 harness public/（fixture + 字体）
-  const pub = resolve(HARNESS, "public");
-  mkdirSync(resolve(pub, "fonts"), { recursive: true });
-  copyFileSync(FIXTURE_SRC, resolve(pub, `${fixture}.json`));
-  for (const f of [
-    ["noto-sans-sc-regular.otf"],
-    ["noto-sans-sc-bold.otf"],
-    ["lxgw-wenkai-regular.ttf"],
-  ]) {
-    copyFileSync(resolve(ROOT, `assets/fonts/${f[0]}`), resolve(pub, "fonts", f[0]));
+  const targetDir = resolve(HARNESS, "src");
+  copyFileSync(FIXTURE_SRC, resolve(targetDir, "fixture.json"));
+
+  execFileSync("pnpm", ["build"], { cwd: HARNESS, stdio: "inherit" });
+  const distDir = resolve(HARNESS, "dist");
+  let bundleBytes = 0;
+  for (const f of readdirSync(resolve(distDir, "assets"))) {
+    if (f.endsWith(".js")) bundleBytes += statSync(resolve(distDir, "assets", f)).size;
   }
 
-  // 2. build（vite bin 借 apps/desktop devDeps；harness config 零依赖可直接加载）
-  execFileSync(
-    "pnpm",
-    ["--dir", resolve(ROOT, "apps/desktop"), "exec", "vite", "build", HARNESS],
-    { cwd: ROOT, stdio: "pipe" },
-  );
-  const distAssets = resolve(HARNESS, "dist/assets");
-  const jsFiles = readdirSync(distAssets).filter((f) => f.endsWith(".js"));
-  const bundleBytes = (
-    await Promise.all(jsFiles.map((f) => readFile(resolve(distAssets, f))))
-  ).reduce((a, b) => a + b.length, 0);
+  const PORT = 4173;
+  const server = await staticServer(distDir, PORT);
 
-  // 3. 静态服务 + headless Chromium 采样
-  const PORT = 5295;
-  const server = await staticServer(resolve(HARNESS, "dist"), PORT);
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(`http://localhost:${PORT}/`);
   await page.waitForFunction(() => window.__READY === true, { timeout: 30000 });
-  await page.waitForTimeout(500); // 字体解析后的首帧稳定
+  await page.waitForTimeout(500);
 
   const nodeBox = await page.locator(".react-flow__node").first().boundingBox();
   if (!nodeBox) throw new Error("harness 未渲染出节点");

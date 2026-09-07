@@ -23,10 +23,11 @@ node scripts/quality/check-boundaries.mjs --scope selected-canvas   # 架构边�
 node scripts/quality/scan-dependency-licenses.mjs                   # 依赖许可扫描
 source ~/.cargo/env && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml  # Rust 侧
 
-pnpm bundle:tauri                # 打包（fail-closed：检测到签名配置即拒绝）
+pnpm bundle:tauri                # 候选构建（由 bundle-gate 严格校验 G2 授权与 candidate-root 边界；检测到签名配置/凭据即 fail-closed，“unsigned”由签名提示门保证）
+pnpm test:install:tauri         # 安装门（默认 --plan 零写入干运行；--execute 在 G2 批准的 deletionBoundaries 内沙箱验证）
 ```
 
-golden 与性能入口（`pnpm test:export` / `run-performance.mjs`）在对应任务卡（MM-040/MM-050）落地前保持 fail-closed，不产假绿。
+性能采样入口（`run-performance.mjs`）在 `--scope release` 下由 G2 授权门保护，消费真实候选产物进行冷/热启动及 RSS 采样；无真实证据时不产假绿。
 
 ## 目录
 

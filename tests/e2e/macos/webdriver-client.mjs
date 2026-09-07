@@ -41,7 +41,11 @@ export class WebDriverClient {
     const json = text ? (JSON.parse(text) ?? {}) : {};
     if (!res.ok) {
       const msg = json.value?.message ?? text ?? res.statusText;
-      throw new WebDriverError(`WebDriver ${method} ${path} -> ${res.status}: ${msg}`, res.status, json);
+      throw new WebDriverError(
+        `WebDriver ${method} ${path} -> ${res.status}: ${msg}`,
+        res.status,
+        json,
+      );
     }
     return json.value ?? {};
   }
@@ -63,7 +67,7 @@ export class WebDriverClient {
   }
 
   #elementRef(el) {
-    return typeof el === "string" ? el : el?.[ELEMENT_KEY] ?? el?.ELEMENT;
+    return typeof el === "string" ? el : (el?.[ELEMENT_KEY] ?? el?.ELEMENT);
   }
 
   async findElement(using, value, root) {
@@ -84,7 +88,10 @@ export class WebDriverClient {
   }
 
   async elementText(el) {
-    const v = await this.#req("GET", `/session/${this.sessionId}/element/${this.#elementRef(el)}/text`);
+    const v = await this.#req(
+      "GET",
+      `/session/${this.sessionId}/element/${this.#elementRef(el)}/text`,
+    );
     return v;
   }
 
@@ -94,7 +101,9 @@ export class WebDriverClient {
 
   /** W3C key actions：[[mods...], "text"] 顺序派发（mods: "Meta"/"Shift"/…）。 */
   async sendKeys(el, text) {
-    await this.#req("POST", `/session/${this.sessionId}/element/${this.#elementRef(el)}/value`, { text });
+    await this.#req("POST", `/session/${this.sessionId}/element/${this.#elementRef(el)}/value`, {
+      text,
+    });
   }
 
   async execute(script, args = []) {
@@ -180,8 +189,11 @@ export class WebDriverClient {
           },
         ];
         // actions API 无 selector 定位：先聚焦元素再派发（fallback 更直接）
-        await this.execute(`document.querySelector(arguments[0])?.dispatchEvent(
-          new MouseEvent('click', {bubbles:true}))`, [selector]);
+        await this.execute(
+          `document.querySelector(arguments[0])?.dispatchEvent(
+          new MouseEvent('click', {bubbles:true}))`,
+          [selector],
+        );
         await this.#req("POST", `/session/${this.sessionId}/actions`, { actions });
       },
       async () => {

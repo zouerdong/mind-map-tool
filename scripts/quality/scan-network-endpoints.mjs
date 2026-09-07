@@ -72,6 +72,55 @@ for (const dir of SCAN_DIRS) {
   }
 }
 
+// PRC-040: 生产 CSP 与最小权限 Capability 审计
+const tauriConfPath = resolve(ROOT, "apps/desktop/src-tauri/tauri.conf.json");
+if (existsSync(tauriConfPath)) {
+  try {
+    const tauriConf = JSON.parse(readFileSync(tauriConfPath, "utf8"));
+    const csp = tauriConf?.app?.security?.csp;
+    if (!csp || typeof csp !== "string" || csp.trim() === "") {
+      violations.push("tauri.conf.json: app.security.csp 为空或为 null（生产发布必须配置最小 CSP）");
+    } else {
+      if (csp.includes("default-src *") || csp.includes("script-src *")) {
+        violations.push("tauri.conf.json: CSP 包含未受限通配符 (*)");
+      }
+      if (csp.includes("unsafe-eval")) {
+        violations.push("tauri.conf.json: CSP 禁止包含 unsafe-eval");
+      }
+      if (/https?:\/\/(?!localhost|127\.0\.0\.1)/.test(csp)) {
+        violations.push("tauri.conf.json: CSP 包含远程 http/https endpoint");
+      }
+    }
+  } catch (e) {
+    violations.push(`tauri.conf.json 解析失败：${e.message}`);
+  }
+}
+
+// 审计 capabilities/*.json
+const capDir = resolve(ROOT, "apps/desktop/src-tauri/capabilities");
+const APPROVED_PERMISSIONS = new Set([
+  "core:default",
+  "core:event:allow-listen",
+  "core:event:allow-unlisten",
+]);
+if (existsSync(capDir)) {
+  for (const name of readdirSync(capDir)) {
+    if (!name.endsWith(".json")) continue;
+    const capPath = resolve(capDir, name);
+    try {
+      const cap = JSON.parse(readFileSync(capPath, "utf8"));
+      const permissions = cap.permissions ?? [];
+      for (const p of permissions) {
+        if (!APPROVED_PERMISSIONS.has(p)) {
+          violations.push(`capabilities/${name}: 未批准的权限条目 '${p}'`);
+        }
+      }
+    } catch (e) {
+      violations.push(`capabilities/${name} 解析失败：${e.message}`);
+    }
+  }
+}
+
 if (violations.length) {
   console.error(`scan-network-endpoints: FAIL (${scanned} files scanned)`);
   for (const v of violations) console.error(`  - ${v}`);
