@@ -1,9 +1,17 @@
-// Tauri host 层（MM-020 骨架 → MM-060 文件/生命周期装配）。
+// Tauri host 层（MM-020 骨架 → MM-060 文件/生命周期装配 → MRT-004 Wave 2
+// 唯一生产 runtime）。
 // 模块：
 // - file/      commit protocol、TargetAuthorization ledger、DocumentTargetHandle、偏好
-// - lifecycle/ LaunchIntent 队列（cold argv / open-file / second-instance / activation）
+// - lifecycle/ WindowRegistry / LaunchCoordinator / LifecycleRuntime（唯一 owner）
+//              + MRT-003 原生关闭状态机；launch.rs 为 MM-060 历史队列（非生产）
 // - ipc/       命令薄壳（serde 契约与 packages/platform/src/ipc/types.ts 对齐）
+// - shortcuts/ 全局热键（多窗 label 路由，Wave 2 D4）
 // 禁止：服务器监听、远程 API、遥测。
+//
+// Wave 2（§4.1 host 单 owner）：生产只 manage 一套 launch 状态——
+// `Arc<LifecycleRuntime>`（内含 Arc<LaunchCoordinator>）。native source
+// （cold argv / RunEvent::Opened / single-instance / Reopen / 菜单）全部经
+// runtime ingest；不再运行旧 LaunchIntentStore 与全局 launch 广播。
 
 pub mod file;
 pub mod ipc;
@@ -16,35 +24,21 @@ use tauri::menu::{MenuBuilder, MenuItem, SubmenuBuilder};
 use tauri::{AppHandle, Manager, RunEvent};
 
 use file::{FileLifecycleService, SystemClock};
+use ipc::TauriHostEffectSink;
 use lifecycle::close::{CloseDecision, CloseDisposition, CloseRequestStore, ExitGate};
-use lifecycle::launch::LaunchIntentStore;
+use lifecycle::launch_coordinator::LaunchCoordinator;
+use lifecycle::runtime::LifecycleRuntime;
+use lifecycle::window_registry::WindowRegistry;
 use shortcuts::GlobalShortcutState;
 
-/// LaunchIntent 事件源 → 队列 → （warm 期）广播前端。
-fn ingest_open_file(app: &AppHandle, store: &LaunchIntentStore, path: &std::path::Path) {
-    if let Some(intent) = store.ingest_open_file(path) {
-        ipc::emit_launch_intent(app, &intent.to_payload());
-    }
-}
-
-fn ingest_activation(app: &AppHandle, store: &LaunchIntentStore) {
-    if let Some(intent) = store.ingest_activation() {
-        ipc::emit_launch_intent(app, &intent.to_payload());
-    }
-}
-
-/// argv 中提取候选文件路径（cold start 与 second-instance 共用）。
-fn ingest_argv(app: &AppHandle, store: &LaunchIntentStore, argv: &[String]) {
-    for arg in argv.iter().skip(1) {
-        let path = std::path::PathBuf::from(arg);
-        ingest_open_file(app, store, &path);
-    }
-}
-
 /// 构建应用菜单：macOS 标准 app 菜单（About/Services/Hide…）+ 自定义
-/// Quit（⌘Q）+ 基础编辑菜单（预定义项，保住 WKWebView 复制/粘贴/撤销）。
+/// Quit（⌘Q）+「文件」子菜单（新建窗口：activation 语义，同 Dock/图标）+
+/// 基础编辑菜单（预定义项，保住 WKWebView 复制/粘贴/撤销）。
+/// 注意：菜单项不设 accelerator——画布内 ⌘N/⌘O 等由 renderer 键位表
+/// （shortcut-table.md）派发，避免系统级抢占改变既有键位语义。
 fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "app-quit", "退出 Mind Map", true, Some("CmdOrCtrl+Q"))?;
+    let new_window = MenuItem::with_id(app, "app-new-window", "新建窗口", true, None::<&str>)?;
     let app_menu = SubmenuBuilder::new(app, "Mind Map")
         .about(None)
         .separator()
@@ -56,6 +50,7 @@ fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         .separator()
         .item(&quit)
         .build()?;
+    let file_menu = SubmenuBuilder::new(app, "文件").item(&new_window).build()?;
     let edit_menu = SubmenuBuilder::new(app, "编辑")
         .undo()
         .redo()
@@ -66,7 +61,7 @@ fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         .select_all()
         .build()?;
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &edit_menu])
+        .items(&[&app_menu, &file_menu, &edit_menu])
         .build()?;
     app.set_menu(menu)?;
     Ok(())
@@ -74,14 +69,24 @@ fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn run() {
     let service = Arc::new(FileLifecycleService::new());
-    let intents = Arc::new(LaunchIntentStore::new(Box::new(SystemClock)));
+    // 唯一生产 launch 状态：registry 先登记默认 main（Booting generation），
+    // 再交给 coordinator/runtime（§5C1）。
+    let mut registry = WindowRegistry::new();
+    registry
+        .register("main")
+        .expect("冷启动 main 尚未登记（重复注册不可能）");
+    let coordinator = Arc::new(LaunchCoordinator::new(registry));
+    let runtime = Arc::new(LifecycleRuntime::new(
+        coordinator.clone(),
+        service.clone(),
+        Arc::from(file::identity::platform_provider()),
+        Box::new(SystemClock),
+    ));
     let close_store = Arc::new(CloseRequestStore::new());
 
-    // cold start argv：前端未就绪，只入队（app_ready 快照投递）。
+    // cold argv：进程参数即事实（在任何 drain 之前收集；setup 统一入队，
+    // 第一个文件占用 main 由路由顺序保证——无 sleep/时序猜测）。
     let cold: Vec<String> = std::env::args().collect();
-    for arg in cold.iter().skip(1) {
-        intents.ingest_open_file(&std::path::PathBuf::from(arg));
-    }
 
     let service_for_windows = service.clone();
 
@@ -89,18 +94,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init({
-            let intents = intents.clone();
+            let runtime = runtime.clone();
             move |app, argv, _cwd| {
-                // warm 期第二实例 argv（Finder 双击文件 / 命令行再次启动）。
-                ingest_argv(app, &intents, &argv);
+                // warm 期第二实例 argv（Finder 双击文件 / 命令行再次启动）：
+                // 有文件逐条 open，无文件恰好一个 activation（N3）。
+                let sink = TauriHostEffectSink::new(app.clone());
+                runtime.ingest_second_instance(&sink, &argv);
             }
         }))
         .manage(service)
-        .manage(intents.clone())
+        .manage(runtime.clone())
         .manage(close_store.clone())
         .manage(GlobalShortcutState::new())
         .setup({
-            let intents = intents.clone();
+            let runtime = runtime.clone();
             move |app| {
                 // 全局热键装配（注册失败仅日志，可经设置换绑；MM-088）。
                 if let Ok(config_dir) = app.path().app_config_dir() {
@@ -112,24 +119,43 @@ pub fn run() {
                 // Quit 项：菜单事件逐窗 window.close()，走与红关闭按钮
                 // 完全相同的 fail-closed 关闭协议。
                 install_app_menu(app.handle())?;
-                let _ = &intents;
+                // cold argv 统一入队 + 首次 drain（静态 main WebView 已由
+                // builder 创建；emit 未达 listener 由 ready 快照承接）。
+                let sink = TauriHostEffectSink::new(app.handle().clone());
+                runtime.ingest_argv(&sink, &cold);
+                eprintln!(
+                    "[lifecycle] setup 完成：cold argv={} 个参数",
+                    cold.len() - 1
+                );
                 Ok(())
             }
         })
         .on_menu_event(|app, event| {
-            if event.id().as_ref() == "app-quit" {
-                for (_, window) in app.webview_windows() {
-                    let _ = window.close(); // → CloseRequested → 三分支协议
+            match event.id().as_ref() {
+                "app-quit" => {
+                    for (_, window) in app.webview_windows() {
+                        let _ = window.close(); // → CloseRequested → 三分支协议
+                    }
                 }
+                // 菜单「新建窗口」：activation（同 Dock/图标语义；D1）。
+                "app-new-window" => {
+                    let sink = TauriHostEffectSink::new(app.clone());
+                    if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
+                        runtime.ingest_activation(&sink);
+                    }
+                }
+                _ => {}
             }
         })
         .on_window_event({
             let close_store = close_store.clone();
             move |window, event| {
                 match event {
-                    // 原生关闭（MRT-003）：host fail closed。
+                    // 原生关闭（MRT-003 + Wave 2 §4.4）：host fail closed。
                     // - 有一次性 permit：消费放行；discarded 在真正放行前撤销
                     //   该窗口全部文件 capability（不写盘，Destroyed 幂等兜底）；
+                    //   **放行时刻**才进入 Closing（Hold/Cancel 不标记——用户
+                    //   仍可取消，closing identity 持有到 Destroyed）；
                     // - 无 permit：prevent_close，建立/复用 pending 并定向 emit
                     //   （复用时事件不重发，前端按 requestId 去重）。
                     tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -137,6 +163,11 @@ pub fn run() {
                             CloseDecision::Permit { disposition } => {
                                 if disposition == CloseDisposition::Discarded {
                                     service_for_windows.revoke_window(window.label());
+                                }
+                                if let Some(runtime) =
+                                    window.app_handle().try_state::<Arc<LifecycleRuntime>>()
+                                {
+                                    runtime.on_close_permitted(window.label());
                                 }
                                 // 不 prevent_close：放行本次原生关闭
                             }
@@ -155,21 +186,30 @@ pub fn run() {
                             }
                         }
                     }
-                    // 窗口销毁：撤销其全部授权与句柄（步骤⑤：跨窗口/撤销后 handle 拒绝）
-                    // + 关闭状态幂等清理（MRT-003 R5）。
+                    // 窗口销毁（§4.4 组合清理）：文件 capability + close state +
+                    // registry/pending rebind/bootstrap 交付 + 未终态 intent 恢复
+                    // + recovery 记录 + 热键目标，随后一次非轮询 drain。
                     tauri::WindowEvent::Destroyed => {
-                        service_for_windows.revoke_window(window.label());
-                        close_store.on_destroyed(window.label());
+                        let label = window.label().to_string();
+                        let app = window.app_handle();
+                        service_for_windows.revoke_window(&label);
+                        close_store.on_destroyed(&label);
+                        if let Some(state) = app.try_state::<GlobalShortcutState>() {
+                            state.on_window_destroyed(&label);
+                        }
+                        if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
+                            let sink = TauriHostEffectSink::new(app.clone());
+                            runtime.on_window_destroyed(&sink, &label);
+                        }
                     }
-                    // MM-090-D6：is_focused() 在 macOS 不可靠——事件跟踪供热键分流。
-                    tauri::WindowEvent::Focused(focused) => {
+                    // D4：跟踪最近一次真实 Focused 的窗口 label（多窗热键
+                    // 分流目标；失焦不清除）。
+                    tauri::WindowEvent::Focused(focused) if *focused => {
                         if let Some(state) = window
                             .app_handle()
                             .try_state::<crate::shortcuts::GlobalShortcutState>()
                         {
-                            state
-                                .focused
-                                .store(*focused, std::sync::atomic::Ordering::SeqCst);
+                            state.on_focused(window.label(), *focused);
                         }
                     }
                     _ => {}
@@ -177,17 +217,27 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            ipc::platform_app_ready,
-            ipc::platform_ack_launch_intent,
-            ipc::platform_open_document,
-            ipc::platform_open_path,
+            // 按窗 bootstrap（Wave 2 §5C3）
+            ipc::platform_window_ready,
+            ipc::platform_complete_window_bootstrap,
+            ipc::platform_open_assigned_document,
+            ipc::platform_retry_launch_intent,
+            ipc::platform_dismiss_launch_intent,
+            ipc::platform_launch_errors,
+            ipc::platform_request_open_intent,
+            ipc::platform_request_blank_window,
+            // 文件能力（commit 经 runtime；export authorization 不变）
             ipc::platform_request_target_authorization,
             ipc::platform_commit_document,
             ipc::platform_commit_export,
+            ipc::platform_pending_recovery,
+            ipc::platform_resolve_pending_recovery,
             ipc::platform_load_preferences,
             ipc::platform_store_preferences,
+            // 热键 / 原生关闭
             ipc::platform_get_global_shortcut,
             ipc::platform_set_global_shortcut,
+            ipc::platform_resolve_shortcut_invocation,
             ipc::platform_pending_close_request,
             ipc::platform_resolve_close_request,
         ])
@@ -196,20 +246,30 @@ pub fn run() {
         .run({
             let close_store = close_store.clone();
             move |app, event| match event {
-                // macOS：文件打开事件（Finder 双击 / 拖拽到图标）。
+                // macOS：文件打开事件（Finder 双击 / 拖拽到图标 / 打开方式）。
+                // 诊断日志（C1 startup barrier 事实来源）+ 唯一 ingest。
                 RunEvent::Opened { urls } => {
+                    let sink = TauriHostEffectSink::new(app.clone());
+                    eprintln!("[lifecycle] RunEvent::Opened: {} 个 URL", urls.len());
                     for url in &urls {
-                        if let Ok(path) = url.to_file_path() {
-                            ingest_open_file(app, &intents, &path);
+                        match url.to_file_path() {
+                            Ok(path) => runtime.ingest_open_path(&sink, &path),
+                            Err(()) => {
+                                eprintln!("[lifecycle] Opened 忽略非 file URL：{url}")
+                            }
                         }
                     }
                 }
-                // macOS：Dock 点击 / Reopen（无可见窗口时视为 activation）。
+                // macOS：Dock 点击 / Reopen。warm 每次恰好一个新空白
+                // activation；cold main 未确认时忽略（startup barrier 承担，
+                // 不多出空窗；N4）。
                 RunEvent::Reopen {
-                    has_visible_windows: false,
+                    has_visible_windows,
                     ..
                 } => {
-                    ingest_activation(app, &intents);
+                    let sink = TauriHostEffectSink::new(app.clone());
+                    eprintln!("[lifecycle] RunEvent::Reopen(has_visible={has_visible_windows})");
+                    runtime.ingest_reopen(&sink, has_visible_windows);
                 }
                 // 应用退出（MRT-003 X2）：不绕过逐窗关闭协议。
                 // 任一受管窗口未取得关闭许可 → 阻止退出并为未决窗口建立/复用

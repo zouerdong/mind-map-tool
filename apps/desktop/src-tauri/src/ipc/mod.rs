@@ -1,6 +1,15 @@
-//! IPC 命令薄壳（MM-060 步骤①）：serde 契约与 TS 侧
+//! IPC 命令薄壳（MM-060 → MRT-004 Wave 2）：serde 契约与 TS 侧
 //! packages/platform/src/ipc/types.ts 一一对应（camelCase / kebab-case tag）。
 //! 对话框等 tauri 依赖只出现在本层；语义全部在 file/lifecycle 服务层。
+//!
+//! Wave 2 变更（任务卡 §5C3）：
+//! - 新增按窗 bootstrap 命令（caller label 由 WebviewWindow 注入，不接受
+//!   前端自报）与 retry/dismiss/blank-window 命令；
+//! - `platform_commit_document` 改走 `LifecycleRuntime::commit_document`
+//!   （B1A host outcome + registry + post-commit recovery）；
+//! - 退役：`platform_app_ready`、`platform_ack_launch_intent`、
+//!   `platform_open_document`、`platform_open_path` 与全局
+//!   `platform://launch-intent` 广播（旧 renderer 直连 open/ack 路径）。
 
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
@@ -8,11 +17,15 @@ use tauri::{AppHandle, Emitter, EventTarget, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::file::preferences::{PreferencesMap, PreferencesStore};
-use crate::file::{FileLifecycleService, TargetKind};
+use crate::file::{FileLifecycleService, Receipt, TargetKind};
 use crate::lifecycle::close::{CloseDisposition, CloseRequestStore, ResolveOutcome};
-use crate::lifecycle::launch::{LaunchIntentPayload, LaunchIntentStore};
+use crate::lifecycle::runtime::{
+    BootstrapEvent, EmitStatus, HostEffectSink, LaunchErrorEvent, LifecycleRuntime,
+};
+use std::sync::Arc;
 
-pub const LAUNCH_INTENT_EVENT: &str = "platform://launch-intent";
+pub const WINDOW_BOOTSTRAP_EVENT: &str = "platform://window-bootstrap";
+pub const LAUNCH_RETRYABLE_ERROR_EVENT: &str = "platform://launch-retryable-error";
 pub const CLOSE_REQUEST_EVENT: &str = "platform://close-requested";
 
 // ---- DTO（camelCase，与 TS 对齐） ----
@@ -33,12 +46,36 @@ pub struct GrantedAuthorizationDto {
     pub display_path: String,
 }
 
-#[derive(Serialize)]
+/// commit 契约（Wave 2 §4.3）：bytes 已落盘时 receipt 真实有效；
+/// `rebind_state` 区分 registry 换绑/刷新是否完成——`recovery-pending`
+/// 不得显示为普通保存失败。
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitReceiptDto {
     pub document_target_handle: String,
     pub version_token: String,
     pub display_path: String,
+    /// "finalized" | "recovery-pending"
+    pub rebind_state: &'static str,
+}
+
+impl CommitReceiptDto {
+    pub fn finalized(receipt: Receipt) -> Self {
+        Self::from_receipt(receipt, "finalized")
+    }
+
+    pub fn recovery_pending(receipt: Receipt, _cause: String) -> Self {
+        Self::from_receipt(receipt, "recovery-pending")
+    }
+
+    fn from_receipt(receipt: Receipt, rebind_state: &'static str) -> Self {
+        Self {
+            document_target_handle: receipt.document_target_handle,
+            version_token: receipt.version_token,
+            display_path: receipt.display_path,
+            rebind_state,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -66,6 +103,19 @@ pub enum CommitDocumentPayload {
     },
 }
 
+/// renderer 对一次 bootstrap 交付的终态回报（与 TS BootstrapActionOutcome
+/// 一一对应；focused-existing/dismissed 属 host）。
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum RendererOutcomeDto {
+    #[serde(rename_all = "camelCase")]
+    Opened,
+    #[serde(rename_all = "camelCase")]
+    BlankCreated,
+    #[serde(rename_all = "camelCase")]
+    RetryableError { reason: String },
+}
+
 /// close-requested 事件 payload（camelCase，与 TS CloseRequestPayload 对齐）。
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -73,60 +123,144 @@ pub struct CloseRequestDto {
     pub request_id: String,
 }
 
-// ---- 命令 ----
+// ---- 生产 effect sink（副作用在 coordinator lock 外执行） ----
 
-#[tauri::command]
-pub fn platform_app_ready(
-    intents: State<'_, std::sync::Arc<LaunchIntentStore>>,
-) -> Result<Vec<LaunchIntentPayload>, crate::file::error::IpcError> {
-    Ok(intents.snapshot_unacked())
-}
-
-#[tauri::command]
-pub fn platform_ack_launch_intent(
-    intents: State<'_, std::sync::Arc<LaunchIntentStore>>,
-    intent_id: String,
-) -> Result<(), crate::file::error::IpcError> {
-    intents.ack(&intent_id);
-    Ok(())
-}
-
-/// 打开文档：原生 open 对话框（无扩展名过滤——扩展名是 G2 前用户确认门槛）
-/// → 读文件 → 签发 handle + VersionToken。取消返回 null。
-/// async command：blocking 对话框必须在非主线程调用（同步命令在主线程
-/// 跑，rfd blocking API 会与面板 run loop 互相等待死锁——真实 app 的
-/// 对话框自 MM-060 起从未打开过，2026-08-30 MRT-003 实测确认）。
-#[tauri::command]
-pub async fn platform_open_document(
+/// `HostEffectSink` 的 Tauri 实现：真实窗口创建/聚焦/定向事件。
+pub struct TauriHostEffectSink {
     app: AppHandle,
-    window: WebviewWindow,
-    service: State<'_, std::sync::Arc<FileLifecycleService>>,
-) -> Result<Option<OpenedDocumentDto>, crate::file::error::IpcError> {
-    let Some(picked) = app.dialog().file().blocking_pick_file() else {
-        return Ok(None); // 用户取消不是错误
-    };
-    let path = picked.into_path().map_err(|e| {
-        crate::file::error::IpcError::new("FILE_IO_ERROR", format!("所选路径不可用：{e}"))
-    })?;
-    Ok(Some(open_path_and_issue(&window, &service, &path)?))
 }
 
-/// 按路径打开（launch intent / argv 文件加载，无对话框；MM-080 消费）。
+impl TauriHostEffectSink {
+    pub fn new(app: AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl HostEffectSink for TauriHostEffectSink {
+    /// 创建唯一 `editor-*` WebView：复用既有 app URL（devUrl/frontendDist
+    /// 由 WebviewUrl::default 解析）与 main 的默认窗口几何。
+    fn create_editor_window(&self, label: &str) -> Result<(), String> {
+        tauri::WebviewWindowBuilder::new(&self.app, label, tauri::WebviewUrl::default())
+            .title("Mind Map")
+            .inner_size(1280.0, 800.0)
+            .min_inner_size(640.0, 480.0)
+            .build()
+            .map(|_| ())
+            .map_err(|e| format!("创建窗口 {label} 失败：{e}"))
+    }
+
+    fn focus_window(&self, label: &str) -> Result<(), String> {
+        let window = self
+            .app
+            .get_webview_window(label)
+            .ok_or_else(|| format!("窗口 {label} 不存在"))?;
+        window
+            .show()
+            .map_err(|e| format!("show({label}) 失败：{e}"))?;
+        window
+            .unminimize()
+            .map_err(|e| format!("unminimize({label}) 失败：{e}"))?;
+        window
+            .set_focus()
+            .map_err(|e| format!("set_focus({label}) 失败：{e}"))
+    }
+
+    fn emit_bootstrap(&self, label: &str, payload: &BootstrapEvent) -> EmitStatus {
+        let Some(window) = self.app.get_webview_window(label) else {
+            // 冷启动静态 main 的 WebView 可能尚未创建完成：交付已持久化,
+            // 由 renderer ready 快照承接(PR4),不算失败。
+            return EmitStatus::WindowNotReady;
+        };
+        match window.emit(WINDOW_BOOTSTRAP_EVENT, payload) {
+            Ok(()) => EmitStatus::Emitted,
+            Err(e) => EmitStatus::Failed(format!("emit bootstrap 到 {label} 失败：{e}")),
+        }
+    }
+
+    fn emit_launch_error(&self, label: &str, payload: &LaunchErrorEvent) {
+        let target = EventTarget::WebviewWindow {
+            label: label.to_string(),
+        };
+        if let Err(e) = self
+            .app
+            .emit_to(target, LAUNCH_RETRYABLE_ERROR_EVENT, payload)
+        {
+            eprintln!("[lifecycle] emit launch-retryable-error 到 {label} 失败：{e}");
+        }
+    }
+
+    /// 错误呈现窗口：最近聚焦窗口优先（shortcuts 维护），其次 main，
+    /// 其次任一存在窗口；找不到才放弃（不全局广播）。
+    fn error_presentation_window(&self) -> Option<String> {
+        if let Some(state) = self
+            .app
+            .try_state::<crate::shortcuts::GlobalShortcutState>()
+        {
+            if let Some(recent) = state.recent_focused_label() {
+                if self.app.get_webview_window(&recent).is_some() {
+                    return Some(recent);
+                }
+            }
+        }
+        if self.app.get_webview_window("main").is_some() {
+            return Some("main".to_string());
+        }
+        self.app
+            .webview_windows()
+            .keys()
+            .next()
+            .map(|k| k.to_string())
+    }
+}
+
+fn sink_of(app: &AppHandle) -> TauriHostEffectSink {
+    TauriHostEffectSink::new(app.clone())
+}
+
+// ---- 按窗 bootstrap 命令（§5C3） ----
+
+/// renderer 就绪：返回该窗口未完成 bootstrap 快照（listener-first 协议的
+/// snapshot 腿；事件腿为定向 `platform://window-bootstrap`）。caller label
+/// 由 WebviewWindow 注入。
 #[tauri::command]
-pub fn platform_open_path(
+pub fn platform_window_ready(
     window: WebviewWindow,
-    service: State<'_, std::sync::Arc<FileLifecycleService>>,
-    path: String,
-) -> Result<OpenedDocumentDto, crate::file::error::IpcError> {
-    open_path_and_issue(&window, &service, std::path::Path::new(&path))
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<Vec<BootstrapEvent>, crate::file::error::IpcError> {
+    Ok(runtime.window_ready(window.label()))
 }
 
-fn open_path_and_issue(
-    window: &WebviewWindow,
-    service: &State<'_, std::sync::Arc<FileLifecycleService>>,
-    path: &std::path::Path,
+/// renderer 终态回报：校验 label + deliveryId + 窗口状态 + 当前代；
+/// opened/blank-created 才 ack；retryable-error 保留错误等待用户。
+#[tauri::command]
+pub fn platform_complete_window_bootstrap(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    delivery_id: String,
+    outcome: RendererOutcomeDto,
+) -> Result<(), crate::file::error::IpcError> {
+    let outcome = match outcome {
+        RendererOutcomeDto::Opened => crate::lifecycle::launch_coordinator::RendererOutcome::Opened,
+        RendererOutcomeDto::BlankCreated => {
+            crate::lifecycle::launch_coordinator::RendererOutcome::BlankCreated
+        }
+        RendererOutcomeDto::RetryableError { reason } => {
+            crate::lifecycle::launch_coordinator::RendererOutcome::RetryableError { reason }
+        }
+    };
+    let sink = sink_of(window.app_handle());
+    runtime.complete_bootstrap(&sink, window.label(), &delivery_id, outcome)
+}
+
+/// 读取该交付绑定的文档（bootstrap open action 的数据源）：host 从
+/// delivery 绑定目标读取，不接受 renderer path（§4.2）。
+#[tauri::command]
+pub fn platform_open_assigned_document(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    delivery_id: String,
 ) -> Result<OpenedDocumentDto, crate::file::error::IpcError> {
-    let outcome = service.open_file(window.label(), path)?;
+    let outcome = runtime.open_assigned_document(window.label(), &delivery_id)?;
     Ok(OpenedDocumentDto {
         content_json: outcome.content_json,
         document_target_handle: outcome.document_target_handle,
@@ -134,6 +268,74 @@ fn open_path_and_issue(
         display_path: outcome.display_path,
     })
 }
+
+// ---- retry / dismiss / 错误快照（§5D2；W2R-F1 caller-bound） ----
+
+/// W2R-F1：retry/dismiss/快照全部注入真实 caller `WebviewWindow`——host
+/// 校验呈现所有权（caller label + generation），跨窗口动作稳定拒绝。
+#[tauri::command]
+pub fn platform_retry_launch_intent(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    intent_id: String,
+) -> Result<(), crate::file::error::IpcError> {
+    let sink = sink_of(window.app_handle());
+    runtime.retry_intent(&sink, window.label(), &intent_id)
+}
+
+#[tauri::command]
+pub fn platform_dismiss_launch_intent(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    intent_id: String,
+) -> Result<(), crate::file::error::IpcError> {
+    let sink = sink_of(window.app_handle());
+    runtime.dismiss_intent(&sink, window.label(), &intent_id)
+}
+
+#[tauri::command]
+pub fn platform_launch_errors(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<Vec<crate::lifecycle::runtime::LaunchErrorSnapshot>, crate::file::error::IpcError> {
+    Ok(runtime.launch_errors_snapshot_for(window.label()))
+}
+
+// ---- 应用内 open/new 入口（§5C4：工具条请求 host 入队） ----
+
+/// 工具条"打开…"：原生 open 对话框（无扩展名过滤——扩展名是 G2 前用户
+/// 确认门槛）→ host 解析 identity 入队；不直接替换调用窗口 session。
+/// async command：blocking 对话框必须在非主线程调用（同步命令在主线程
+/// 跑，rfd blocking API 会与面板 run loop 互相等待死锁——真实 app 的
+/// 对话框自 MM-060 起从未打开过，2026-08-30 MRT-003 实测确认）。
+#[tauri::command]
+pub async fn platform_request_open_intent(
+    app: AppHandle,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<(), crate::file::error::IpcError> {
+    let Some(picked) = app.dialog().file().blocking_pick_file() else {
+        return Ok(()); // 用户取消不是错误
+    };
+    let path = picked.into_path().map_err(|e| {
+        crate::file::error::IpcError::new("FILE_IO_ERROR", format!("所选路径不可用：{e}"))
+    })?;
+    let sink = sink_of(&app);
+    runtime.ingest_open_path(&sink, &path);
+    Ok(())
+}
+
+/// 应用内"新建窗口"：入队 activation（每 intent 各建一个新空白窗）。
+#[tauri::command]
+pub fn platform_request_blank_window(
+    app: AppHandle,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<(), crate::file::error::IpcError> {
+    let sink = sink_of(&app);
+    runtime.ingest_activation(&sink);
+    Ok(())
+}
+
+// ---- 文件命令（MM-060；commit 走 runtime，§4.3） ----
 
 /// 一次性选址授权：原生 save 对话框（建议名由调用方给出，含扩展名——
 /// 扩展名决定权在产品层，host 不做扩展名策略）。
@@ -173,33 +375,17 @@ pub async fn platform_request_target_authorization(
     }))
 }
 
+/// 生产提交唯一入口（Wave 2）：ordinary/Save As 均经
+/// `LifecycleRuntime::commit_document`（B1A host outcome + registry +
+/// post-commit recovery；PostCommit 失败返回真实 receipt +
+/// `recovery-pending`）。
 #[tauri::command]
 pub fn platform_commit_document(
     window: WebviewWindow,
-    service: State<'_, std::sync::Arc<FileLifecycleService>>,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
     payload: CommitDocumentPayload,
 ) -> Result<CommitReceiptDto, crate::file::error::IpcError> {
-    let receipt = match payload {
-        CommitDocumentPayload::Ordinary {
-            document_target_handle,
-            expected_version_token,
-            content_json,
-        } => service.commit_ordinary(
-            window.label(),
-            &document_target_handle,
-            &expected_version_token,
-            &content_json,
-        )?,
-        CommitDocumentPayload::SaveAs {
-            authorization_ref,
-            content_json,
-        } => service.commit_save_as(window.label(), &authorization_ref, &content_json)?,
-    };
-    Ok(CommitReceiptDto {
-        document_target_handle: receipt.document_target_handle,
-        version_token: receipt.version_token,
-        display_path: receipt.display_path,
-    })
+    runtime.commit_document(window.label(), payload)
 }
 
 #[tauri::command]
@@ -243,6 +429,27 @@ fn preferences_store(app: &AppHandle) -> Result<PreferencesStore, crate::file::e
         crate::file::error::IpcError::new("PREFERENCES_IO_ERROR", format!("无法定位配置目录：{e}"))
     })?;
     Ok(PreferencesStore::new(&dir))
+}
+
+// ---- post-commit recovery（§4.3） ----
+
+/// 该窗口 pending recovery 的可见投影（无 token/canonical/capability）。
+#[tauri::command]
+pub fn platform_pending_recovery(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<Option<crate::lifecycle::runtime::PendingRecoverySnapshot>, crate::file::error::IpcError>
+{
+    Ok(runtime.pending_recovery(window.label()))
+}
+
+/// 一次显式、有限的恢复；成功清 record，失败保持 fail closed 并返回错误。
+#[tauri::command]
+pub fn platform_resolve_pending_recovery(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+) -> Result<(), crate::file::error::IpcError> {
+    runtime.resolve_pending_recovery(window.label())
 }
 
 // ---- 原生关闭协议（MRT-003） ----
@@ -316,17 +523,27 @@ pub fn platform_set_global_shortcut(
     Ok(GlobalShortcutInfo { accelerator })
 }
 
+#[tauri::command]
+pub fn platform_resolve_shortcut_invocation(
+    app: AppHandle,
+    invocation_id: String,
+    window_id: String,
+    generation: u64,
+    had_document_focus: bool,
+) -> Result<(), crate::file::error::IpcError> {
+    crate::shortcuts::resolve_invocation(
+        &app,
+        &invocation_id,
+        &window_id,
+        generation,
+        had_document_focus,
+    )
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlobalShortcutInfo {
     pub accelerator: String,
-}
-
-/// warm 期新 intent 到达：入队并广播给前端（early intents 走 app_ready 快照）。
-pub fn emit_launch_intent(app: &AppHandle, payload: &LaunchIntentPayload) {
-    if let Err(e) = app.emit(LAUNCH_INTENT_EVENT, payload) {
-        eprintln!("[lifecycle] emit launch-intent 失败：{e}");
-    }
 }
 
 /// 定向 emit close-requested：只发给目标窗口，不得全局广播
@@ -340,5 +557,101 @@ pub fn emit_close_request(app: &AppHandle, window_label: &str, request_id: &str)
     };
     if let Err(e) = app.emit_to(target, CLOSE_REQUEST_EVENT, payload) {
         eprintln!("[lifecycle] emit close-requested 到 {window_label} 失败：{e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CommitDocumentPayload;
+
+    #[test]
+    fn commit_document_payload_accepts_typescript_camel_case_fields() {
+        let ordinary: CommitDocumentPayload = serde_json::from_value(serde_json::json!({
+            "kind": "ordinary",
+            "documentTargetHandle": "handle-1",
+            "expectedVersionToken": "version-1",
+            "contentJson": "{}"
+        }))
+        .expect("ordinary payload should deserialize from the TypeScript contract");
+        assert!(matches!(
+            ordinary,
+            CommitDocumentPayload::Ordinary {
+                document_target_handle,
+                expected_version_token,
+                content_json
+            } if document_target_handle == "handle-1"
+                && expected_version_token == "version-1"
+                && content_json == "{}"
+        ));
+
+        let save_as: CommitDocumentPayload = serde_json::from_value(serde_json::json!({
+            "kind": "save-as",
+            "authorizationRef": "authorization-1",
+            "contentJson": "{}"
+        }))
+        .expect("save-as payload should deserialize from the TypeScript contract");
+        assert!(matches!(
+            save_as,
+            CommitDocumentPayload::SaveAs {
+                authorization_ref,
+                content_json
+            } if authorization_ref == "authorization-1" && content_json == "{}"
+        ));
+    }
+
+    #[test]
+    fn renderer_outcome_dto_matches_typescript_discriminated_union() {
+        use super::RendererOutcomeDto;
+        let opened: RendererOutcomeDto = serde_json::from_value(serde_json::json!({
+            "kind": "opened"
+        }))
+        .expect("opened outcome should deserialize");
+        assert!(matches!(opened, RendererOutcomeDto::Opened));
+        let retryable: RendererOutcomeDto = serde_json::from_value(serde_json::json!({
+            "kind": "retryable-error",
+            "reason": "decode failed"
+        }))
+        .expect("retryable-error outcome should deserialize");
+        assert!(matches!(
+            retryable,
+            RendererOutcomeDto::RetryableError { reason } if reason == "decode failed"
+        ));
+        let blank: RendererOutcomeDto =
+            serde_json::from_value(serde_json::json!({ "kind": "blank-created" }))
+                .expect("blank-created outcome should deserialize");
+        assert!(matches!(blank, RendererOutcomeDto::BlankCreated));
+    }
+
+    #[test]
+    fn bootstrap_event_serializes_typescript_shape() {
+        use super::BootstrapEvent;
+        let open = BootstrapEvent::OpenPath {
+            delivery_id: "delivery-1".into(),
+            intent_id: "intent-1".into(),
+            canonical_path: Some("/tmp/a.mm".into()),
+        };
+        let json = serde_json::to_value(&open).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": "open-path",
+                "deliveryId": "delivery-1",
+                "intentId": "intent-1",
+                "canonicalPath": "/tmp/a.mm"
+            })
+        );
+        let blank = BootstrapEvent::Blank {
+            delivery_id: "delivery-2".into(),
+            intent_id: "intent-2".into(),
+        };
+        let json = serde_json::to_value(&blank).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": "blank",
+                "deliveryId": "delivery-2",
+                "intentId": "intent-2"
+            })
+        );
     }
 }

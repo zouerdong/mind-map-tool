@@ -15,6 +15,9 @@ import type {
 } from "@mindmap/platform";
 import { PlatformError } from "@mindmap/platform";
 import type { PreferencesPort, PreferencesSnapshot } from "@mindmap/platform";
+import type { LaunchRetryableError, PendingRecovery } from "@mindmap/platform";
+import type { FontResolver } from "@mindmap/export/src/layout.js";
+import type { LaunchPort, FontMetricsState } from "./ports.js";
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
@@ -159,6 +162,7 @@ export class FakeFilePort implements FilePort {
       documentTargetHandle: handle,
       versionToken: (await sha256Hex(bytes)) as CommitReceipt["versionToken"],
       displayPath: path,
+      rebindState: "finalized",
     };
   }
 }
@@ -207,22 +211,99 @@ export class FakeCloseLifecyclePort implements CloseLifecyclePort {
   }
 }
 
+/** Fake host launch 通道（MRT-004 Wave 2；浏览器 dev 无 host intent）。 */
+export class FakeLaunchPort implements LaunchPort {
+  readonly openRequests: string[][] = [];
+  readonly blankRequests: string[][] = [];
+  async requestOpenIntent() {
+    this.openRequests.push([]);
+  }
+  async requestBlankWindow() {
+    this.blankRequests.push([]);
+  }
+  async launchErrors(): Promise<LaunchRetryableError[]> {
+    return [];
+  }
+  async retryLaunchIntent(_intentId: string): Promise<void> {
+    // 浏览器 dev 无 host intent 队列；no-op
+  }
+  async dismissLaunchIntent(_intentId: string): Promise<void> {
+    // 同上
+  }
+  async pendingRecovery(): Promise<PendingRecovery | null> {
+    return null;
+  }
+  async resolvePendingRecovery(): Promise<void> {
+    // 同上
+  }
+}
+
 /** Fake 导出 renderer（接口对齐 @mindmap/export ExportRenderer 子集）。 */
 export class FakeExportRenderer {
+  private metricsState: FontMetricsState = "ready";
+  private deferredResolver: {
+    resolve: (fonts: FontResolver) => void;
+    reject: (error: unknown) => void;
+    promise: Promise<FontResolver>;
+  } | null = null;
   readonly rendered: Array<{ format: string; sceneNodes: number }> = [];
+
   constructor(
     private readonly results: {
       svg?: Uint8Array;
       png?: Uint8Array;
       pdf?: Uint8Array;
     } = {},
+    private readonly customFonts?: FontResolver,
   ) {}
-  /** 假字体度量（等宽近似）。 */
-  fonts() {
+
+  fontMetricsState(): FontMetricsState {
+    return this.metricsState;
+  }
+
+  warmup(): void {}
+
+  async whenReady(): Promise<void> {
+    await this.whenMetricsReady();
+  }
+
+  whenMetricsReady(): Promise<FontResolver> {
+    if (this.metricsState === "ready") return Promise.resolve(this.fonts());
+    if (this.metricsState === "failed") return Promise.reject(new Error("假字体资源加载失败"));
+    return this.deferredResolver?.promise ?? Promise.resolve(this.fonts());
+  }
+
+  /** 测试辅助：切换为 pending 模式，并提供 resolve/reject 控制句柄 */
+  deferFontMetrics(): { resolve(fonts?: FontResolver): void; reject(error?: unknown): void } {
+    this.metricsState = "pending";
+    let res!: (f: FontResolver) => void;
+    let rej!: (err: unknown) => void;
+    const promise = new Promise<FontResolver>((r, j) => {
+      res = r;
+      rej = j;
+    });
+    promise.catch(() => {});
+    this.deferredResolver = { resolve: res, reject: rej, promise };
     return {
-      regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
-      bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+      resolve: (fonts?: FontResolver) => {
+        this.metricsState = "ready";
+        res(fonts ?? this.fonts());
+      },
+      reject: (error?: unknown) => {
+        this.metricsState = "failed";
+        rej(error ?? new Error("假字体资源加载失败"));
+      },
     };
+  }
+
+  /** 假字体度量（等宽近似）。 */
+  fonts(): FontResolver {
+    return (
+      this.customFonts ?? {
+        regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+        bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+      }
+    );
   }
   async buildScene(doc: {
     document: { nodes: unknown[] };

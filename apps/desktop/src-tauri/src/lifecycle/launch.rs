@@ -58,13 +58,18 @@ impl LaunchIntent {
         LaunchIntentPayload {
             intent_id: self.intent_id.clone(),
             kind: self.kind.as_str(),
-            canonical_path: self.canonical_path.as_ref().map(|p| p.display().to_string()),
+            canonical_path: self
+                .canonical_path
+                .as_ref()
+                .map(|p| p.display().to_string()),
             received_at: self.received_at_ms,
         }
     }
 
     fn dedupe_key(&self) -> Option<String> {
-        self.canonical_path.as_ref().map(|p| format!("{}:{}", self.kind.as_str(), p.display()))
+        self.canonical_path
+            .as_ref()
+            .map(|p| format!("{}:{}", self.kind.as_str(), p.display()))
     }
 }
 
@@ -76,7 +81,11 @@ pub struct LaunchIntentStore {
 
 impl LaunchIntentStore {
     pub fn new(clock: Box<dyn Clock>) -> Self {
-        Self { queue: Mutex::new(Vec::new()), counter: AtomicU64::new(0), clock }
+        Self {
+            queue: Mutex::new(Vec::new()),
+            counter: AtomicU64::new(0),
+            clock,
+        }
     }
 
     /// open-file 输入：路径必须存在且可 canonicalize；队列级去重。
@@ -108,12 +117,20 @@ impl LaunchIntentStore {
 
     /// AppReady：返回未 ack 快照；队列保留（前端断线重连可幂等重取）。
     pub fn snapshot_unacked(&self) -> Vec<LaunchIntentPayload> {
-        self.queue.lock().unwrap().iter().map(|i| i.to_payload()).collect()
+        self.queue
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|i| i.to_payload())
+            .collect()
     }
 
     /// ack：移除未确认 intent；幂等（未知/已移除 id 均成功）。
     pub fn ack(&self, intent_id: &str) {
-        self.queue.lock().unwrap().retain(|i| i.intent_id != intent_id);
+        self.queue
+            .lock()
+            .unwrap()
+            .retain(|i| i.intent_id != intent_id);
     }
 
     pub fn unacked_len(&self) -> usize {
@@ -123,7 +140,9 @@ impl LaunchIntentStore {
     fn push_if_new(&self, intent: LaunchIntent) -> Option<LaunchIntent> {
         let mut queue = self.queue.lock().unwrap();
         if let Some(key) = intent.dedupe_key() {
-            let dup = queue.iter().any(|q| q.dedupe_key().as_deref() == Some(key.as_str()));
+            let dup = queue
+                .iter()
+                .any(|q| q.dedupe_key().as_deref() == Some(key.as_str()));
             if dup {
                 return None; // 队列级合并：同键未 ack 已存在
             }
@@ -170,13 +189,18 @@ mod tests {
         let snap = s.snapshot_unacked();
         assert_eq!(snap.len(), 1);
         assert_eq!(snap[0].kind, "open-file");
-        assert_eq!(snap[0].canonical_path.as_deref(), Some(f.canonicalize().unwrap().to_str().unwrap()));
+        assert_eq!(
+            snap[0].canonical_path.as_deref(),
+            Some(f.canonicalize().unwrap().to_str().unwrap())
+        );
     }
 
     #[test]
     fn nonexistent_path_ignored() {
         let s = store();
-        assert!(s.ingest_open_file(Path::new("/no/such/file.json")).is_none());
+        assert!(s
+            .ingest_open_file(Path::new("/no/such/file.json"))
+            .is_none());
         assert_eq!(s.unacked_len(), 0);
     }
 
@@ -186,7 +210,10 @@ mod tests {
         let f = tmpfile("b.json");
         let dir = f.parent().unwrap();
         // 同一文件经相对段/父引用表达 → canonicalize 后同键。
-        let equiv = dir.join(format!("./{}/../b.json", dir.file_name().unwrap().to_string_lossy()));
+        let equiv = dir.join(format!(
+            "./{}/../b.json",
+            dir.file_name().unwrap().to_string_lossy()
+        ));
         assert!(s.ingest_open_file(&f).is_some());
         assert!(s.ingest_open_file(&equiv).is_none(), "等价路径应合并");
         assert_eq!(s.unacked_len(), 1);

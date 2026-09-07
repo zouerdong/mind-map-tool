@@ -8,7 +8,10 @@ import type { OnboardingObservation } from "@mindmap/ui";
 export type ObservationSink = (o: OnboardingObservation) => void;
 
 export class ObservedDocumentSession extends DocumentSession {
-  constructor(initial: MindMapDocumentV1, private readonly sink: ObservationSink) {
+  constructor(
+    initial: MindMapDocumentV1,
+    private readonly sink: ObservationSink,
+  ) {
     super(initial);
   }
 

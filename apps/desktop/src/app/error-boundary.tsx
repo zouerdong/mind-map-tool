@@ -9,7 +9,10 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 function formatError(label: string, error: unknown, extra?: string): string {
-  const msg = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
+  const msg =
+    error instanceof Error
+      ? `${error.name}: ${error.message}\n${error.stack ?? ""}`
+      : String(error);
   return `[${label}] ${msg}${extra ? `\n${extra}` : ""}`;
 }
 
@@ -18,15 +21,28 @@ function paintFatal(text: string): void {
   if (!host) {
     host = document.createElement("pre");
     host.id = "fatal-error";
-    host.setAttribute("style", [
-      "position:fixed", "inset:0", "z-index:2147483647", "margin:0", "padding:24px",
-      "background:#ffffff", "color:#b00020", "font:13px/1.5 monospace",
-      "white-space:pre-wrap", "overflow:auto",
-    ].join(";"));
+    host.setAttribute(
+      "style",
+      [
+        "position:fixed",
+        "inset:0",
+        "z-index:2147483647",
+        "margin:0",
+        "padding:24px",
+        "background:#ffffff",
+        "color:#b00020",
+        "font:13px/1.5 monospace",
+        "white-space:pre-wrap",
+        "overflow:auto",
+      ].join(";"),
+    );
     // 可关闭：错误已留 console，遮挡层不应把后续交互也堵死
     const dismiss = document.createElement("button");
     dismiss.textContent = "关闭错误提示";
-    dismiss.setAttribute("style", "position:fixed;top:8px;right:8px;z-index:2147483647;padding:6px 10px;");
+    dismiss.setAttribute(
+      "style",
+      "position:fixed;top:8px;right:8px;z-index:2147483647;padding:6px 10px;",
+    );
     dismiss.onclick = () => {
       host?.remove();
       dismiss.remove();
@@ -40,7 +56,11 @@ function paintFatal(text: string): void {
 /** 全局兜底：渲染到独立 DOM 节点，不依赖 React 存活。 */
 export function installGlobalErrorTrap(): void {
   window.onerror = (message, source, lineno, colno, error) => {
-    const text = formatError("window.onerror", error ?? message, `at ${source ?? "?"}:${lineno ?? "?"}:${colno ?? "?"}`);
+    const text = formatError(
+      "window.onerror",
+      error ?? message,
+      `at ${source ?? "?"}:${lineno ?? "?"}:${colno ?? "?"}`,
+    );
     console.error(text);
     paintFatal(text);
   };

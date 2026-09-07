@@ -5,13 +5,7 @@
 // - undo/redo 由画布处理（focus 在画布时），此处不重复。
 
 export type ShortcutAction =
-  | "new"
-  | "open"
-  | "save"
-  | "save-as"
-  | "export-panel"
-  | "replay-onboarding"
-  | "organize";
+  "new" | "open" | "save" | "save-as" | "export-panel" | "replay-onboarding" | "organize";
 
 export interface NormalizedShortcut {
   action: ShortcutAction;
@@ -20,11 +14,7 @@ export interface NormalizedShortcut {
 
 const isEditable = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "INPUT" ||
-    target.isContentEditable
-  );
+  return target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable;
 };
 
 const isComposing = (e: KeyboardEvent): boolean => e.isComposing || e.keyCode === 229;
@@ -38,7 +28,8 @@ export function normalizeShortcut(e: KeyboardEvent): NormalizedShortcut | null {
   if (isEditable(e.target)) return null;
 
   const key = e.key.toLowerCase();
-  if (key === "s") return e.shiftKey ? { action: "save-as", id: "mod+shift+s" } : { action: "save", id: "mod+s" };
+  if (key === "s")
+    return e.shiftKey ? { action: "save-as", id: "mod+shift+s" } : { action: "save", id: "mod+s" };
   if (key === "o" && !e.shiftKey) return { action: "open", id: "mod+o" };
   if (key === "n" && !e.shiftKey) return { action: "new", id: "mod+n" };
   if (key === "e" && !e.shiftKey) return { action: "export-panel", id: "mod+e" };

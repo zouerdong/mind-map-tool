@@ -11,7 +11,10 @@ pub struct IpcError {
 
 impl IpcError {
     pub fn new(code: &str, message: impl Into<String>) -> Self {
-        Self { code: code.to_string(), message: message.into() }
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+        }
     }
 }
 
@@ -32,10 +35,16 @@ impl ServiceError {
         Self(IpcError::new("INVALID_TARGET_AUTHORIZATION", msg))
     }
     pub fn authorization_expired() -> Self {
-        Self(IpcError::new("TARGET_AUTHORIZATION_EXPIRED", "授权已过期，请重新选择目标"))
+        Self(IpcError::new(
+            "TARGET_AUTHORIZATION_EXPIRED",
+            "授权已过期，请重新选择目标",
+        ))
     }
     pub fn authorization_consumed() -> Self {
-        Self(IpcError::new("TARGET_AUTHORIZATION_CONSUMED", "授权已被使用，请重新选择目标"))
+        Self(IpcError::new(
+            "TARGET_AUTHORIZATION_CONSUMED",
+            "授权已被使用，请重新选择目标",
+        ))
     }
     pub fn authorization_kind_mismatch(expected: &str) -> Self {
         Self(IpcError::new(
@@ -47,16 +56,31 @@ impl ServiceError {
         Self(IpcError::new("INVALID_DOCUMENT_TARGET_HANDLE", msg))
     }
     pub fn target_modified_externally() -> Self {
-        Self(IpcError::new("TARGET_MODIFIED_EXTERNALLY", "目标已被外部修改，未覆盖；请重新打开或另存"))
+        Self(IpcError::new(
+            "TARGET_MODIFIED_EXTERNALLY",
+            "目标已被外部修改，未覆盖；请重新打开或另存",
+        ))
     }
     pub fn target_appeared() -> Self {
-        Self(IpcError::new("TARGET_APPEARED", "选择时目标不存在，现在已出现；未覆盖；请重新选择"))
+        Self(IpcError::new(
+            "TARGET_APPEARED",
+            "选择时目标不存在，现在已出现；未覆盖；请重新选择",
+        ))
     }
     pub fn file_io(msg: impl Into<String>) -> Self {
         Self(IpcError::new("FILE_IO_ERROR", msg))
     }
+    pub fn document_too_large(bytes: u64, max: u64) -> Self {
+        Self(IpcError::new(
+            "DOCUMENT_TOO_LARGE",
+            format!("文档大小 {bytes} bytes 超过上限 {max} bytes"),
+        ))
+    }
     pub fn preferences_io(msg: impl Into<String>) -> Self {
         Self(IpcError::new("PREFERENCES_IO_ERROR", msg))
+    }
+    pub fn preferences_corrupt(msg: impl Into<String>) -> Self {
+        Self(IpcError::new("PREFERENCES_CORRUPT", msg))
     }
 }
 

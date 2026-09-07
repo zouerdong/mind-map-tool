@@ -3,8 +3,5 @@
   "identifier": "file-lifecycle",
   "description": "MM-060 文件/生命周期能力：主窗口与文档窗口订阅 host 事件（launch-intent 等）。对话框与提交全部经由 host 自定义命令（ledger/handle 语义在 host），不给前端直连 dialog/fs 权限。",
   "windows": ["main", "editor-*"],
-  "permissions": [
-    "core:event:allow-listen",
-    "core:event:allow-unlisten"
-  ]
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
 }

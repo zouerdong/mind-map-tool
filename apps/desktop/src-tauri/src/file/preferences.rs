@@ -18,19 +18,25 @@ pub struct PreferencesStore {
 
 impl PreferencesStore {
     pub fn new(config_dir: &Path) -> Self {
-        Self { path: config_dir.join("preferences.json") }
+        Self {
+            path: config_dir.join("preferences.json"),
+        }
     }
 
     pub fn load(&self) -> ServiceResult<PreferencesMap> {
         match std::fs::read(&self.path) {
             Ok(bytes) => {
-                let v: Value = serde_json::from_slice(&bytes).map_err(|e| {
-                    ServiceError::preferences_io(format!("偏好文件损坏：{e}"))
-                })?;
-                let obj = v.as_object().ok_or_else(|| {
-                    ServiceError::preferences_io("偏好文件顶层必须是对象")
-                })?;
-                Ok(obj.iter().filter(|(_, v)| is_scalar(v)).map(|(k, v)| (k.clone(), v.clone())).collect())
+                let v: Value = serde_json::from_slice(&bytes)
+                    .map_err(|e| ServiceError::preferences_corrupt(format!("偏好文件损坏：{e}")))?;
+                let obj = v
+                    .as_object()
+                    .ok_or_else(|| ServiceError::preferences_corrupt("偏好文件顶层必须是对象"))?;
+                if let Some((key, _)) = obj.iter().find(|(_, v)| !is_scalar(v)) {
+                    return Err(ServiceError::preferences_corrupt(format!(
+                        "偏好值必须是标量：{key}"
+                    )));
+                }
+                Ok(obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(PreferencesMap::new()),
             Err(e) => Err(ServiceError::preferences_io(format!("读取偏好失败：{e}"))),
@@ -39,14 +45,23 @@ impl PreferencesStore {
 
     /// delta 合并：出现的键覆盖；null 值删除键。
     pub fn store(&self, delta: &PreferencesMap) -> ServiceResult<()> {
-        let mut current = self.load()?;
+        // 损坏文件不把编辑器锁死：下一次明确写入以空快照为基线，
+        // 通过原子替换修复 preferences.json；权限/磁盘等真实 IO 错误
+        // 仍然 fail closed 返回 PREFERENCES_IO_ERROR。
+        let mut current = match self.load() {
+            Ok(values) => values,
+            Err(error) if error.0.code == "PREFERENCES_CORRUPT" => PreferencesMap::new(),
+            Err(error) => return Err(error),
+        };
         for (k, v) in delta {
             if v.is_null() {
                 current.remove(k);
             } else if is_scalar(v) {
                 current.insert(k.clone(), v.clone());
             } else {
-                return Err(ServiceError::preferences_io(format!("偏好值必须是标量：{k}")));
+                return Err(ServiceError::preferences_io(format!(
+                    "偏好值必须是标量：{k}"
+                )));
             }
         }
         let bytes = serde_json::to_vec_pretty(&json!(current))
@@ -113,6 +128,17 @@ mod tests {
         std::fs::write(dir.join("preferences.json"), "not json").unwrap();
         let store = PreferencesStore::new(&dir);
         let err = store.load().unwrap_err();
-        assert_eq!(err.0.code, "PREFERENCES_IO_ERROR");
+        assert_eq!(err.0.code, "PREFERENCES_CORRUPT");
+    }
+
+    #[test]
+    fn store_repairs_corrupted_file_without_deleting_it() {
+        let dir = tmpdir();
+        std::fs::write(dir.join("preferences.json"), "not json").unwrap();
+        let store = PreferencesStore::new(&dir);
+        let mut delta = PreferencesMap::new();
+        delta.insert("theme".into(), json!("dark"));
+        store.store(&delta).unwrap();
+        assert_eq!(store.load().unwrap().get("theme"), Some(&json!("dark")));
     }
 }

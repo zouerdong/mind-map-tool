@@ -14,8 +14,13 @@ import type { CommitDocumentRequest, CommitReceipt } from "@mindmap/platform";
 vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule()));
 
 const { MindMapApp } = await import("./mindmap-app.js");
-const { FakeCloseLifecyclePort, FakeExportRenderer, FakeFilePort, FakePreferencesPort } =
-  await import("./fake-ports.js");
+const {
+  FakeCloseLifecyclePort,
+  FakeExportRenderer,
+  FakeFilePort,
+  FakeLaunchPort,
+  FakePreferencesPort,
+} = await import("./fake-ports.js");
 const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
@@ -87,6 +92,7 @@ function setup(filePort: CountingFilePort = new CountingFilePort()) {
         isBrowserDev: true,
         globalShortcut: new FakeGlobalShortcut(),
         closeLifecycle: closePort,
+        launch: new FakeLaunchPort(),
       }}
     />,
   );

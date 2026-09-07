@@ -14,6 +14,7 @@ import {
 import {
   createOnboardingPreferences,
   EditorCanvas,
+  GeometryBarrier,
   OnboardingFlow,
   type OnboardingObservation,
 } from "@mindmap/ui";
@@ -144,10 +145,70 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   const [pendingReports, setPendingReports] = useState<
     { deliveryId: string; outcomeText: string }[]
   >([]);
+  const onPreferenceWarning = useCallback((text: string) => {
+    setNotice({ tone: "error", text });
+  }, []);
   const bump = useCallback(() => {
     setRevision((r) => r + 1);
     refresh((n) => n + 1);
   }, []);
+
+  const activeEditorRef = useRef<{ flush(): void } | null>(null);
+
+  const geometryBarrier = useMemo(() => {
+    return new GeometryBarrier({
+      session,
+      getMetricsState: () =>
+        ports.fontMetricsState?.() ?? ports.renderer.fontMetricsState?.() ?? "ready",
+      whenMetricsReady: () =>
+        ports.whenMetricsReady?.() ??
+        ports.renderer.whenMetricsReady?.() ??
+        Promise.resolve(ports.fonts),
+      getFallbackFonts: () => ports.fonts,
+      onCommitted: () => bump(),
+      onError: (err) => {
+        setNotice({
+          tone: "error",
+          text: `字体资源加载失败，无法提交几何变更：${err instanceof Error ? err.message : String(err)}`,
+        });
+      },
+    });
+  }, [bump, ports, session]);
+
+  // MRT-011 / PRC-025：先完成画布首帧，再后台预热导出 chunk/字体/WASM；
+  // 资源就绪后刷新几何屏障中待提交的意图并触发刷新，保证持久化 size 均源自真实字体。
+  useEffect(() => {
+    const warmup = ports.renderer.warmup;
+    const whenReady =
+      ports.renderer.whenReady?.bind(ports.renderer) ??
+      (ports.whenMetricsReady
+        ? () => ports.whenMetricsReady!()
+        : ports.renderer.whenMetricsReady
+          ? () => ports.renderer.whenMetricsReady!()
+          : undefined);
+    if (!whenReady) return;
+    let cancelled = false;
+    warmup?.call(ports.renderer);
+    void whenReady()
+      .then(async () => {
+        if (!cancelled) {
+          await geometryBarrier.flush();
+          bump();
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice({
+            tone: "error",
+            text: `导出资源加载失败，编辑仍可继续：${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+      geometryBarrier.dispose();
+    };
+  }, [bump, geometryBarrier, ports.renderer]);
 
   const deps = useMemo(() => ({ filePort: ports.filePort }), [ports.filePort]);
   const onboardingPreferences = useMemo(
@@ -288,14 +349,34 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   );
 
   const onSave = useCallback(async () => {
+    try {
+      activeEditorRef.current?.flush();
+      await geometryBarrier.flush();
+    } catch (e) {
+      setNotice({
+        tone: "error",
+        text: `字体资源加载失败，无法保存文档：${e instanceof Error ? e.message : String(e)}`,
+      });
+      return;
+    }
     reportSaveResult(await saveFlow(session, deps));
     bump();
-  }, [bump, deps, reportSaveResult, session]);
+  }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 
   const onSaveAs = useCallback(async () => {
+    try {
+      activeEditorRef.current?.flush();
+      await geometryBarrier.flush();
+    } catch (e) {
+      setNotice({
+        tone: "error",
+        text: `字体资源加载失败，无法另存文档：${e instanceof Error ? e.message : String(e)}`,
+      });
+      return;
+    }
     reportSaveResult(await saveAsFlow(session, deps, `未命名.json`));
     bump();
-  }, [bump, deps, reportSaveResult, session]);
+  }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 
   // ---- 原生关闭三分支控制器（MRT-003 / CR-003）----
   // host fail-closed 持有 pending request；此处只做应答：clean 直接放行；
@@ -358,6 +439,14 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     if (!current || current.phase !== "deciding") return;
     setCloseError(null);
     applyCloseState({ requestId: current.requestId, phase: "saving" }); // 锁定防重复提交
+    try {
+      activeEditorRef.current?.flush();
+      await geometryBarrier.flush();
+    } catch (e) {
+      setCloseError(e instanceof Error ? e.message : String(e));
+      applyCloseState({ requestId: current.requestId, phase: "deciding" });
+      return;
+    }
     const result = await saveFlow(session, deps);
     if (result.kind === "cancelled") {
       // Save As 被用户取消：保持 modal 与窗口，可再次选择
@@ -445,6 +534,16 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, [applyCloseState, closePort]);
   const onExport = useCallback(
     async (format: ExportFormat) => {
+      try {
+        activeEditorRef.current?.flush();
+        await geometryBarrier.flush();
+      } catch (e) {
+        setNotice({
+          tone: "error",
+          text: `字体资源加载失败，无法导出：${e instanceof Error ? e.message : String(e)}`,
+        });
+        return;
+      }
       const result = await exportFlow(
         session,
         { filePort: ports.filePort, renderer: ports.renderer },
@@ -458,7 +557,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         setNotice({ tone: "error", text: result.message });
       }
     },
-    [ports.filePort, ports.renderer, session],
+    [geometryBarrier, ports.filePort, ports.renderer, session],
   );
 
   // 全局热键设置（MM-088；默认 ⌥Space，键位专项讨论定稿 2026-08-29）。
@@ -540,17 +639,38 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onNew, onOpen, onSave, onSaveAs, onOrganize]);
 
-  // ---- 全局热键同键分流（Tauri）：画布已聚焦时的 quick-create 事件 ----
+  // ---- 全局热键 Pre-Focus 两阶段协议（PRC-030 / ADR 0011）：
+  // 阶段 1：响应 host 的 pre-focus probe，此时 host 尚未聚焦窗口，读取真实 document.hasFocus()；
+  // 阶段 2：仅当 host 验证 pre-focus 且判定可建点后，接收 quick-create 事件驱动画布。
   useEffect(() => {
     if (!isTauriRuntime()) return; // 浏览器 dev 无原生热键
-    const unlisten = listen("quick-create", () => {
-      // MM-090-D8 终案（用户决策 2026-08-29：回归原设计）：⌥Space 直达
-      // 画布建点+进编辑（textarea 挂载即重试抢焦）；编辑态时本信号由
-      // 画布解释为「焦点修复」（极端情况再按一次=聚焦，不盲建）。
+
+    const unlistenProbe = listen<{
+      invocationId: string;
+      windowId: string;
+      generation: number;
+    }>("shortcut://pre-focus-probe", async (event) => {
+      const { invocationId, windowId, generation } = event.payload;
+      const hadDocumentFocus = document.hasFocus() && document.visibilityState === "visible";
+      try {
+        await invoke("platform_resolve_shortcut_invocation", {
+          invocationId,
+          windowId,
+          generation,
+          hadDocumentFocus,
+        });
+      } catch {
+        // probe 响应过期、窗口已销毁或失效，静默忽略
+      }
+    });
+
+    const unlistenQuickCreate = listen("quick-create", () => {
       setQuickCreateSignal((n) => n + 1);
     });
+
     return () => {
-      void unlisten.then((dispose) => dispose());
+      void unlistenProbe.then((dispose) => dispose());
+      void unlistenQuickCreate.then((dispose) => dispose());
     };
   }, []);
 
@@ -803,6 +923,8 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         <EditorCanvas
           session={session}
           fonts={ports.fonts}
+          geometryBarrier={geometryBarrier}
+          activeEditorRef={activeEditorRef}
           revision={revision}
           quickCreateSignal={quickCreateSignal}
           fitViewSignal={fitViewSignal}
@@ -811,11 +933,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           onOrganizeResult={handleOrganizeResult}
         />
 
-        <AppNotice
-          notice={notice}
-          theme={theme}
-          onDismiss={() => setNotice(null)}
-        />
+        <AppNotice notice={notice} theme={theme} onDismiss={() => setNotice(null)} />
 
         {/* bootstrap report-pending（W2R R3）：动作已完成但终态回报未送达
             host——显式一次重报；不自动 timer、不重跑 action。 */}
@@ -841,7 +959,10 @@ export function MindMapApp({ ports }: MindMapAppProps) {
             }}
           >
             {pendingReports.map((report) => (
-              <div key={report.deliveryId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div
+                key={report.deliveryId}
+                style={{ display: "flex", gap: 8, alignItems: "center" }}
+              >
                 <span data-testid={`pending-report-${report.deliveryId}`}>
                   {`启动回报待重发（${report.deliveryId}）：${report.outcomeText}`}
                 </span>
@@ -1170,6 +1291,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         preferences={onboardingPreferences}
         theme={theme}
         replaySignal={replaySignal}
+        onPreferenceWarning={onPreferenceWarning}
       />
     </div>
   );

@@ -23,7 +23,9 @@ pub struct HandleRegistry {
 
 impl HandleRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     /// 签发新 handle（每次 open / Save As 成功各签发一个；旧的不失效，
@@ -32,7 +34,10 @@ impl HandleRegistry {
         let id = identity::new_handle_id();
         self.inner.lock().unwrap().insert(
             id.clone(),
-            DocumentHandleRecord { window_label: window_label.to_string(), canonical_path },
+            DocumentHandleRecord {
+                window_label: window_label.to_string(),
+                canonical_path,
+            },
         );
         id
     }
@@ -51,6 +56,26 @@ impl HandleRegistry {
 
     /// 撤销某窗口全部句柄（窗口关闭；session 结束随进程消亡）。
     pub fn revoke_window(&self, window_label: &str) {
-        self.inner.lock().unwrap().retain(|_, r| r.window_label != window_label);
+        self.inner
+            .lock()
+            .unwrap()
+            .retain(|_, r| r.window_label != window_label);
+    }
+
+    /// 精确撤销单个 handle（MRT-004W2R R6：open 竞态中签发、随后交付校验
+    /// 失败的孤立 capability 不得存活）。返回是否确实移除。
+    pub fn revoke_handle(&self, handle: &str) -> bool {
+        self.inner.lock().unwrap().remove(handle).is_some()
+    }
+
+    /// 只读诊断：该窗口当前存活的 handle 数量（测试/证据观测通道；
+    /// Destroyed 后必须归零——R6「零残留」的可直接观察事实）。
+    pub fn count_for_window(&self, window_label: &str) -> usize {
+        self.inner
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|r| r.window_label == window_label)
+            .count()
     }
 }

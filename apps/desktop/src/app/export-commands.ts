@@ -12,12 +12,22 @@ export type ExportFormat = "svg" | "png" | "pdf";
 export interface ExportRendererLike {
   buildScene(
     doc: unknown,
-  ): Promise<{ ok: true; scene: unknown } | { ok: false; error: { code: string; message: string } }>;
+  ): Promise<
+    { ok: true; scene: unknown } | { ok: false; error: { code: string; message: string } }
+  >;
   renderSvg(scene: unknown): Uint8Array | Promise<Uint8Array>;
   renderPng(svgBytes: Uint8Array, scene: unknown): Promise<Uint8Array>;
   renderPdf(scene: unknown): Promise<Uint8Array>;
   /** EditorCanvas 共享 layout 度量（与导出同源）。 */
   fonts(): FontResolver;
+  /** 可选：首帧之后预热导出资源，不阻塞画布挂载。 */
+  warmup?(): void;
+  /** 可选：导出资源就绪通知，用于字体度量切换后的受控重投影。 */
+  whenReady?(): Promise<void>;
+  /** 可选：字体度量就绪状态（PRC-025）。 */
+  fontMetricsState?(): "pending" | "ready" | "failed";
+  /** 可选：等待真实字体度量就绪（PRC-025）。 */
+  whenMetricsReady?(): Promise<FontResolver>;
 }
 
 export type ExportResult =
@@ -55,7 +65,10 @@ export async function exportFlow(
   try {
     if (format === "svg") bytes = await deps.renderer.renderSvg(sceneResult.scene);
     else if (format === "png")
-      bytes = await deps.renderer.renderPng(await deps.renderer.renderSvg(sceneResult.scene), sceneResult.scene);
+      bytes = await deps.renderer.renderPng(
+        await deps.renderer.renderSvg(sceneResult.scene),
+        sceneResult.scene,
+      );
     else bytes = await deps.renderer.renderPdf(sceneResult.scene);
   } catch (e) {
     return toError(e);

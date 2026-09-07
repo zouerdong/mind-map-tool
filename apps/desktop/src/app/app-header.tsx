@@ -174,7 +174,11 @@ export function AppHeader({
       }}
     >
       {/* 左侧：文件菜单 */}
-      <div ref={fileMenuRef} style={{ position: "relative" }} className={fileMenuOpen ? "open" : ""}>
+      <div
+        ref={fileMenuRef}
+        style={{ position: "relative" }}
+        className={fileMenuOpen ? "open" : ""}
+      >
         <button
           type="button"
           aria-haspopup="menu"
@@ -334,7 +338,11 @@ export function AppHeader({
           整理 ⌘⇧L
         </button>
 
-        <div ref={viewMenuRef} style={{ position: "relative" }} className={viewMenuOpen ? "open" : ""}>
+        <div
+          ref={viewMenuRef}
+          style={{ position: "relative" }}
+          className={viewMenuOpen ? "open" : ""}
+        >
           <button
             type="button"
             aria-haspopup="menu"
@@ -379,7 +387,9 @@ export function AppHeader({
               }}
             >
               <span>布局方向</span>
-              <span style={kbdStyle}>{organizeDirection === "horizontal" ? "横向 (默认)" : "纵向"}</span>
+              <span style={kbdStyle}>
+                {organizeDirection === "horizontal" ? "横向 (默认)" : "纵向"}
+              </span>
             </button>
             <hr style={hrStyle} />
             <button
@@ -436,10 +446,7 @@ export function AppHeader({
           </div>
         </div>
 
-        <ThemeToggle
-          currentTheme={theme}
-          onCommand={onThemeCommand}
-        />
+        <ThemeToggle currentTheme={theme} onCommand={onThemeCommand} />
       </div>
     </header>
   );

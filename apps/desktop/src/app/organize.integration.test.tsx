@@ -8,8 +8,13 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@xyflow/react", () => import("./rf-stub.js").then((m) => m.rfStubModule()));
 
 const { MindMapApp } = await import("./mindmap-app.js");
-const { FakeCloseLifecyclePort, FakeExportRenderer, FakeFilePort, FakePreferencesPort } =
-  await import("./fake-ports.js");
+const {
+  FakeCloseLifecyclePort,
+  FakeExportRenderer,
+  FakeFilePort,
+  FakeLaunchPort,
+  FakePreferencesPort,
+} = await import("./fake-ports.js");
 const { FakeGlobalShortcut } = await import("./ports.js");
 
 beforeAll(() => {
@@ -34,6 +39,7 @@ function setup() {
         isBrowserDev: true,
         globalShortcut: new FakeGlobalShortcut(),
         closeLifecycle: new FakeCloseLifecyclePort(),
+        launch: new FakeLaunchPort(),
       }}
     />,
   );
