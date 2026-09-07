@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "caseId": "MRT-POST-VRA-RISK-2026-09-07",
+  "task": "MRT-010/MM-110",
+  "generatedAt": "2026-09-06T16:36:39Z",
+  "source": {
+    "commit": "dc5402184cd49d9a960d5b303063d6d6e75012b1",
+    "worktree": "dirty"
+  },
+  "risks": [
+    {
+      "id": "R-001",
+      "status": "mitigated-on-macos-residual-windows",
+      "evidence": ["packages/platform/test", "apps/desktop/src-tauri/src/lifecycle", "mrt-post-vra-readiness.json"],
+      "residual": "Windows WebView2/IME/渲染实机报告缺失。"
+    },
+    {
+      "id": "R-002",
+      "status": "mitigated-by-approved-host",
+      "evidence": ["docs/decisions/decision-register.json", "scripts/runtime-spike/verify-decision.mjs"],
+      "residual": "后续 product identity/packaging scope 仍需 G2。"
+    },
+    {
+      "id": "R-003",
+      "status": "covered-by-automated-contracts",
+      "evidence": ["packages/ui/test", "packages/core/src/schema.test.ts", "packages/ui/test/a11y/a11y.test.tsx"],
+      "residual": "真实 Windows 键盘/IME 矩阵缺设备。"
+    },
+    {
+      "id": "R-004",
+      "status": "covered-by-boundary-and-build-checks",
+      "evidence": ["scripts/quality/check-boundaries.mjs", "pnpm build"],
+      "residual": "原生 unsigned candidate 尚未按 G2 scope 生成。"
+    },
+    {
+      "id": "R-005",
+      "status": "covered-by-rust-and-platform-tests",
+      "evidence": ["apps/desktop/src-tauri/src/file", "cargo test -- --test-threads=1"],
+      "residual": "Windows 文件系统实机复验缺失。"
+    },
+    {
+      "id": "R-006",
+      "status": "open-platform-evidence",
+      "evidence": ["apps/desktop/src-tauri/src/file/commit.rs", "docs/quality/evidence/wave2/mrt-004w2r-windows-probe.log"],
+      "residual": "Windows FlushFileBuffers/ReplaceFileW、ACL 和安装器证据需要 Windows 实机。"
+    },
+    {
+      "id": "R-007",
+      "status": "mitigated-with-font-limits-and-golden",
+      "evidence": ["packages/export/test/resource-limits.test.ts", "tests/golden/export/export-golden.test.ts", "assets/fonts/README.md"],
+      "residual": "最终项目许可与字体法律审阅仍待 G2。"
+    },
+    {
+      "id": "R-008",
+      "status": "covered-by-golden-residual-manual-viewers",
+      "evidence": ["tests/golden/export/export-golden.test.ts", "packages/export/src/render-pdf.ts"],
+      "residual": "发布候选上的双 viewer 原生抽查尚未完成。"
+    },
+    {
+      "id": "R-009",
+      "status": "mitigated-by-single-renderer-owner",
+      "evidence": ["docs/decisions/decision-register.json", "packages/export/src/index.ts", "scripts/quality/check-boundaries.mjs"],
+      "residual": "无。"
+    },
+    {
+      "id": "R-010",
+      "status": "mitigated-by-fail-closed-evidence",
+      "evidence": ["scripts/quality/verify-evidence.mjs", "scripts/quality/run-all.mjs"],
+      "residual": "原生安装/卸载矩阵需 G2 后执行。"
+    },
+    {
+      "id": "R-011",
+      "status": "open-legal-review",
+      "evidence": ["docs/product/licensing.md", "scripts/quality/scan-dependency-licenses.mjs", ".tmp/quality/license-scan.json"],
+      "residual": "最终项目许可证、商业授权和 notices 法律审阅未完成。"
+    },
+    {
+      "id": "R-012",
+      "status": "mitigated-in-code-open-packaging",
+      "evidence": ["apps/desktop/src-tauri/tauri.conf.json", "docs/quality/release-checklist.md"],
+      "residual": "产品身份、CSP 最终审阅和 unsigned installer 需 G2。"
+    },
+    {
+      "id": "R-013",
+      "status": "accepted-user-scope-but-platform-blocker",
+      "evidence": ["docs/quality/v1-quality-gates.md", "docs/quality/evidence/mrt-post-vra-readiness.json"],
+      "residual": "当前无 Windows 设备；若要完成双平台 release evidence，必须提供设备或修改已批准范围。"
+    },
+    {
+      "id": "R-014",
+      "status": "covered-by-concurrency-and-lifecycle-tests",
+      "evidence": ["apps/desktop/src-tauri/src/lifecycle/runtime.rs", "cargo test -- --test-threads=1", "pnpm test:unit"],
+      "residual": "当前工作树未形成可审计 clean-source release commit。"
+    },
+    {
+      "id": "R-015",
+      "status": "web-budget-pass-native-budget-pending",
+      "evidence": [".tmp/quality/release-assets.json", ".tmp/quality/release-performance.json", "scripts/quality/run-performance.mjs"],
+      "residual": "原生 cold/warm start、RSS、installer size 和 Windows 性能未测量。"
+    },
+    {
+      "id": "R-016",
+      "status": "open-until-gates-and-manifest-clean",
+      "evidence": ["scripts/quality/verify-evidence.mjs", "docs/quality/evidence/mrt-post-vra-readiness.json"],
+      "residual": "readiness manifest 当前按规则拒绝 dirty worktree、partial macOS 和 blocked Windows。"
+    }
+  ],
+  "overall": "BLOCKED"
+}

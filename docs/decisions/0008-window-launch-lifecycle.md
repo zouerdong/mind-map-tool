@@ -1,8 +1,10 @@
 # ADR 0008: Host 主导的窗口注册与启动意图协议
 
-- Status: Proposed
-- ADR-Version: 0.1.0
+- Status: Accepted
+- ADR-Version: 1.0.0
 - Date: 2026-08-30
+- Approved-By: ErDong Zou（项目负责人）
+- Approved-At: 2026-08-30 21:31:37 +0800
 - Owners: Project maintainers
 - Track: windowLifecycle（MRT-004）
 
@@ -67,7 +69,7 @@ Rejected。扩大 capability，窗口 identity/路径 identity/close ledger 分�
 
 ### D. Host registry + per-window bootstrap
 
-Proposed。所有原生事实和窗口副作用保持单 owner；renderer 只执行自己窗口的文档 load，并返回可等待终态。
+Accepted（本 ADR Decision）。所有原生事实和窗口副作用保持单 owner；renderer 只执行自己窗口的文档 load，并返回可等待终态。
 
 ## Consequences
 
@@ -97,4 +99,4 @@ Proposed。所有原生事实和窗口副作用保持单 owner；renderer 只执
 
 ## Approval Gate
 
-本 ADR 当前仅为 Proposed。MRT-004 生产实现前，项目负责人必须明确批准；批准时更新为 Accepted，并按仓库决策登记规则记录版本/hash。若不批准，先选择替代 coordinator 方案，不得先写实现。
+本 ADR 已于 2026-08-30 获项目负责人明确批准并转为 Accepted 1.0.0。批准原文与最终 ADR SHA-256 绑定记录于 `.omx/reviews/2026-08-30-mrt-004g-approval.json`（MRT-004G 审计记录；`decision-register.json` 是 G1 四轨 Spike 登记结构，不承载本决定）。

@@ -1,6 +1,6 @@
 # V1 质量门（G0 / G1 / G2）
 
-> 状态：MM-000 建立的门槛定义。G0 已由项目负责人于 2026-08-26 批准；G1/G2 保持 pending。
+> 状态：G0 与 G1 已由项目负责人于 2026-08-26 批准；G2 保持 pending。v1 权威发布平台为 macOS Apple Silicon，Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。
 > 机器可读登记：`docs/decisions/decision-register.json`；本文件是可读说明，冲突时以 JSON 登记为准。
 
 ## 1. Gate 定义
@@ -8,19 +8,18 @@
 ### G0｜Spike 授权（已批准 2026-08-26）
 
 - **批准人**：ErDong Zou（项目负责人）
-- **批准内容**：本地 Spike 实验授权；macOS 设备 Apple M4 / 24 GB / macOS 26.6.2 / arm64；Windows 设备待登记（登记前 MM-010 双平台聚合保持 BLOCKED）；实验红线见下。
+- **批准内容**：本地 Spike 实验授权；macOS 设备 Apple M4 / 24 GB / macOS 26.6.2 / arm64；Windows 设备记录为 no-device-currently（实验红线见下）。
 - **红线**：候选依赖只存在于 `scripts/runtime-spike/**`；不发布、不改 CI/CD、不访问凭据、不签名/公证、不安装正式产品依赖、不上传远端。
 - **不包含**：正式技术选型、产品实现、发布。
 
-### G1｜Bootstrap 前（pending）
+### G1｜Bootstrap 前（已批准 2026-08-26）
 
-进入 MM-020 前必须满足：
-
-1. Spike 顶层与四轨（desktopHost/canvasView/exportRenderer/font）全部 `recommendation-ready`，每轨推荐引用 PASS 候选与证据。
-2. 项目负责人逐轨批准 approved value，并确认：schema v1、最低平台/CPU、性能预算、产品标识与扩展名、React Flow attribution（如适用）、PDF/背景策略、尺寸上限。
-3. 对应 ADR（0001–0006 相关轨）转 Accepted，`acceptedAdr {id, version, sha256}` 与当前 ADR bytes 一致。
-4. `G1.sourceSpikeResult {path, sha256, generatedAt}` 绑定不可变 Spike snapshot；任何漂移使 G1 失效并重新审签。
-5. `verify-decision.mjs --phase bootstrap` 通过。
+- **批准人**：ErDong Zou（项目负责人）
+- **批准内容**：
+  1. 四轨选型批准：desktopHost=tauri, canvasView=react-flow, exportRenderer=web-ts-wasm, font=noto-sans-sc-regular + lxgw-wenkai-regular。
+  2. 平台范围变更：v1 仅发布 macOS（Apple Silicon）；Windows 顺延至后续专门版本，不属于 v1 验收。保留平台无关架构与移植就绪约束（PRD §1.1）。
+  3. 对应 ADR 0001～0006 转 Accepted 1.0.0。
+  4. `G1.sourceSpikeResult` 绑定不可变 Spike snapshot。
 
 ### G2｜发布准备前（pending）
 
@@ -43,10 +42,11 @@
 
 ## 3. 发布候选质量门槛（MM-090 消费）
 
-发布候选必须同时具备证据：core 单元测试、模块集成测试、桌面 E2E（E2E-01～E2E-14）、macOS/Windows 人工矩阵、双平台性能预算达标、三格式导出 golden（语义/视觉/PDF 双 viewer）、安装/文件关联验证。任何一项缺证据都不是"已完成"。质量入口脚本由 MM-020 创建：`run-all.mjs`、`run-export-golden.mjs`、`run-performance.mjs`、`check-boundaries.mjs`、`scan-dependency-licenses.mjs`、`scan-network-endpoints.mjs`、`run-e2e-macos.sh` / `run-e2e-windows.ps1`。
+发布候选必须同时具备证据：core 单元测试、模块集成测试、桌面 E2E（E2E-01～E2E-14）、macOS 人工矩阵、macOS 原生性能预算达标、三格式导出 golden（语义/视觉/PDF 双 viewer）、安装/文件关联验证。Windows 原生验收顺延至后续专门版本。质量入口脚本由 MM-020 创建并由 PRC 批次演进：`run-all.mjs`、`run-export-golden.mjs`、`run-performance.mjs`、`check-boundaries.mjs`、`scan-dependency-licenses.mjs`、`scan-network-endpoints.mjs`、`run-e2e-macos.sh`。
 
-## 4. 双平台证据规则
+## 4. 平台证据规则
 
-- 每项验收（AC-01～AC-14）与性能数据都需要 macOS、Windows 各一份真实设备报告 + 一份聚合报告；缺任一平台返回 BLOCKED（R-013）。
+- **v1 必需平台（requiredPlatforms）**：`macos`（Apple Silicon）。必须有真实设备完整运行报告（AC-01～AC-14 适用范围、性能与安装/生命周期），报告状态必须为 `verified`。
+- **顺延平台（deferredPlatforms）**：`windows`。作为后续专门版本，明确不属于 v1 验收范围。在证据清单中明确显示为 `deferred/not-run`，并附带引用 `docs/product/v1-product-spec.md`。不影响本次 v1 的 `READY` 判定，也不得冒充为通过。
 - 报告必须记录 OS build、CPU、内存、WebView 版本、应用 commit、构建类型、脚本版本与证据路径。
-- 不允许用 mock、单平台推断或更新 golden 冒充通过。
+- 不允许用 mock、假证据或更新 golden 冒充通过。

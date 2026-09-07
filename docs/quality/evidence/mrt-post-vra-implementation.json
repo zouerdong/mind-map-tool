@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "caseId": "MRT-POST-VRA-IMPLEMENTATION-2026-09-07",
+  "task": "MRT-004W2R2/MRT-005/MRT-006/MRT-007/MRT-008/MRT-010/MRT-011/MRT-012",
+  "generatedAt": "2026-09-06T16:36:39Z",
+  "source": {
+    "commit": "dc5402184cd49d9a960d5b303063d6d6e75012b1",
+    "worktree": "dirty",
+    "note": "工作树包含本次继续开发与先前用户交付的未提交变更；因此本报告不是发布放行证据。"
+  },
+  "implementation": [
+    {
+      "task": "MRT-004W2R2",
+      "status": "IMPLEMENTED",
+      "paths": [
+        "apps/desktop/src-tauri/src/lifecycle/launch_coordinator.rs",
+        "apps/desktop/src-tauri/src/lifecycle/runtime.rs"
+      ],
+      "proof": "锁外提交/恢复操作绑定 window generation；旧代完成不会向同名新代写入 recovery 或 finalize。"
+    },
+    {
+      "task": "MRT-005",
+      "status": "IMPLEMENTED",
+      "paths": [
+        "apps/desktop/src-tauri/src/file/mod.rs",
+        "packages/platform/src/ipc/types.ts"
+      ],
+      "proof": "host 端 metadata 预检加 take(max+1) 有界读取；超过 50 MiB 返回 DOCUMENT_TOO_LARGE，且不会签发 handle。"
+    },
+    {
+      "task": "MRT-006",
+      "status": "IMPLEMENTED",
+      "paths": [
+        "packages/export/src/font-source.ts",
+        "packages/export/src/render-png.ts",
+        "packages/export/src/render-pdf.ts",
+        "packages/export/test/resource-limits.test.ts"
+      ],
+      "proof": "字体每文件 32 MiB、总计 64 MiB；PNG/PDF 在进入重资源 renderer 前返回结构化限制错误。"
+    },
+    {
+      "task": "MRT-007",
+      "status": "IMPLEMENTED",
+      "paths": [
+        "apps/desktop/src-tauri/src/file/preferences.rs",
+        "packages/platform/src/preferences/tauri-adapter.ts",
+        "packages/ui/src/onboarding/onboarding-flow.tsx"
+      ],
+      "proof": "损坏偏好回退为空快照并产生一次性非阻塞提示；下一次合法写入用原子替换修复，真实 I/O 错误仍 fail closed。"
+    },
+    {
+      "task": "MRT-008",
+      "status": "IMPLEMENTED_WITH_NATIVE_MATRIX_PENDING",
+      "paths": [
+        "apps/desktop/src-tauri/src/shortcuts/mod.rs",
+        "apps/desktop/src/app/mindmap-app.tsx"
+      ],
+      "proof": "换绑采用注册新键→持久化→注销旧键事务；失败尝试恢复绑定和偏好；前端失焦时首个唤醒只聚焦、不创建节点。"
+    },
+    {
+      "task": "MRT-010",
+      "status": "IMPLEMENTED_FAIL_CLOSED",
+      "paths": [
+        "scripts/quality/run-all.mjs",
+        "scripts/quality/verify-evidence.mjs"
+      ],
+      "proof": "唯一总入口已覆盖格式、类型、lint、单测、集成、a11y、构建、Cargo、边界、许可证、网络、golden、性能、资产和证据校验；缺证据返回非零。"
+    },
+    {
+      "task": "MRT-011",
+      "status": "WEB_ASSET_IMPLEMENTED_NATIVE_MEASUREMENT_PENDING",
+      "paths": [
+        "packages/export/src/index.ts",
+        "apps/desktop/src/app/ports.ts",
+        "scripts/quality/measure-release-assets.mjs",
+        "scripts/quality/run-performance.mjs"
+      ],
+      "proof": "初始 entry JS 当前为 495,995 bytes；PDF/PNG/WASM 和字体不阻塞首帧，原生 installer/startup/RSS 仍需 G2 后的候选包。"
+    },
+    {
+      "task": "MRT-012",
+      "status": "ENGINEERING_PREPARATION_COMPLETE_G2_PENDING",
+      "paths": [
+        "docs/product/licensing.md",
+        "docs/quality/release-checklist.md",
+        "scripts/quality/scan-dependency-licenses.mjs"
+      ],
+      "proof": "JS 直接依赖与 Cargo lockfile 均纳入许可证扫描；最终项目许可证、产品身份、unsigned candidate 和安装范围仍由 G2/法律审阅决定。"
+    }
+  ],
+  "verification": {
+    "commands": [
+      "node scripts/runtime-spike/verify-decision.mjs --phase bootstrap docs/decisions/decision-register.json",
+      "pnpm format:check",
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm test:unit",
+      "pnpm build",
+      "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+      "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+      "node scripts/quality/check-boundaries.mjs --scope selected-canvas",
+      "node scripts/quality/scan-dependency-licenses.mjs",
+      "node scripts/quality/scan-network-endpoints.mjs"
+    ],
+    "expected": "上述工程检查应为 0；发布性能和证据完整性仍按下方 blockedReasons 失败关闭。",
+    "artifacts": [
+      ".tmp/quality/release-assets.json",
+      ".tmp/quality/release-performance.json",
+      "docs/quality/evidence/mrt-post-vra-readiness.json"
+    ]
+  },
+  "blockedReasons": [
+    "G2 仍为 pending，不能构建或安装未获批准范围的 release candidate。",
+    "当前工作树未提交，不能生成 clean-source release evidence。",
+    "Windows 实机、安装/卸载、性能和视觉报告缺失（R-013）。",
+    "原生 cold/warm start、稳定 RSS、installer size 和 native dense-canvas 未测量。",
+    "ADR 0007 最终项目许可证、产品身份与必要法律审阅仍未完成。",
+    "G-FINAL 真实 macOS 视觉终态签署仍需项目负责人执行。"
+  ],
+  "overall": "BLOCKED"
+}

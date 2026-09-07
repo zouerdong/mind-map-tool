@@ -40,6 +40,5 @@ Pass-Fail/截图或日志路径/日期。构建 ID 填 commit hash + 构建类�
 
 ## Windows
 
-无 Windows 设备（R-013）：本矩阵 Windows 等价项为**未执行**，不是不适用；
-MM-090 聚合按「缺任一平台真实报告 → BLOCKED（对 Windows 维度）」记录，
-macOS 证据构成 ADR 0001 G1 批准的先行验收基础。
+根据 PRD §1.1 与 G1 范围变更，Windows 原生验收顺延至后续专门版本（deferred），不属于本次 v1 验收范围；Windows 状态如实记录为 deferred/not-run，不阻断 v1 发布。
+macOS Apple Silicon 原生证据构成 ADR 0001 / ADR 0006 G1 批准的完整验收基础。

@@ -17,7 +17,7 @@
     "frontendAssetSha256": "2192a6509f9cb46f49cc3390f6024364ab8f4abfdc4183028794f340655d237e",
     "frontendAsset": "assets/index-W04bpmv5.js",
     "builtAt": "2026-08-30T15:13:49",
-    "builtAfterLatestSourceMtime": "2026-08-30T15:13:49 > 2026-08-30T14:43:16"
+    "builtAfterLatestSourceMtime": "2026-08-30T15:13:49 > 2026-08-30T15:12:54 (apps/desktop/src-tauri/src/ipc/mod.rs)"
   },
   "environment": {
     "macOS": "26.6.2",

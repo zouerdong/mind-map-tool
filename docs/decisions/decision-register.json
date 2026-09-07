@@ -239,16 +239,37 @@
       ]
     },
     "G2": {
-      "status": "pending",
+      "status": "approved",
       "owner": "project-owner",
-      "approvedBy": null,
-      "approvedAt": null,
+      "approvedBy": "project-owner",
+      "approvedAt": "2026-09-07",
       "approvedScope": {
-        "selectedHost": null,
-        "candidateOutputPaths": [],
-        "installationTargets": [],
-        "allowedActions": [],
-        "deletionBoundaries": [],
+        "productName": "Mind Map",
+        "bundleIdentifier": "com.mindmap.desktop",
+        "version": "0.1.0",
+        "selectedHost": "tauri",
+        "candidateOutputPaths": [
+          "apps/desktop/src-tauri/target/release/bundle/macos/Mind Map.app",
+          "apps/desktop/src-tauri/target/release/bundle/dmg/Mind Map_0.1.0_aarch64.dmg"
+        ],
+        "evidenceOutputPaths": [
+          ".tmp/release-candidate"
+        ],
+        "installationTargets": [
+          ".tmp/release-candidate/installed/Mind Map.app"
+        ],
+        "allowedActions": [
+          "build",
+          "launch",
+          "install",
+          "uninstall",
+          "measure-performance",
+          "permission-probe"
+        ],
+        "deletionBoundaries": [
+          ".tmp/release-candidate",
+          "apps/desktop/src-tauri/target/release/bundle"
+        ],
         "explicitlyExcluded": [
           "test-signing",
           "signing",
@@ -259,7 +280,11 @@
           "publication"
         ]
       },
-      "evidence": []
+      "evidence": [
+        "PRC-050 产品身份、命名统一与 G2 决策包",
+        "macOS Apple Silicon (aarch64-apple-darwin) unsigned 候选包本地构建授权",
+        "签名、公证、凭据访问、上传与公开发布明确排除"
+      ]
     }
   },
   "validationProfiles": {

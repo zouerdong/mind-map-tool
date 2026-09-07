@@ -1,0 +1,18 @@
+{
+  "task": "MRT-004G",
+  "decisionId": "ADR-0008-window-launch-lifecycle",
+  "approvedBy": "ErDong Zou（项目负责人）",
+  "approvedAt": "2026-08-30T21:31:37+08:00",
+  "userStatement": "我已阅读并批准 docs/decisions/0008-window-launch-lifecycle.md 所提出的方案：采用 Rust host 作为唯一 WindowRegistry 与 LaunchCoordinator owner。请将 ADR 0008 转为 Accepted 1.0.0，并开始 MRT-004G 与 MRT-004A。",
+  "adrPath": "docs/decisions/0008-window-launch-lifecycle.md",
+  "adrVersion": "1.0.0",
+  "adrSha256": "a88c9606000a8e72e59ee634f02eecc652c0d82c1a336b8f5ad248c70a1c105e",
+  "hashAlgorithm": "SHA-256（shasum -a 256，对最终 ADR 文件 bytes 计算）",
+  "decisionSummary": "Rust host 作为唯一 WindowRegistry 与 LaunchCoordinator owner：native source 只向 host 入队；host 按序路由、维护 per-window 状态与 file identity reservation；同 identity 聚焦；cold 首文件可分配默认 main，其余建 editor-*；activation 总是新建空白窗；新窗口 listener-first bootstrap；renderer 回报 awaitable terminal outcome 后才 ack。",
+  "scopeAuthorized": "MRT-004G（本记录）与 MRT-004A（纯状态机基础）；MRT-004B～E 未开始。",
+  "registerNote": "decision-register.json 为 G1 四轨 Spike 登记（approvedTracks/acceptedAdrVersions schema），不承载 windowLifecycle 决定；本记录为该决定的独立审计来源。",
+  "predecessorState": {
+    "mrt003vAcceptance": ".omx/reviews/2026-08-30-mrt-003v-acceptance.md（ACCEPTED）",
+    "priorAdrStatus": "Proposed 0.1.0 → 本批准转为 Accepted 1.0.0"
+  }
+}

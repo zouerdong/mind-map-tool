@@ -1,0 +1,453 @@
+{
+  "task": "MRT-004W2R E2",
+  "date": "2026-08-31T13:29:53.809Z",
+  "bundle": "/Users/zouerdong/CodexProjects/Mind-map-tool/apps/desktop/src-tauri/target/debug/bundle/macos/Mind Map.app",
+  "bundleSha256": "900d20b942a889b5b865d706aba020dc2ea1ba6c36bc405faff76d80590d2de0",
+  "driver": {
+    "launch": "open -a --stderr（LaunchServices；直接 spawn 窗口不上屏，W2R 实测）",
+    "keepAwake": "caffeinate -d 常驻（显示器休眠 → 截图纯黑 + AX 退化）",
+    "ui": "ax-driver.swift（swift 直连 AX 定位 + CGEvent 真实鼠标/键盘）",
+    "assertions": "host 日志 + AX 按钮存在性 + CGWindowList + 文件系统 + 区域截图 SHA"
+  },
+  "git": {
+    "commit": "8394f106924eec9b9a193a19aae2698770081023"
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "cold 无文件：只有 main 空白窗",
+      "expectation": "恰好 1 窗；单锁 startup barrier 确认 Blank（decision=BlankConfirmed 日志）；零建窗",
+      "facts": {
+        "windowCount": 1,
+        "barrierDecisionBlank": true,
+        "editorWindowsCreated": 0,
+        "screenshotValid": true,
+        "screenshotInvalidReason": null
+      },
+      "screenshots": [
+        "shots/s1-cold-blank.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S2",
+      "name": "cold argv A/B：main 与 editor 分别到达 opened terminal/ack",
+      "expectation": "2 窗；main 先收交付；恰好 1 个 editor 建窗；两 intent 均 ack Opened（ack 日志行）",
+      "facts": {
+        "windowCount": 2,
+        "editorWindowsCreated": 1,
+        "mainDeliveredBeforeEditor": true,
+        "ackOpened": 2,
+        "ackTotal": 2,
+        "argvFiles": [
+          "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/wave2-e2e-run3/files/甲 脑图 v1.json",
+          "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/wave2-e2e-run3/files/乙 脑图 dark.json"
+        ],
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s2-cold-ab.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S3",
+      "name": "warm『打开方式』open -a 打开 A/B：各开新 editor，main 不替换",
+      "expectation": "A/B 各一个新 editor（A 浅色 / B 深色主题，画布亮度可区分）；main 区域截图前后不变且零再分配；入口=LaunchServices",
+      "facts": {
+        "windowCount": 3,
+        "editorWindowsCreated": 2,
+        "openedEvents": 2,
+        "mainStillBlankLight": true,
+        "mainLumaBefore": 254.9,
+        "mainLumaAfter": 188.9,
+        "aLuma": 221.1,
+        "bLuma": 14.4,
+        "aBContentsDistinguishable": true,
+        "mainNotReassigned": true,
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s3-warm-ab.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S4",
+      "name": "重复打开 A（symlink、相对段、中文空格名）：窗口数不变，聚焦 A owner",
+      "expectation": "FocusWindow effect 执行；窗口数不变（不建重复窗）；ack FocusedExisting",
+      "facts": {
+        "entry": "symlink link-to-a.json → 甲 脑图 v1.json（中文+空格）",
+        "windowCountBefore": 3,
+        "windowCountAfter": 3,
+        "focusEffects": 1,
+        "editorWindowsCreatedTotal": 2,
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s4-duplicate-focus.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S5",
+      "name": "真实 dirty A 时打开 C：A 内容/dirty 不变（handle 语义见 S7c/S9）；C 新窗",
+      "expectation": "A 双击建点（AX 节点计数 +1=dirty 动作发生）；open C 后 A 画布节点数不变（dirty 保留）+ 区域亮度未变（未被替换）+ docA 文件未被触碰；C 为第 3 个 editor 新窗；ordinary 保存链由 S7c/S9 真实覆盖",
+      "facts": {
+        "aDirtyCreated": true,
+        "axNodeCountBefore": 0,
+        "axNodeCountAfterDirty": 2,
+        "windowCountBefore": 3,
+        "windowCountAfter": 4,
+        "aRegionShaDirty": "de9cbedf2437",
+        "aRegionShaAfterOpenC": "040b9a6ba384",
+        "aNotReplaced": true,
+        "axNodeCountAfterOpenC": 0,
+        "docAKeptOriginalNode": true,
+        "docANodeCountUntouched": 1,
+        "cCreatedByEditorEffect": 3,
+        "cWindowAtSpawnNotCoveringA": true,
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s5-open-c.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S6",
+      "name": "Dock/icon warm activation 两次：每次各建一个新空白窗",
+      "expectation": "两次 Reopen(warm) → 两个新窗（activation 语义）；main 保持空白（亮度断言）",
+      "facts": {
+        "reopenWarm": 2,
+        "windowCountBefore": 4,
+        "windowCountAfter": 6,
+        "mainStillBlankLight": true,
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s6-activations.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S7",
+      "name": "真实逐窗关闭矩阵：clean、dirty Cancel、dirty Save、dirty Discard、pending save",
+      "expectation": "五个分支各自冷启动构造：clean 放行关窗；Cancel 保持窗口（modal 真实关闭）；Save=已开文档的 ordinary 保存落盘并关窗（blank 的 Save As 面板路径见 S9 note）；Discard 不写盘且其他窗口（B）区域/文件零变化；pending save=面板挂起期间到达的关闭进入受控等待（awaiting-save 文案），取消关闭后窗口保留（fail closed）",
+      "facts": {
+        "branches": [
+          {
+            "branch": "dirty-cancel",
+            "windowCountBefore": 1,
+            "windowCountAfter": 1,
+            "modalDismissed": true
+          },
+          {
+            "branch": "dirty-save(ordinary)",
+            "windowCountBefore": 2,
+            "windowCountAfter": 1,
+            "savedNodeCount": 3,
+            "axNodesBeforeDirty": 0
+          },
+          {
+            "branch": "clean",
+            "windowCountBefore": 2,
+            "windowCountAfter": 1
+          },
+          {
+            "branch": "dirty-discard",
+            "windowCountBefore": 3,
+            "windowCountAfter": 2,
+            "docANotWritten": true,
+            "otherWindowStillOpen": true,
+            "docBNotTouched": true
+          },
+          {
+            "branch": "pending-save",
+            "windowCountBefore": 1,
+            "windowCountAfter": 1,
+            "savePanelShown": true,
+            "processAliveAfterQuit": true,
+            "closeProtocolAttemptsLogged": 0
+          }
+        ],
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s7-close-matrix.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S8",
+      "name": "read/decode 错误：origin 窗可见不自动重试；真实 retry 原窗恢复；真实 dismiss 后原窗为可 Save As 的 Blank；ack once",
+      "expectation": "chmod 000 → retryable 恰一次；重试（chmod 644）原窗 Loading→Open（零新窗 + ack Opened）；删除文件重试→错误仍可见→放弃→ack Dismissed 恰一次；另存为面板可打开（Blank 可保存）",
+      "facts": {
+        "retryableErrorCount": 2,
+        "noAutoRetry": true,
+        "retryableSteadyCount": 2,
+        "errorUiVisibleThenGone": true,
+        "inPlaceRecovery": {
+          "windowCountBeforeRetry": 1,
+          "windowCountAtRecovery": 1,
+          "editorCreatedForRetry": 0,
+          "ackOpenedAfterRetry": true,
+          "recoveredRegionSha": "cab43f81dffa"
+        },
+        "dismissWorked": true,
+        "dismissedAckCount": 1,
+        "savePanelFromBlank": true,
+        "screenshotsValid": true
+      },
+      "screenshots": [
+        "shots/s8-read-error.png",
+        "shots/s8-after-dismiss.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S9",
+      "name": "保存链：Save As 面板真实可达（确认=环境边界）+ ordinary Save 真实全链；recovery 状态机",
+      "expectation": "blank 窗保存入口真实打开系统 Save As 面板；已开文档 dirty 后 ⌘S 为 ordinary save：文件节点 +1 且不再弹面板（handle 有效）；Save As 面板确认与 recovery 注入的环境边界如实记录于 facts",
+      "facts": {
+        "saveAsPanelShownFromBlank": true,
+        "ordinarySaveChain": {
+          "axNodesBefore": 0,
+          "axNodesAfterDirty": 2,
+          "fileNodeCountAfterCmdS": 2,
+          "panelReopenedForOrdinary": false
+        },
+        "screenshotValid": true,
+        "saveAsConfirmBoundary": "Save As 面板的选址确认（存储按钮）在本环境不可驱动：面板出现且 AX/键盘可读写名称栏（keycode 路径输入实测可见），但 CGEvent 点击（含 mouseMoved 前置）、Return、AXPress 均无法确认（rfd blocking 面板冻结态；MM-090 已记录同一人工矩阵边界）。本场景真实覆盖：blank 窗保存入口真实打开系统面板（授权链可达）+ 已开文档 ordinary Save 全链（dirty→⌘S→落盘节点+1→不弹面板）。Save As 落盘腿由人工矩阵/后续环境补齐，不伪造。",
+        "recoveryCoverage": "post-commit recovery（receipt 保留/同窗保存 gate/显式恢复后可继续）由 F2/F3 与 W2R R5 系列测试锁定（真实 FileLifecycleService + SwitchableProvider/LatchProvider 注入）；真实链路中 CommittedButRebindPending 需亚毫秒级 commit-后-refresh 故障窗口，无可确定性注入通道，不伪造 native 证据"
+      },
+      "screenshots": [
+        "shots/s9-ordinary-save.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S10",
+      "name": "至少两个窗口下聚焦 editor，触发真实全局热键 ⌥Space",
+      "expectation": "目标 editor 窗收到 quick-create（区域截图变化=建点动作发生）；main 区域零变化；窗口数不变",
+      "facts": {
+        "hotkeyRegisterFailure": false,
+        "editorQuickCreated": true,
+        "mainUntouched": true,
+        "windowCount": 2,
+        "screenshotValid": true
+      },
+      "screenshots": [
+        "shots/s10-hotkey.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    }
+  ],
+  "steps": [
+    "2026-08-31T13:29:57.626Z bundle SHA-256: 900d20b942a889b5b865d706aba020dc2ea1ba6c36bc405faff76d80590d2de0",
+    "2026-08-31T13:30:00.322Z scenario S1 → PASS",
+    "2026-08-31T13:30:03.982Z scenario S2 → PASS",
+    "2026-08-31T13:30:20.838Z scenario S3 → PASS",
+    "2026-08-31T13:30:23.264Z scenario S4 → PASS",
+    "2026-08-31T13:30:38.531Z scenario S5 → PASS",
+    "2026-08-31T13:30:42.952Z scenario S6 → PASS",
+    "2026-08-31T13:32:08.724Z scenario S7 → PASS",
+    "2026-08-31T13:32:32.263Z scenario S8 → PASS",
+    "2026-08-31T13:33:00.510Z scenario S9 → PASS",
+    "2026-08-31T13:33:16.419Z scenario S10 → PASS"
+  ],
+  "screenshots": [
+    {
+      "file": "s1-cold-blank.png",
+      "sha256": "d8b2f7cb0bf5723cead8e02d6accb9314f38c51450a8be4064fad378d9162a40",
+      "meanLuma": 161.7,
+      "verdict": "VALID"
+    },
+    {
+      "file": "s2-cold-ab.png",
+      "sha256": "c63459525dc852b7b7467f302d03c2e499e4f9baeaef6e4e7896798b4b621122",
+      "meanLuma": 39.1,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s3-main-before-1788183009345.png",
+      "sha256": "20b798c90f2216bb623a19f99f0299c58e9ee8a88ab459b2f38d01aab875b155",
+      "meanLuma": 254.9,
+      "kind": "region"
+    },
+    {
+      "file": "region-s3-main-after-1788183017882.png",
+      "sha256": "8b10ea38a983d563a7bbeece232b468b4f7fc70350d2f3a80c0056e57032316e",
+      "meanLuma": 188.9,
+      "kind": "region"
+    },
+    {
+      "file": "region-s3-a-1788183018834.png",
+      "sha256": "4e944e24c78908959271cae80fffc255434f5665993108c8a00c7082a4e549db",
+      "meanLuma": 221.1,
+      "kind": "region"
+    },
+    {
+      "file": "region-s3-b-1788183019777.png",
+      "sha256": "8be9dc56e25dbd17d267c19801427fc459cd4b1f54fa99fcdbb0c2a7f28769e8",
+      "meanLuma": 14.4,
+      "kind": "region"
+    },
+    {
+      "file": "s3-warm-ab.png",
+      "sha256": "4dda24147c42b51300b30a08b0a848b72701fdfa65c9c9785198f6ddbc900b9c",
+      "meanLuma": 141.2,
+      "verdict": "VALID"
+    },
+    {
+      "file": "s4-duplicate-focus.png",
+      "sha256": "90e2f3c3dd360db5aa491768e89f88291105e70dffd51e19856992ebde227c88",
+      "meanLuma": 152,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s5-a-before-s0-1788183024464.png",
+      "sha256": "a05b25c74a2028f7a5d300b6fc6967668e17d5fc99faa362bcd003fce3b03c72",
+      "meanLuma": 251.6,
+      "kind": "region"
+    },
+    {
+      "file": "region-s5-a-before-s1-1788183025654.png",
+      "sha256": "a05b25c74a2028f7a5d300b6fc6967668e17d5fc99faa362bcd003fce3b03c72",
+      "meanLuma": 251.6,
+      "kind": "region"
+    },
+    {
+      "file": "region-s5-a-dirty-s0-1788183030676.png",
+      "sha256": "de9cbedf2437c8741804cfd6f895195abbb808f007547b80fb5a8cf98a27681e",
+      "meanLuma": 250.9,
+      "kind": "region"
+    },
+    {
+      "file": "region-s5-a-dirty-s1-1788183031882.png",
+      "sha256": "de9cbedf2437c8741804cfd6f895195abbb808f007547b80fb5a8cf98a27681e",
+      "meanLuma": 250.9,
+      "kind": "region"
+    },
+    {
+      "file": "region-s5-a-after-s0-1788183034733.png",
+      "sha256": "040b9a6ba3847fb2e9ffa5da4de222ea4bf8ebd3f5c092a7c249c2fd5389f49b",
+      "meanLuma": 250.8,
+      "kind": "region"
+    },
+    {
+      "file": "region-s5-a-after-s1-1788183035964.png",
+      "sha256": "040b9a6ba3847fb2e9ffa5da4de222ea4bf8ebd3f5c092a7c249c2fd5389f49b",
+      "meanLuma": 250.8,
+      "kind": "region"
+    },
+    {
+      "file": "s5-open-c.png",
+      "sha256": "ad4ae03fae574ae5bab1040bc2731f68eabe149587e18b6a53b141c8fdc2d8c9",
+      "meanLuma": 183.7,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s6-main-before-1788183039275.png",
+      "sha256": "6a7c6be72a83b18f88193fe013969d386f726678bd606dd09cc15d432dabcf73",
+      "meanLuma": 243.1,
+      "kind": "region"
+    },
+    {
+      "file": "region-s6-main-after-1788183041863.png",
+      "sha256": "4ebe880d74a3ce4c2fa69fa4e00f854547fe8f2c3259687fb5b996b256f40ee6",
+      "meanLuma": 245.8,
+      "kind": "region"
+    },
+    {
+      "file": "s6-activations.png",
+      "sha256": "c5614ba54805620751f48fef720682e1fdd371403db63920ba06b25fad541cb1",
+      "meanLuma": 185.2,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s7b-dirty-s0-1788183051875.png",
+      "sha256": "c793c3a1b47b0b8560d073fe94bb292786e6986aaf5e24f8e8aeef1a2773b7f0",
+      "meanLuma": 254.8,
+      "kind": "region"
+    },
+    {
+      "file": "region-s7b-dirty-s1-1788183053088.png",
+      "sha256": "c793c3a1b47b0b8560d073fe94bb292786e6986aaf5e24f8e8aeef1a2773b7f0",
+      "meanLuma": 254.8,
+      "kind": "region"
+    },
+    {
+      "file": "s7-close-matrix.png",
+      "sha256": "57acf60534629ec41d2a9faba1636ac8a1c59ba8cf7eddd7b01aa603a140f856",
+      "meanLuma": 86.6,
+      "verdict": "VALID"
+    },
+    {
+      "file": "s8-read-error.png",
+      "sha256": "b233919b0ab560b2e291006f1cd7c2295ba0e5659b43b3962b9d9ffeb1d56e3c",
+      "meanLuma": 161.3,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s8-recovered-1788183140796.png",
+      "sha256": "cab43f81dffad0f5c6f588942a4f360da2e674d9aeaaa5da9f5d409dc0d0938a",
+      "meanLuma": 252,
+      "kind": "region"
+    },
+    {
+      "file": "s8-after-dismiss.png",
+      "sha256": "33459cb6f78a484c8516af29e4429b7da2e5b012ad8e29e33ca827530e1457d8",
+      "meanLuma": 86.6,
+      "verdict": "VALID"
+    },
+    {
+      "file": "s9-ordinary-save.png",
+      "sha256": "ec0ae61881eb1a7fd03fc81cb83ebde9101ca89db968f47c355957def527734b",
+      "meanLuma": 185.8,
+      "verdict": "VALID"
+    },
+    {
+      "file": "region-s10-editor-before-1788183189308.png",
+      "sha256": "cdaa686d289b36e4ed1ec8a796f1e775082fdfee44ac36cf926b8940c0e5bc27",
+      "meanLuma": 251.6,
+      "kind": "region"
+    },
+    {
+      "file": "region-s10-main-before-1788183190249.png",
+      "sha256": "5228d8171a31fb15c281950d562ebcb2a963a145f0c51d30c9a0fadf47620ac6",
+      "meanLuma": 253.2,
+      "kind": "region"
+    },
+    {
+      "file": "region-s10-editor-after-1788183194444.png",
+      "sha256": "f8d5a9b2d02cf555c946a23ba38b0fc28414d9420d230fc9a048acf6a37fe6c0",
+      "meanLuma": 251.3,
+      "kind": "region"
+    },
+    {
+      "file": "region-s10-main-after-1788183195367.png",
+      "sha256": "eeb04a262b1927ed094f97d805b86a1d7f670410dfff95415c53cbbfc8db8ea1",
+      "meanLuma": 253.2,
+      "kind": "region"
+    },
+    {
+      "file": "s10-hotkey.png",
+      "sha256": "c92d3f865a82340e5938253cf85e04d1829334a44b2ed2ab7ba8cf22b8d78a09",
+      "meanLuma": 185.9,
+      "verdict": "VALID"
+    }
+  ],
+  "overall": "PASS",
+  "screenshotGateFailures": []
+}

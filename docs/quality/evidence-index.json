@@ -1,7 +1,7 @@
 {
   "task": "MM-090",
-  "description": "AC-01～AC-14 证据索引（v1-test-spec §8 追溯矩阵的登记处）",
-  "statusNote": "final-rerun 2026-08-29（完整重跑后刷新；E2E 受本机 TCC 输入注入限制的覆盖边界见 mm-090-report.md 与 cases.mjs 头注）",
+  "description": "AC-01～AC-14 证据索引（v1 必需发布平台为 macOS Apple Silicon，Windows 顺延至后续专门版本）",
+  "statusNote": "final-rerun 2026-08-29；PRC 批次对齐：macOS 为 v1 唯一 required 平台，Windows 标记为 deferred/not-run",
   "generatedAt": "2026-08-29T10:32:06.333582+00:00",
   "acs": [
     {

@@ -2,6 +2,18 @@
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
+## 2026-09-07 发布前收口批次
+
+本批次把 2026-09-07 发布前终审中仍未关闭的真实发布条件整理为 PRC-000～PRC-090。当前状态为 `DRAFT / READY_FOR_OWNER_REVIEW`：用户已要求产出指南与任务卡，但尚未因此授权修改 CI/发布判定、生产 Tauri 配置、删除文件、候选安装、签名、公证、上传或公开发布。
+
+- [发布前收口开发指南](./pre-release-closure-development-guide-2026-09-07.md)：v1 权威范围、完成层级、Gate、技术路线与最终验收口径。
+- [发布前收口任务卡](./pre-release-closure-task-cards-2026-09-07.md)：PRC-000～PRC-090 的允许范围、红灯用例、命令、STOP 条件与交接物。
+- [终审输入](../../.omx/reviews/2026-09-07-mrt-post-vra-final-review.md)：当前代码、测试、候选证据和发布治理的事实基线。
+
+本批次明确按已批准 PRD/ADR 执行：v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，只保留移植准备与 `deferred/not-run` 记录，不作为本次 v1 原生发布阻塞。由于修订现有 quality/CI 判定仍属于发布门变更，必须先取得任务卡定义的 `G-PRC-SCOPE`。
+
+文件使用 `pre-release-closure-<purpose>-2026-09-07.md`。正文通过 `G-PRC-PLAN` 前不得派发写入型任务；通过后若正文发生实质变化，需要重新审阅并记录新批准版本，旧版保留追溯。
+
 ## 2026-09-06 参考对齐批次
 
 以下是独立同伴审阅的新增规划，不冒充旧 Ralplan 共识或用户实施批准。审阅与精确哈希见 `.omx/plans/visual-alignment-review-manifest-2026-09-06.json`。

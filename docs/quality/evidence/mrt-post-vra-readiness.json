@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "caseId": "MRT-POST-VRA-READINESS-2026-09-07",
+  "task": "MRT-010/MM-110",
+  "generatedAt": "2026-09-06T16:36:39Z",
+  "source": {
+    "commit": "dc5402184cd49d9a960d5b303063d6d6e75012b1",
+    "worktree": "dirty",
+    "dirtyEntryCount": 171
+  },
+  "environment": {
+    "platform": "macOS",
+    "arch": "arm64",
+    "os": "macOS 26.6.2 (25G83)",
+    "node": "v26.8.1",
+    "buildType": "web production build; no native release candidate"
+  },
+  "commands": [
+    {
+      "id": "bootstrap-decision",
+      "command": "node scripts/runtime-spike/verify-decision.mjs --phase bootstrap docs/decisions/decision-register.json",
+      "exitCode": 0,
+      "artifact": "docs/decisions/decision-register.json"
+    },
+    {
+      "id": "format-check",
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "typecheck",
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "lint",
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "unit",
+      "command": "pnpm test:unit",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "build",
+      "command": "pnpm build",
+      "exitCode": 0,
+      "artifact": ".tmp/quality/release-assets.json"
+    },
+    {
+      "id": "cargo-format",
+      "command": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "cargo-test",
+      "command": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml -- --test-threads=1",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "cargo-clippy",
+      "command": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "boundaries",
+      "command": "node scripts/quality/check-boundaries.mjs --scope selected-canvas",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    },
+    {
+      "id": "license-scan",
+      "command": "node scripts/quality/scan-dependency-licenses.mjs --output .tmp/quality/license-scan.json",
+      "exitCode": 0,
+      "artifact": ".tmp/quality/license-scan.json"
+    },
+    {
+      "id": "network-scan",
+      "command": "node scripts/quality/scan-network-endpoints.mjs",
+      "exitCode": 0,
+      "artifact": "docs/quality/evidence/mrt-post-vra-implementation.json"
+    }
+  ],
+  "platformReports": {
+    "macos": {
+      "platform": "macOS",
+      "arch": "arm64",
+      "os": "macOS 26.6.2 (25G83)",
+      "command": "scripts/quality/run-e2e-macos.sh --case MRT-011/MRT-012",
+      "exitCode": null,
+      "status": "partial",
+      "reason": "现有 macOS lifecycle evidence 来自此前 commit；本批未在 G2 批准的 candidate 上重新完成 installer/startup/RSS 矩阵。",
+      "artifact": "docs/quality/evidence/wave2/mrt-004w2r-macos-e2e-run3.json"
+    },
+    "windows": {
+      "platform": "Windows",
+      "arch": "unavailable",
+      "os": "unavailable",
+      "command": "powershell -File scripts/quality/run-e2e-windows.ps1",
+      "exitCode": null,
+      "status": "blocked-no-device",
+      "reason": "当前没有 Windows 实机；同源 probe 不能替代应用 E2E、安装和性能报告。",
+      "artifact": "docs/quality/evidence/wave2/mrt-004w2r-windows-probe-source-sha256.txt"
+    }
+  },
+  "blockedReasons": [
+    "G2.status=pending",
+    "source.worktree=dirty",
+    "Windows 实机和真实平台报告缺失",
+    "原生 release candidate 尚未按批准范围生成",
+    "G-FINAL 与最终许可证/产品身份审阅未完成"
+  ],
+  "overall": "BLOCKED"
+}

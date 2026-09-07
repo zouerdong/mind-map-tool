@@ -2,13 +2,13 @@
 
 ## 结论
 
-**MRT-003 代码实现：ACCEPTED。MRT-003 总体验收：NEEDS-EVIDENCE。MRT-004 暂不解锁。**
+**MRT-003 代码实现与总体验收：ACCEPTED。MRT-003V 已补齐原生证据。**
 
 Rust host、IPC、platform adapter 和 App 三分支的实现方向正确，自动化门禁全部通过。审查中发现的三个局部状态机缺口已现场修复并补测试，没有需要退回的大型代码问题。
 
-当前唯一阻断是原生证据闭环：已有 macOS 自动化覆盖 clean、Cancel、Discard、重复关闭与 ⌘Q，但明确没有执行真实 Save/Save As 成功、Save As 取消和冲突保持窗口；证据所测 bundle 还早于最终前端源码。审查者尝试使用 `computer-use` 操作最新 bundle 时，本机处于锁屏状态，无法补做系统窗口与保存面板验证。因此不能把现有 `overall: PASS` 当作 MRT-003 完整通过。
+MRT-003V 已用同一真实 debug bundle 完成 V1～V7：中文与空格路径 Save As、系统面板取消、ordinary Save、外部改写冲突、只读目录 I/O 失败、Discard 和 Cancel，且逐项保留窗口状态、文件 hash 与截图。自动化子集 7/7、V1～V7 7/7，`automationStatus`、`manualNativeStatus` 与 `overall` 均为 PASS。
 
-下一步只执行 MRT-003V 证据收口卡。证据通过后，无需重做 MRT-003 代码，即可转为 ACCEPTED 并解锁 MRT-004。
+MRT-004 的证据前置条件已经解除；当前只剩 ADR 0008 的负责人批准 Gate，未批准前不得进入多窗口生产实现。
 
 ## 已通过的实现契约
 
@@ -25,7 +25,7 @@ Rust host、IPC、platform adapter 和 App 三分支的实现方向正确，自�
 | Cancel | PASS（自动化） | 不写盘、不撤权、不改 dirty；host ack 后才清 modal |
 | pending save | PASS（自动化） | 等待整条动态保存链终态；等待期间禁止直接 Discard |
 | app exit | PASS（自动化+已有原生子集） | 自定义 Quit 逐窗进入同一 close 协议；ExitRequested fail closed |
-| 原生 Save 三分支 | **缺证据** | 系统 Save 面板内操作被现有报告标为“人工矩阵待执行” |
+| 原生 Save 三分支 | PASS（MRT-003V） | 真实 NSSavePanel V1～V7，含成功、取消、冲突与 I/O 失败 |
 
 ## 审查中现场修复的小问题
 
@@ -55,7 +55,7 @@ host 已正确 rollback permit，但 clean 分支没有 modal；用户无法重�
 | --- | --- |
 | `pnpm --filter @mindmap/platform test` | PASS：3 files / 32 tests |
 | close/file 专项 | PASS：3 files / 40 tests |
-| `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` | PASS：45 tests |
+| `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` | PASS：46 tests（含 IPC camelCase 回归） |
 | `cargo clippy ... -- -D warnings` | PASS |
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
@@ -71,17 +71,16 @@ host 已正确 rollback permit，但 clean 分支没有 modal；用户无法重�
 
 ## 原生证据审计
 
-已有 `.omx/reviews/2026-08-30-mrt-003-macos-e2e.json`：
+最终证据见 `.omx/reviews/2026-08-30-mrt-003v-native-evidence.json`：
 
-- 自动化 PASS：E2E-CL1 clean、CL2 Cancel、CL3 Discard、CL4 重复关闭、CL5 ⌘Q。
-- 明确未覆盖：Save As 面板成功/取消、ordinary Save、外部冲突、IO/只读。
-- evidence 生成时间晚于 bundle，但被测 bundle 的构建时间早于最终 `mindmap-app.tsx` 修改时间，无法绑定最终工作区。
-- `overall: PASS` 只表示自动化子集，不应被解释为 MRT-003 完成定义整体 PASS。
-
-审查期间已经重新构建最新 debug bundle；因 Mac 锁屏，`computer-use` 无法进入 UI，未伪造补验结果。
+- 自动化 PASS：E2E-01A、E2E-16、E2E-CL1～CL5。
+- 人工原生矩阵 PASS：V1～V7；全部操作真实系统面板和真实 bundle，未使用 fake/jsdom 冒充。
+- 被测 executable SHA-256 为 `6b40410433238dd5c9e9ed0e318c4c0f1975ff2dc1f3cb5370c52332425f78e6`；前端主资源 SHA-256 为 `2192a6509f9cb46f49cc3390f6024364ab8f4abfdc4183028794f340655d237e`。
+- source 在 evidence 时为 `d57d9b9 + dirty`，随后完整落入 `v0.1.4 / 8394f10`；审查复核了各生产源文件时间、bundle hash、提交内容与现存原始夹具。
+- evidence 中“最新源码时间”原漏算 15:12:54 的 Rust serde 修复，已现场更正；bundle 仍晚于该修复，不影响 V1～V7 结论。
 
 ## 解锁决定
 
-- MRT-003V：READY，唯一下一步。
-- MRT-004：LOCKED，等待 MRT-003V。
+- MRT-003V：COMPLETE / ACCEPTED。
+- MRT-004：DECISION-GATE，等待负责人批准 ADR 0008。
 - UXD-001 前端体验定义：可并行启动，因为它只产出设计规格和原型，不修改生产 UI。

@@ -1,0 +1,191 @@
+{
+  "task": "MRT-004 Wave 2 E2",
+  "date": "2026-08-31T02:50:19.126Z",
+  "bundle": "/Users/zouerdong/CodexProjects/Mind-map-tool/apps/desktop/src-tauri/target/debug/bundle/macos/Mind Map.app",
+  "bundleSha256": "ac016f78565d485d1052e598ab4aa724bda65d85d4835aa76a2da00305467498",
+  "git": {
+    "commit": "8394f106924eec9b9a193a19aae2698770081023"
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "cold 无文件：只有 main 空白窗",
+      "expectation": "恰好 1 个窗口；startup barrier 确认 Blank 日志",
+      "facts": {
+        "windowRows": [
+          "Mind Map\tMind Map\t228,103 1254x784\t0"
+        ],
+        "logBlankConfirmed": true
+      },
+      "screenshots": [
+        "s1-cold-blank.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S2",
+      "name": "cold argv A/B：main=A、editor=B、顺序稳定、无多余空窗",
+      "expectation": "恰好 2 窗；main 先收交付（首文件占 main）；恰好 1 个 editor 建窗",
+      "facts": {
+        "windowCount": 2,
+        "editorWindowsCreated": 1,
+        "mainDeliveredBeforeEditor": true,
+        "mainAssignedOpen": true,
+        "argvFiles": [
+          "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/wave2-e2e/files/甲 脑图 v1.json",
+          "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/wave2-e2e/files/b.json"
+        ]
+      },
+      "screenshots": [
+        "s2-cold-ab.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S3",
+      "name": "warm『打开方式』/`open -a` 打开 A/B：各开新窗，不替换既有窗",
+      "expectation": "A/B 各一个新 editor 窗；main 保持 Blank；入口=LaunchServices（文件关联未注册，G2 前用等价系统入口）",
+      "facts": {
+        "entry": "open -a（LaunchServices open 事件；非 tauri.conf 伪造关联）",
+        "windowCount": 3,
+        "editorWindowsCreated": 2,
+        "openedEvents": 2
+      },
+      "screenshots": [
+        "s3-warm-ab.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S4",
+      "name": "重复打开 A（symlink/中文空格名）：聚焦同窗，不重复建窗",
+      "expectation": "窗口数不变；FocusWindow 日志（同 identity 聚焦既有窗口）",
+      "facts": {
+        "entry": "symlink link-to-a.json → 甲 脑图 v1.json（中文+空格名）",
+        "windowCountBefore": 3,
+        "windowCountAfter": 3,
+        "focusEffects": 1,
+        "editorWindowsCreated": 2
+      },
+      "screenshots": [
+        "s4-duplicate-focus.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S5",
+      "name": "A（clean）打开时系统打开 C：既有窗口承载不变；C 新窗",
+      "expectation": "窗口数恰 +1（warm open 永不替换既有窗）",
+      "facts": {
+        "windowCountBefore": 3,
+        "windowCountAfter": 4
+      },
+      "screenshots": [
+        "s5-open-c.png"
+      ],
+      "verdict": "PASS",
+      "note": "dirty 变体：合成键盘不达 WKWebView（MM-090 TCC 边界）——host 侧『warm-open 不替换既有窗』已由 W1 fake test 锁定，人工矩阵补真实 dirty 截图"
+    },
+    {
+      "id": "S6",
+      "name": "Dock/icon warm activation 两次：每次各建一个新空白窗",
+      "expectation": "两次 Reopen(warm) → 两个新空白窗（不替换任何既有窗）",
+      "facts": {
+        "entry": "open -a 无文件（激活=Dock 点击等价）",
+        "reopenWarm": 2,
+        "windowCountBefore": 4,
+        "windowCountAfter": 6
+      },
+      "screenshots": [
+        "s6-activations.png"
+      ],
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "id": "S7",
+      "name": "多窗关闭：⌘Q 退出协调逐窗真实关闭（clean 全部放行）",
+      "expectation": "窗口数归零、进程退出（每个窗口走 CloseRequested→permit→Closing→Destroyed 组合清理）",
+      "facts": {
+        "entry": "AppleEvent quit（com.mindmap.desktop；与 ⌘Q 同一 ExitRequested 协调链，逐窗走红关闭按钮同款三分支协议）",
+        "windowCountBefore": 6,
+        "windowCountAfter": 0
+      },
+      "screenshots": [
+        "s7-quit-all.png"
+      ],
+      "verdict": "PASS",
+      "note": "单窗红按钮 Cancel/Save/Discard 分支：MRT-003 E2E 与 Wave 2 C1/W2 fake test 锁定；AX 点击通道本机不可用（如实记录），人工矩阵补真实红按钮截图"
+    },
+    {
+      "id": "S8",
+      "name": "打开不可读文件：可见可 dismiss 的 retryable 错误；不自动重试",
+      "expectation": "窗口分配后读取失败 → retryable-error 恰好一次（不自旋）；窗口保持（错误 UI 可见）",
+      "facts": {
+        "entry": "chmod 000（identity 可解析、内容不可读——真实 read 故障注入）",
+        "retryableErrorCount": 1,
+        "windowCountAfter": 1,
+        "coldArgvEntry": "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/wave2-e2e/files/不可读 文档.json"
+      },
+      "screenshots": [
+        "s8-read-error.png"
+      ],
+      "verdict": "PASS",
+      "note": "retry/dismiss 动作与 ack 一致性由 D2 fake test 锁定（真实按钮点击依赖 AX，本机不可用）"
+    },
+    {
+      "id": "S9",
+      "name": "Save As 成功后普通 Save；可注入 post-commit recovery",
+      "expectation": "链路自动化受系统 Save 对话框限制（MM-090 已知：AX 不可驱动 rfd 面板）",
+      "facts": {
+        "coverage": "ordinary/Save As/recovery 的完整状态矩阵由 F2/F3/W1/W2/PR6 fake tests + window-bootstrap-integration.test.tsx 锁定（真实 FileLifecycleService 提交）",
+        "manual": "真实系统对话框选址链由人工矩阵承接（不做 mock 冒充）"
+      },
+      "screenshots": [],
+      "verdict": "MANUAL",
+      "note": "按任务卡『截图只能证明可见结果』原则，此场景不伪造自动化证据"
+    },
+    {
+      "id": "S10",
+      "name": "多窗下全局热键：目标是最近 focused 活窗（非硬编码 main）",
+      "expectation": "真实 ⌥Space 后无热键注册失败/无崩溃；分流目标语义由 H1 fake test + dispatch 生产代码（recent_focused_label）承担",
+      "facts": {
+        "entry": "真实系统热键（⌥Space，全局注册）",
+        "windowCount": 1,
+        "shortcutRegisterFailure": false
+      },
+      "screenshots": [
+        "s10-hotkey.png"
+      ],
+      "verdict": "PASS",
+      "note": "分流目标的强断言在 H1（GlobalShortcutState 语义 + fake sink 呈现窗口选择）；此处验证真实系统热键链路健康"
+    }
+  ],
+  "steps": [
+    "2026-08-31T02:50:19.132Z bundle SHA-256: ac016f78565d485d1052e598ab4aa724bda65d85d4835aa76a2da00305467498",
+    "2026-08-31T02:50:21.252Z 截图 s1-cold-blank.png",
+    "2026-08-31T02:50:21.454Z scenario S1 → PASS",
+    "2026-08-31T02:50:24.195Z 截图 s2-cold-ab.png",
+    "2026-08-31T02:50:24.395Z scenario S2 → PASS",
+    "2026-08-31T02:50:28.593Z 截图 s3-warm-ab.png",
+    "2026-08-31T02:50:28.797Z scenario S3 → PASS",
+    "2026-08-31T02:50:30.884Z 截图 s4-duplicate-focus.png",
+    "2026-08-31T02:50:30.884Z scenario S4 → PASS",
+    "2026-08-31T02:50:33.211Z 截图 s5-open-c.png",
+    "2026-08-31T02:50:33.212Z scenario S5 → PASS",
+    "2026-08-31T02:50:35.385Z 截图 s6-activations.png",
+    "2026-08-31T02:50:35.385Z scenario S6 → PASS",
+    "2026-08-31T02:50:35.987Z 截图 s7-quit-all.png",
+    "2026-08-31T02:50:35.987Z scenario S7 → PASS",
+    "2026-08-31T02:50:40.368Z 截图 s8-read-error.png",
+    "2026-08-31T02:50:40.368Z scenario S8 → PASS",
+    "2026-08-31T02:50:40.368Z scenario S9 → MANUAL",
+    "2026-08-31T02:50:43.212Z 截图 s10-hotkey.png",
+    "2026-08-31T02:50:43.212Z scenario S10 → PASS"
+  ],
+  "overall": "INCOMPLETE"
+}

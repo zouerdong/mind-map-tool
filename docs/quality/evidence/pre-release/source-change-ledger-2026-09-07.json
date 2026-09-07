@@ -1,0 +1,2131 @@
+{
+  "schemaVersion": 1,
+  "batch": "PRC-000",
+  "generatedAt": "2026-09-07T02:10:42.253Z",
+  "summary": {
+    "totalPaths": 211,
+    "modified": 127,
+    "deleted": 0,
+    "untracked": 84,
+    "byClassification": {
+      "releaseSource": 137,
+      "reviewEvidence": 63,
+      "referenceInput": 2,
+      "regenerableOutput": 8,
+      "obsoleteCandidate": 1
+    }
+  },
+  "entries": [
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-003-acceptance.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-003v-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-003v-native-evidence.json",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004-development-guide-and-task-card.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004-wave-1-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004-wave-1-host-foundation-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004-wave-1-implementation-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004a-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004a-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004a-state-machine-foundation-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004a1-concurrency-and-delivery-remediation-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004a1-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004b1-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004b1-reservation-and-rebind-remediation-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-30-mrt-004g-approval.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004-wave-2-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004-wave-2-implementation-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004-wave-2-production-integration-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004-wave-2-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004b1-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004b1a-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004b1a-host-outcome-and-token-remediation-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004b1a-implementation-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004b1a-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004w2r-acceptance.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004w2r-implementation-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004w2r-lifecycle-isolation-and-native-evidence-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004w2r-red-light-evidence.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-mrt-004w2r2-final-generation-and-native-proof-task-card.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-08-31-project-roadmap-and-space-audit.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": ".omx/reviews/2026-09-07-mrt-post-vra-final-review.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT review processes",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/capabilities/default.json",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/capabilities/file-lifecycle.json",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/authorization.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/error.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/handle.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/identity.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/mod.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/file/preferences.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/ipc/mod.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lib.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lifecycle/launch_coordinator.rs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lifecycle/launch.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lifecycle/mod.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lifecycle/runtime.rs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/lifecycle/window_registry.rs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src/shortcuts/mod.rs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src-tauri/tauri.conf.json",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/App.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/app-header.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/app-integration.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/close-lifecycle.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/error-boundary.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/export-commands.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/fake-ports.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/font-geometry-barrier.test.tsx",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/global-shortcut.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/keyboard.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/mindmap-app.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/observed-session.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/organize.integration.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/ports.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/shortcut-pre-focus.test.tsx",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/shortcut-table.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/window-bootstrap-blank.test.tsx",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "apps/desktop/src/app/window-bootstrap-integration.test.tsx",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/architecture/window-launch-lifecycle.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/decisions/0008-window-launch-lifecycle.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/decisions/0011-post-vra-reliability-and-loading.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/decisions/decision-register.json",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/pre-release-closure-development-guide-2026-09-07.md",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC planning",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/pre-release-closure-task-cards-2026-09-07.md",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC planning",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/README.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/visual-alignment-audit-2026-09-06.md",
+      "gitState": "untracked",
+      "originBatch": "VRA",
+      "owner": "product-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA planning & spec",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/visual-alignment-development-guide-2026-09-06.md",
+      "gitState": "untracked",
+      "originBatch": "VRA",
+      "owner": "product-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA planning & spec",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/planning/visual-alignment-task-cards-2026-09-06.md",
+      "gitState": "untracked",
+      "originBatch": "VRA",
+      "owner": "product-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA planning & spec",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/product/licensing.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/product/v1-product-spec.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/product/visual-target-brief-2026-09-06.md",
+      "gitState": "untracked",
+      "originBatch": "VRA",
+      "owner": "product-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA planning & spec",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence-index.json",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/mrt-post-vra-implementation.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT post-VRA review",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/mrt-post-vra-readiness.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT post-VRA review",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/mrt-post-vra-risk-evidence.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT post-VRA review",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/pre-release//README.md",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/pre-release//source-change-ledger-2026-09-07.json",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer2-layout-horizontal.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer2-layout-vertical.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer3-motion-200ms.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer3-motion-400ms.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer3-motion-600ms.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer3-motion-800ms.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/layer3-motion-tree-17.png",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/visual-alignment/visual-evidence-summary.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "regenerable-output",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "scripts/quality/run-visual-alignment.mjs",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004-wave2-cold-opened-order.log",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004-wave2-macos-e2e.json",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-macos-e2e-run1.json",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-macos-e2e-run2.json",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-macos-e2e-run3.json",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-windows-main-crate-check.log",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-windows-probe-check.log",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-windows-probe-source-sha256.txt",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2//mrt-004w2r-windows-probe.log",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2/mrt-004-wave2-macos-e2e.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT Wave 2 e2e",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2/mrt-004w2r-macos-e2e-run1.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT Wave 2 e2e",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2/mrt-004w2r-macos-e2e-run2.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT Wave 2 e2e",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2/mrt-004w2r-macos-e2e-run3.json",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT Wave 2 e2e",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/evidence/wave2/mrt-004w2r-windows-probe-source-sha256.txt",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT Wave 2 e2e",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/mm-090-manual-matrix.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/README.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/release-checklist.md",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "architecture",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Documentation",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/v1-quality-gates.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/v1-risk-register.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "docs/quality/v1-test-spec.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "project-owner",
+      "classification": "review-evidence",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "input/动态样式参考.mov",
+      "gitState": "untracked",
+      "originBatch": "user-input",
+      "owner": "product-owner",
+      "classification": "reference-input",
+      "intendedDisposition": "retain-untracked-pending-decision",
+      "evidenceOrGenerator": "User reference materials",
+      "approvalRequired": "PRC-060-retention-decision"
+    },
+    {
+      "path": "input/样式参考.JPG",
+      "gitState": "untracked",
+      "originBatch": "user-input",
+      "owner": "product-owner",
+      "classification": "reference-input",
+      "intendedDisposition": "retain-untracked-pending-decision",
+      "evidenceOrGenerator": "User reference materials",
+      "approvalRequired": "PRC-060-retention-decision"
+    },
+    {
+      "path": "package.json",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/canonical.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/organize.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/organize.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/schema.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/schema.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/core/src/visual-style.test.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/edge-geometry.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/font-source.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/index.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/render-pdf.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/render-png.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/scene.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/svg.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/src/visual-style.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/test/edge-geometry.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/test/graph-json.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/test/resource-limits.test.ts",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/export/test/visual-style.test.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/file/tauri-file-adapter.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/index.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/ipc/types.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/lifecycle/launch-router.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/lifecycle/tauri-adapter.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "obsolete-candidate",
+      "intendedDisposition": "delete-pending-approval",
+      "evidenceOrGenerator": "Superseded by tauri-window-bootstrap.ts",
+      "approvalRequired": "G-PRC-ADR"
+    },
+    {
+      "path": "packages/platform/src/lifecycle/tauri-window-bootstrap.ts",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/lifecycle/window-bootstrap.ts",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/preferences/tauri-adapter.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/src/preferences/types.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/test/launch-router.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/test/tauri-adapters.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/platform/test/window-bootstrap.test.ts",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/perf/canvas-perf-app/src/main.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/context-toolbar.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/editor-canvas.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/geometry-barrier.ts",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/keyboard-navigation.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/mind-edge.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/mind-node.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/motion-coordinator.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/canvas/node-text-editor.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/controller/event-command-map.md",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/controller/interaction-controller.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/index.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/onboarding/onboarding-flow.tsx",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/onboarding/onboarding-overlay.tsx",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/onboarding/onboarding-preferences.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/onboarding/onboarding-reducer.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/onboarding/onboarding-types.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/src/projection/projection.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/context-toolbar.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/editor-canvas.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/geometry-barrier.test.ts",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/ime-editing.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/interaction-controller.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/keyboard-flow.test.tsx",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/keyboard-navigation.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/motion-coordinator.test.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/onboarding-flow.test.tsx",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/onboarding.test.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "packages/ui/test/projection.test.ts",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Source code & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "README.md",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/ax-driver.swift",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/bundle-gate.mjs",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/g2-scope.mjs",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/image-stats.swift",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/install-gate.mjs",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/measure-release-assets.mjs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/permission-probe.swift",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/run-all.mjs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/run-performance.mjs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/run-visual-alignment.mjs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/scan-dependency-licenses.mjs",
+      "gitState": "modified",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/scan-network-endpoints.mjs",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/verify-evidence.mjs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/window-list.swift",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "scripts/quality/windows-probe.mjs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "Quality tooling",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/bootstrap/csp-gate.test.ts",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/bootstrap/release-runners.test.ts",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/bootstrap/verify-evidence.test.ts",
+      "gitState": "untracked",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "PRC pre-release closure implementation & tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/e2e/macos/wave2-windows.mjs",
+      "gitState": "untracked",
+      "originBatch": "MRT",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "MRT-004 Wave 2 integration",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/e2e/macos/webdriver-client.mjs",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/fixtures/visual/motion-tree-17.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/fixtures/visual/README.md",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/fixtures/visual/reference-dag-12-scattered.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/fixtures/visual/reference-dag-12.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/golden/export/export-fixtures.ts",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/golden/export/export-golden.test.ts",
+      "gitState": "modified",
+      "originBatch": "PRC",
+      "owner": "engineering",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual-prototype/README.md",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual-prototype/reference-prototype.html",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/index.html",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/public/fixtures/motion-tree-17.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/public/fixtures/reference-dag-12-scattered.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/public/fixtures/reference-dag-12.json",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/src/main.tsx",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/harness/vite.config.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    },
+    {
+      "path": "tests/visual/visual-alignment.test.ts",
+      "gitState": "modified",
+      "originBatch": "VRA",
+      "owner": "quality",
+      "classification": "release-source",
+      "intendedDisposition": "track",
+      "evidenceOrGenerator": "VRA visual tests",
+      "approvalRequired": "G-PRC-PLAN"
+    }
+  ],
+  "updatedAt": "2026-09-07T02:55:01.419Z"
+}
