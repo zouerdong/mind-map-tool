@@ -14,6 +14,7 @@ import {
   existsSync,
   statSync,
   lstatSync,
+  rmSync,
 } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname, extname, join, relative } from "node:path";
