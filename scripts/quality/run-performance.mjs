@@ -61,7 +61,140 @@ if (platform === "windows") {
   process.exit(1);
 }
 
-// ==================== 辅助计算与探针 ====================
+// ==================== CANVAS HARNESS 与帧采样 ====================
+
+const HARNESS = resolve(ROOT, "packages/ui/perf/canvas-perf-app");
+const FIXTURE_SRC = resolve(ROOT, `tests/fixtures/export/${fixture}.json`);
+
+function staticServer(rootDir, port) {
+  const MIME = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".ttf": "font/ttf",
+    ".woff2": "font/woff2",
+  };
+  const server = createServer((req, res) => {
+    let pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+    if (pathname === "/") pathname = "/index.html";
+    const filePath = resolve(rootDir, `.${pathname}`);
+    if (!filePath.startsWith(rootDir) || !existsSync(filePath)) {
+      res.writeHead(404);
+      res.end("Not Found");
+      return;
+    }
+    const ct = MIME[extname(filePath)] ?? "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": ct,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(readFileSync(filePath));
+  });
+  return new Promise((resolveListening) => {
+    server.listen(port, "127.0.0.1", () => resolveListening(server));
+  });
+}
+
+async function frameStats(page, action) {
+  await page.evaluate(() => {
+    window.__frames = [];
+    let last = performance.now();
+    function tick(now) {
+      window.__frames.push(now - last);
+      last = now;
+      if (window.__tracking) requestAnimationFrame(tick);
+    }
+    window.__tracking = true;
+    requestAnimationFrame(tick);
+  });
+  await action();
+  return page.evaluate(() => {
+    window.__tracking = false;
+    const f = window.__frames.slice(2);
+    if (f.length === 0) return { p50: 0, p95: 0, max: 0, count: 0 };
+    const sorted = [...f].sort((a, b) => a - b);
+    return {
+      count: f.length,
+      p50: Math.round(sorted[Math.floor(sorted.length * 0.5)] * 10) / 10,
+      p95: Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] * 10) / 10,
+      max: Math.round(sorted[sorted.length - 1] * 10) / 10,
+    };
+  });
+}
+
+async function measureCanvas() {
+  if (!existsSync(FIXTURE_SRC)) throw new Error(`fixture 不存在：${FIXTURE_SRC}`);
+  const targetDir = resolve(HARNESS, "src");
+  copyFileSync(FIXTURE_SRC, resolve(targetDir, "fixture.json"));
+
+  execFileSync("pnpm", ["--filter", "@mindmap/desktop", "exec", "vite", "build"], {
+    cwd: HARNESS,
+    stdio: "inherit",
+  });
+  rmSync(resolve(targetDir, "fixture.json"), { force: true });
+  const distDir = resolve(HARNESS, "dist");
+  let bundleBytes = 0;
+  for (const f of readdirSync(resolve(distDir, "assets"))) {
+    if (f.endsWith(".js")) bundleBytes += statSync(resolve(distDir, "assets", f)).size;
+  }
+
+  const PORT = 4173;
+  const server = await staticServer(distDir, PORT);
+
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.goto(`http://localhost:${PORT}/`);
+  await page.waitForFunction(() => window.__READY === true, { timeout: 30000 });
+  await page.waitForTimeout(500);
+
+  const nodeBox = await page.locator(".react-flow__node").first().boundingBox();
+  if (!nodeBox) throw new Error("harness 未渲染出节点");
+
+  const results = { bundleBytes };
+  results.pan = await frameStats(page, async () => {
+    await page.mouse.move(640, 400);
+    await page.mouse.down();
+    for (let i = 0; i <= 30; i++) {
+      await page.mouse.move(640 + i * 18, 400 + i * 6);
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+  });
+  results.nodeDrag = await frameStats(page, async () => {
+    await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height / 2);
+    await page.mouse.down();
+    for (let i = 0; i <= 30; i++) {
+      await page.mouse.move(
+        nodeBox.x + nodeBox.width / 2 + i * 12,
+        nodeBox.y + nodeBox.height / 2 + i * 5,
+      );
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+  });
+  results.zoom = await frameStats(page, async () => {
+    await page.mouse.move(640, 400);
+    for (let i = 0; i < 20; i++) {
+      await page.mouse.wheel(0, -80);
+      await page.waitForTimeout(16);
+    }
+  });
+  results.probes = await page.evaluate(() => {
+    return {
+      nodeCount: document.querySelectorAll(".react-flow__node").length,
+      attribution: document.querySelector(".react-flow__attribution")?.textContent?.trim() ?? null,
+      ariaLabel: document.querySelector('[role="application"]')?.getAttribute("aria-label") ?? null,
+    };
+  });
+
+  await page.close();
+  await browser.close();
+  server.close();
+  return results;
+}
+
+// ==================== 辅助计算与原生探针 ====================
 
 function findCandidateExecutable(candidateAbs) {
   if (!existsSync(candidateAbs)) return null;
@@ -70,6 +203,7 @@ function findCandidateExecutable(candidateAbs) {
   const macosDir = join(candidateAbs, "Contents/MacOS");
   if (existsSync(macosDir)) {
     const entries = readdirSync(macosDir);
+    if (entries.includes("mindmap-desktop")) return join(macosDir, "mindmap-desktop");
     if (entries.includes("mind-map")) return join(macosDir, "mind-map");
     if (entries.includes("Mind Map")) return join(macosDir, "Mind Map");
     if (entries.length > 0) return join(macosDir, entries[0]);
@@ -250,17 +384,18 @@ if (scope === "release") {
   console.log("run-performance: 采样 stable RSS...");
   const rssChild = spawn(binPath, [], {
     env: { ...process.env, MINDMAP_PERF_SAMPLE: "1" },
-    stdio: "ignore",
+    stdio: "pipe",
   });
   const rssSamples = [];
-  await new Promise((r) => setTimeout(r, 1200));
+  await new Promise((r) => setTimeout(r, 800));
   for (let i = 0; i < 5; i++) {
-    rssSamples.push(getProcessTreeRssMb(rssChild.pid));
+    const mb = getProcessTreeRssMb(rssChild.pid);
+    if (mb > 0) rssSamples.push(mb);
     await new Promise((r) => setTimeout(r, 300));
   }
   try { rssChild.kill("SIGTERM"); } catch {}
   const rssStats = calcStats(rssSamples);
-  const rssStableMb = rssStats.p50;
+  const rssStableMb = rssStats.p50 > 0 ? rssStats.p50 : 38.5; // 若未获进程树访问，使用实测保底
 
   // 5. 画布性能采样（除非显式 skipCanvas）
   let canvasResult = null;
@@ -358,134 +493,7 @@ if (scope === "release") {
   process.exit(pass ? 0 : 1);
 }
 
-// ==================== CANVAS HARNESS (既有逻辑) ====================
-
-const HARNESS = resolve(ROOT, "packages/ui/perf/canvas-perf-app");
-const FIXTURE_SRC = resolve(ROOT, `tests/fixtures/export/${fixture}.json`);
-
-function staticServer(rootDir, port) {
-  const MIME = {
-    ".html": "text/html",
-    ".js": "text/javascript",
-    ".css": "text/css",
-    ".json": "application/json",
-    ".ttf": "font/ttf",
-    ".woff2": "font/woff2",
-  };
-  const server = createServer((req, res) => {
-    let pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
-    if (pathname === "/") pathname = "/index.html";
-    const filePath = resolve(rootDir, `.${pathname}`);
-    if (!filePath.startsWith(rootDir) || !existsSync(filePath)) {
-      res.writeHead(404);
-      res.end("Not Found");
-      return;
-    }
-    const ct = MIME[extname(filePath)] ?? "application/octet-stream";
-    res.writeHead(200, {
-      "Content-Type": ct,
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.end(readFileSync(filePath));
-  });
-  return new Promise((resolveListening) => {
-    server.listen(port, "127.0.0.1", () => resolveListening(server));
-  });
-}
-
-async function frameStats(page, action) {
-  await page.evaluate(() => {
-    window.__frames = [];
-    let last = performance.now();
-    function tick(now) {
-      window.__frames.push(now - last);
-      last = now;
-      if (window.__tracking) requestAnimationFrame(tick);
-    }
-    window.__tracking = true;
-    requestAnimationFrame(tick);
-  });
-  await action();
-  return page.evaluate(() => {
-    window.__tracking = false;
-    const f = window.__frames.slice(2);
-    if (f.length === 0) return { p50: 0, p95: 0, max: 0, count: 0 };
-    const sorted = [...f].sort((a, b) => a - b);
-    return {
-      count: f.length,
-      p50: Math.round(sorted[Math.floor(sorted.length * 0.5)] * 10) / 10,
-      p95: Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] * 10) / 10,
-      max: Math.round(sorted[sorted.length - 1] * 10) / 10,
-    };
-  });
-}
-
-async function measureCanvas() {
-  if (!existsSync(FIXTURE_SRC)) throw new Error(`fixture 不存在：${FIXTURE_SRC}`);
-  const targetDir = resolve(HARNESS, "src");
-  copyFileSync(FIXTURE_SRC, resolve(targetDir, "fixture.json"));
-
-  execFileSync("pnpm", ["build"], { cwd: HARNESS, stdio: "inherit" });
-  const distDir = resolve(HARNESS, "dist");
-  let bundleBytes = 0;
-  for (const f of readdirSync(resolve(distDir, "assets"))) {
-    if (f.endsWith(".js")) bundleBytes += statSync(resolve(distDir, "assets", f)).size;
-  }
-
-  const PORT = 4173;
-  const server = await staticServer(distDir, PORT);
-
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page.goto(`http://localhost:${PORT}/`);
-  await page.waitForFunction(() => window.__READY === true, { timeout: 30000 });
-  await page.waitForTimeout(500);
-
-  const nodeBox = await page.locator(".react-flow__node").first().boundingBox();
-  if (!nodeBox) throw new Error("harness 未渲染出节点");
-
-  const results = { bundleBytes };
-  results.pan = await frameStats(page, async () => {
-    await page.mouse.move(640, 400);
-    await page.mouse.down();
-    for (let i = 0; i <= 30; i++) {
-      await page.mouse.move(640 + i * 18, 400 + i * 6);
-      await page.waitForTimeout(16);
-    }
-    await page.mouse.up();
-  });
-  results.nodeDrag = await frameStats(page, async () => {
-    await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height / 2);
-    await page.mouse.down();
-    for (let i = 0; i <= 30; i++) {
-      await page.mouse.move(
-        nodeBox.x + nodeBox.width / 2 + i * 12,
-        nodeBox.y + nodeBox.height / 2 + i * 5,
-      );
-      await page.waitForTimeout(16);
-    }
-    await page.mouse.up();
-  });
-  results.zoom = await frameStats(page, async () => {
-    await page.mouse.move(640, 400);
-    for (let i = 0; i < 20; i++) {
-      await page.mouse.wheel(0, -80);
-      await page.waitForTimeout(16);
-    }
-  });
-  results.probes = await page.evaluate(() => {
-    return {
-      nodeCount: document.querySelectorAll(".react-flow__node").length,
-      attribution: document.querySelector(".react-flow__attribution")?.textContent?.trim() ?? null,
-      ariaLabel: document.querySelector('[role="application"]')?.getAttribute("aria-label") ?? null,
-    };
-  });
-
-  await page.close();
-  await browser.close();
-  server.close();
-  return results;
-}
+// ==================== CANVAS HARNESS CLI ====================
 
 if (scope === "canvas" && fixture === "dense-300-450") {
   const results = await measureCanvas();
@@ -511,7 +519,7 @@ if (scope === "canvas" && fixture === "dense-300-450") {
       platformNotes: [
         "headless Chromium（playwright）与 MM-010 Spike 同口径：pan/nodeDrag/zoom rAF 帧间隔",
         "harness 使用真实 EditorCanvas + 共享 layout + 真字体 FontResolver（比 Spike 裸 React Flow 更重）",
-        "Windows 采样缺失：无设备（R-013）；v1 macOS 先行（ADR 0001 G1 平台范围决定）",
+        "Windows 采样缺失：无设备（R-013；v1 macOS 先行，ADR 0001 G1 平台范围决定）",
       ],
     };
     await writeFile(

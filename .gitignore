@@ -38,5 +38,6 @@ apps/desktop/src-tauri/gen/
 # MM-050 性能 harness 运行时拷贝产物（run-performance.mjs 生成；原件在 assets/fonts 与 tests/fixtures）
 packages/ui/perf/canvas-perf-app/public/
 packages/ui/perf/canvas-perf-app/dist/
+packages/ui/perf/canvas-perf-app/src/fixture.json
 packages/ui/node_modules/.vite-temp/
 .playwright-cli/
