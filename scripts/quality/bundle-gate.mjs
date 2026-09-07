@@ -7,11 +7,7 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { existsSync, readdirSync, lstatSync, statSync } from "node:fs";
 import { resolve, dirname, relative, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadAndValidateG2Scope,
-  checkSigningHints,
-  computeArtifactSha256,
-} from "./g2-scope.mjs";
+import { loadAndValidateG2Scope, checkSigningHints, computeArtifactSha256 } from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -113,7 +109,9 @@ for (const relEntry of currentEntries) {
       (cop) => cop === relToRepo || relToRepo.startsWith(cop),
     );
     if (!isApproved) {
-      console.error(`bundle-gate: FAIL — 发现越界产物: ${relToRepo}（未在 G2 批准 candidateOutputPaths 内）`);
+      console.error(
+        `bundle-gate: FAIL — 发现越界产物: ${relToRepo}（未在 G2 批准 candidateOutputPaths 内）`,
+      );
       process.exit(1);
     }
     const sha256 = computeArtifactSha256(full);

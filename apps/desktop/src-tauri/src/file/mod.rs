@@ -277,11 +277,13 @@ impl FileLifecycleService {
         let token = sha256_hex(content_json.as_bytes());
 
         // 签发 handle 前做二次验证：当前路径仍指向该 descriptor identity（消除 TOCTOU 竞态）
-        let current_identity = provider
-            .resolve_existing(&canon)
-            .map_err(|e| ServiceError::file_io(format!("verify target {}: {e}", canon.display())))?;
+        let current_identity = provider.resolve_existing(&canon).map_err(|e| {
+            ServiceError::file_io(format!("verify target {}: {e}", canon.display()))
+        })?;
         if current_identity != identity {
-            return Err(ServiceError::file_io("open identity 与实际打开目标不一致（路径底层对象发生变化）"));
+            return Err(ServiceError::file_io(
+                "open identity 与实际打开目标不一致（路径底层对象发生变化）",
+            ));
         }
 
         // provider 与打开目标的绑定验证通过后再签发能力，失败路径不留下孤立 handle
@@ -654,7 +656,11 @@ pub fn orchestrate_save_as_with_generation(
 
 /// 从已打开的描述符执行有界读取（PRC-020）：先用 metadata 拒绝明显超限文件，
 /// 再以 `take(max + 1)` 防止读取期间文件增长绕过限制。超限时立即失败，不签发 handle。
-fn read_bounded_from_file(file: &mut std::fs::File, canon: &Path, max: u64) -> ServiceResult<Vec<u8>> {
+fn read_bounded_from_file(
+    file: &mut std::fs::File,
+    canon: &Path,
+    max: u64,
+) -> ServiceResult<Vec<u8>> {
     let metadata = file
         .metadata()
         .map_err(|e| ServiceError::file_io(format!("read metadata {}: {e}", canon.display())))?;
@@ -1941,7 +1947,8 @@ mod b1a_red_tests {
         let real_id = UnixFileIdentityProvider.resolve_existing(&canon).unwrap();
 
         // 构造一个模拟外部进程把 target 替换成另一个新文件的 provider
-        let swapped_id = FileIdentity::synthetic_with_physical(canon.to_str().unwrap(), 9999, 888888);
+        let swapped_id =
+            FileIdentity::synthetic_with_physical(canon.to_str().unwrap(), 9999, 888888);
         assert_ne!(real_id, swapped_id);
 
         let swapping_provider = SwapSimulatingProvider {
@@ -1956,7 +1963,11 @@ mod b1a_red_tests {
         assert!(err_msg.contains("open identity 与实际打开目标不一致"));
 
         // 断言失败路径没有签发 orphan handle
-        assert_eq!(svc.document_handle_count(MAIN), 0, "失败路径不得残留 orphan handle");
+        assert_eq!(
+            svc.document_handle_count(MAIN),
+            0,
+            "失败路径不得残留 orphan handle"
+        );
     }
 
     #[test]
@@ -1966,10 +1977,17 @@ mod b1a_red_tests {
         fs::write(&target, r#"{"version":1,"nodes":[{"id":"root"}]}"#).unwrap();
 
         let svc = FileLifecycleService::new();
-        let out = svc.open_file_with_identity(&UnixFileIdentityProvider, MAIN, &target).unwrap();
+        let out = svc
+            .open_file_with_identity(&UnixFileIdentityProvider, MAIN, &target)
+            .unwrap();
 
-        assert_eq!(out.renderer.content_json, r#"{"version":1,"nodes":[{"id":"root"}]}"#);
+        assert_eq!(
+            out.renderer.content_json,
+            r#"{"version":1,"nodes":[{"id":"root"}]}"#
+        );
         assert_eq!(svc.document_handle_count(MAIN), 1);
-        assert!(svc.validate_document_handle(MAIN, &out.renderer.document_target_handle).is_ok());
+        assert!(svc
+            .validate_document_handle(MAIN, &out.renderer.document_target_handle)
+            .is_ok());
     }
 }

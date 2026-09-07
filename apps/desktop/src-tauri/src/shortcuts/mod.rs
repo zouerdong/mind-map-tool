@@ -175,10 +175,7 @@ impl GlobalShortcutState {
             ));
         }
         if inv.generation != generation {
-            return Err(IpcError::new(
-                "STALE_WINDOW_GENERATION",
-                "窗口代次已过期",
-            ));
+            return Err(IpcError::new("STALE_WINDOW_GENERATION", "窗口代次已过期"));
         }
         if let Some(curr_gen) = current_window_generation {
             if curr_gen != generation {
@@ -189,10 +186,7 @@ impl GlobalShortcutState {
             }
         }
         if inv.created_at.elapsed() > std::time::Duration::from_millis(500) {
-            return Err(IpcError::new(
-                "INVOCATION_EXPIRED",
-                "快捷键调用已过期",
-            ));
+            return Err(IpcError::new("INVOCATION_EXPIRED", "快捷键调用已过期"));
         }
         inv.consumed = true;
         let _ = inv.responder.send(had_focus);

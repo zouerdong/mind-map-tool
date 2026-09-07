@@ -153,8 +153,7 @@ if (manifest.releaseScope) {
           continue;
         }
         if (!KNOWN_PLATFORMS.has(item.platform)) fail(`${dLabel}.platform 未知: ${item.platform}`);
-        if (deferredSet.has(item.platform))
-          fail(`${dLabel}.platform 重复: ${item.platform}`);
+        if (deferredSet.has(item.platform)) fail(`${dLabel}.platform 重复: ${item.platform}`);
         deferredSet.add(item.platform);
 
         if (typeof item.reason !== "string" || item.reason.length === 0) {
@@ -209,7 +208,9 @@ if (manifest.releaseScope) {
           fail(`${label} (deferred/not-run) 必须说明 reason`);
         }
       } else {
-        fail(`${label} deferred 平台状态必须为 deferred、not-run 或 verified（实际 ${report.status}）`);
+        fail(
+          `${label} deferred 平台状态必须为 deferred、not-run 或 verified（实际 ${report.status}）`,
+        );
       }
     }
   }

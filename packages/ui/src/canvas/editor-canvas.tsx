@@ -689,8 +689,7 @@ export function EditorCanvas({
         });
         return;
       }
-      const current =
-        session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
+      const current = session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
       if (text === current) return;
       if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
         void geometryBarrier.enqueue({ kind: "edit-text", id, text });

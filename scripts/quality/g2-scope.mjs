@@ -211,9 +211,7 @@ export function loadAndValidateG2Scope({
       safeEvidenceOutputPaths.some(
         (eop) => eop === safeEvidenceDir || safeEvidenceDir.startsWith(eop),
       ) ||
-      safeDeletionBoundaries.some(
-        (db) => db === safeEvidenceDir || safeEvidenceDir.startsWith(db),
-      );
+      safeDeletionBoundaries.some((db) => db === safeEvidenceDir || safeEvidenceDir.startsWith(db));
     if (!isApprovedEvidenceDir) {
       throw new Error(`evidenceDir "${evidenceDir}" 不在批准 evidenceOutputPaths 中`);
     }

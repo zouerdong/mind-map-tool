@@ -3,6 +3,7 @@
 // fail-closed：阶段未到/证据缺失即非零退出，不产假绿。
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -75,8 +76,32 @@ const STAGES = {
       [resolve(HERE, "measure-release-assets.mjs"), "--output", ".tmp/quality/release-assets.json"],
       ROOT,
     ),
-  releasePerformance: () =>
-    run(
+  releasePerformance: () => {
+    if (releaseEvidence && existsSync(resolve(ROOT, releaseEvidence))) {
+      try {
+        const manifest = JSON.parse(readFileSync(resolve(ROOT, releaseEvidence), "utf8"));
+        const candidatePath = manifest.candidate?.path;
+        const evidenceDir = dirname(releaseEvidence);
+        if (candidatePath) {
+          return run(
+            "node",
+            [
+              resolve(HERE, "run-performance.mjs"),
+              "--scope",
+              "release",
+              "--candidate",
+              candidatePath,
+              "--evidence-dir",
+              evidenceDir,
+              "--output",
+              ".tmp/quality/release-performance.json",
+            ],
+            ROOT,
+          );
+        }
+      } catch {}
+    }
+    return run(
       "node",
       [
         resolve(HERE, "run-performance.mjs"),
@@ -86,7 +111,8 @@ const STAGES = {
         ".tmp/quality/release-performance.json",
       ],
       ROOT,
-    ),
+    );
+  },
   evidence: () => {
     if (!releaseEvidence) {
       console.error(
@@ -94,15 +120,7 @@ const STAGES = {
       );
       return false;
     }
-    return run(
-      "node",
-      [
-        resolve(HERE, "verify-evidence.mjs"),
-        "--manifest",
-        releaseEvidence,
-      ],
-      ROOT,
-    );
+    return run("node", [resolve(HERE, "verify-evidence.mjs"), "--manifest", releaseEvidence], ROOT);
   },
   visual: () => run("node", [resolve(HERE, "run-visual-alignment.mjs")], ROOT),
 };

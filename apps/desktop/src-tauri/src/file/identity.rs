@@ -255,9 +255,9 @@ impl FileIdentityProvider for UnixFileIdentityProvider {
         file: &std::fs::File,
     ) -> Result<FileIdentity, IdentityError> {
         use std::os::unix::fs::MetadataExt;
-        let md = file
-            .metadata()
-            .map_err(|e| IdentityError::Io(format!("file metadata {}: {e}", canonical.display())))?;
+        let md = file.metadata().map_err(|e| {
+            IdentityError::Io(format!("file metadata {}: {e}", canonical.display()))
+        })?;
         Ok(FileIdentity {
             canonical: CanonicalPathKey(canonical.to_path_buf()),
             physical: Some(PlatformPhysicalFileKey::Unix {

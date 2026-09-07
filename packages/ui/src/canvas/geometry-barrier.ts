@@ -5,13 +5,7 @@
 // 触发 Save/Close-Save/Export 时，等待真实字体就绪后 flush 提交；
 // 失败时不产生部分 command/canonical save，fail-closed 保留输入。
 
-import type {
-  Command,
-  DocumentSession,
-  NodeShape,
-  Point,
-  TextRun,
-} from "@mindmap/core";
+import type { Command, DocumentSession, NodeShape, Point, TextRun } from "@mindmap/core";
 import { documentDefaults } from "../projection/projection.js";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import { measureNodeBox } from "@mindmap/export/src/layout.js";
@@ -83,9 +77,7 @@ export class GeometryBarrier {
     if (intent.kind === "create-node") {
       this.queue.push(intent);
     } else if (intent.kind === "edit-text") {
-      const createIdx = this.queue.findIndex(
-        (q) => q.kind === "create-node" && q.id === intent.id,
-      );
+      const createIdx = this.queue.findIndex((q) => q.kind === "create-node" && q.id === intent.id);
       if (createIdx !== -1) {
         const existing = this.queue[createIdx] as Extract<GeometryIntent, { kind: "create-node" }>;
         const merged: Extract<GeometryIntent, { kind: "create-node" }> = {
@@ -102,9 +94,7 @@ export class GeometryBarrier {
         };
         this.queue[createIdx] = merged;
       } else {
-        const editIdx = this.queue.findIndex(
-          (q) => q.kind === "edit-text" && q.id === intent.id,
-        );
+        const editIdx = this.queue.findIndex((q) => q.kind === "edit-text" && q.id === intent.id);
         if (editIdx !== -1) {
           this.queue[editIdx] = intent;
         } else {
@@ -112,9 +102,7 @@ export class GeometryBarrier {
         }
       }
     } else if (intent.kind === "set-kicker") {
-      const kickerIdx = this.queue.findIndex(
-        (q) => q.kind === "set-kicker" && q.id === intent.id,
-      );
+      const kickerIdx = this.queue.findIndex((q) => q.kind === "set-kicker" && q.id === intent.id);
       if (kickerIdx !== -1) {
         this.queue[kickerIdx] = intent;
       } else {

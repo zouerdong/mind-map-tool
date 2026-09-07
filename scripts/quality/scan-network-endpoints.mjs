@@ -79,7 +79,9 @@ if (existsSync(tauriConfPath)) {
     const tauriConf = JSON.parse(readFileSync(tauriConfPath, "utf8"));
     const csp = tauriConf?.app?.security?.csp;
     if (!csp || typeof csp !== "string" || csp.trim() === "") {
-      violations.push("tauri.conf.json: app.security.csp 为空或为 null（生产发布必须配置最小 CSP）");
+      violations.push(
+        "tauri.conf.json: app.security.csp 为空或为 null（生产发布必须配置最小 CSP）",
+      );
     } else {
       if (csp.includes("default-src *") || csp.includes("script-src *")) {
         violations.push("tauri.conf.json: CSP 包含未受限通配符 (*)");

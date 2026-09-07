@@ -1,13 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import {
-  writeFileSync,
-  mkdirSync,
-  rmSync,
-  existsSync,
-  chmodSync,
-  readdirSync,
-} from "node:fs";
+import { writeFileSync, mkdirSync, rmSync, existsSync, chmodSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
@@ -34,8 +27,14 @@ function runNode(script: string, args: string[], env: Record<string, string> = {
   }
 }
 
-function createSyntheticRegister(g2Status: "approved" | "pending" | "blocked" = "approved", overrides: any = {}) {
-  const regPath = join(FIXTURE_DIR, `register-${g2Status}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+function createSyntheticRegister(
+  g2Status: "approved" | "pending" | "blocked" = "approved",
+  overrides: any = {},
+) {
+  const regPath = join(
+    FIXTURE_DIR,
+    `register-${g2Status}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+  );
   const relFixtureDir = ".tmp/release-runner-fixtures";
   const content = {
     schemaVersion: 1,
