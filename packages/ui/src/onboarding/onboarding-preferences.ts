@@ -10,6 +10,7 @@ import type { OnboardingStatus } from "./onboarding-types.js";
 export interface PreferenceStore {
   load(): Promise<Readonly<Record<string, string | number | boolean | null>>>;
   store(delta: Readonly<Record<string, string | number | boolean | null>>): Promise<void>;
+  consumeWarning?(): string | null;
 }
 
 export const ONBOARDING_STATUS_KEY = "onboardingStatus";
@@ -18,6 +19,7 @@ export interface OnboardingPreferencesPort {
   load(): Promise<OnboardingStatus>;
   /** completed/skipped/in-progress 时持久化（not-started 不写）。 */
   store(status: OnboardingStatus): Promise<void>;
+  consumeWarning?(): string | null;
 }
 
 export function createOnboardingPreferences(store: PreferenceStore): OnboardingPreferencesPort {
@@ -32,6 +34,7 @@ export function createOnboardingPreferences(store: PreferenceStore): OnboardingP
       if (status === "not-started") return;
       await store.store({ [ONBOARDING_STATUS_KEY]: status });
     },
+    ...(store.consumeWarning ? { consumeWarning: () => store.consumeWarning!() } : {}),
   };
 }
 

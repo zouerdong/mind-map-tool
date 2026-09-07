@@ -6,11 +6,18 @@ import { toPlatformError } from "../file/errors.js";
 import type { PreferencesPort, PreferencesSnapshot } from "./types.js";
 
 export class TauriPreferencesAdapter implements PreferencesPort {
+  private warning: string | null = null;
+
   async load(): Promise<PreferencesSnapshot> {
     try {
       return await invoke<PreferencesSnapshot>(IPC_COMMANDS.loadPreferences);
     } catch (raw) {
-      throw toPlatformError(raw);
+      const error = toPlatformError(raw);
+      if (error.code === "PREFERENCES_CORRUPT") {
+        this.warning = "本机偏好文件损坏，已回退默认设置；下次保存时会自动修复。";
+        return {};
+      }
+      throw error;
     }
   }
 
@@ -20,5 +27,11 @@ export class TauriPreferencesAdapter implements PreferencesPort {
     } catch (raw) {
       throw toPlatformError(raw);
     }
+  }
+
+  consumeWarning(): string | null {
+    const warning = this.warning;
+    this.warning = null;
+    return warning;
   }
 }

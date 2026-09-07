@@ -11,4 +11,6 @@ export interface PreferencesPort {
   load(): Promise<PreferencesSnapshot>;
   /** 合并写入（delta 只覆盖出现的键；null 值删除键）。 */
   store(delta: PreferencesSnapshot): Promise<void>;
+  /** 可选的一次性恢复提示；不参与偏好值语义。 */
+  consumeWarning?(): string | null;
 }

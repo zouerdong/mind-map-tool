@@ -26,7 +26,13 @@ const doc = (): MindMapDocumentV1 => ({
 });
 
 const cmd = (c: Command) => ({ kind: "command", command: c }) as const;
-const CREATE = cmd({ kind: "CreateNode", id: "n1", text: "", position: { x: 0, y: 0 }, size: { width: 10, height: 10 } });
+const CREATE = cmd({
+  kind: "CreateNode",
+  id: "n1",
+  text: "",
+  position: { x: 0, y: 0 },
+  size: { width: 10, height: 10 },
+});
 const EDIT = cmd({ kind: "EditNodeText", id: "n1", text: "一", size: { width: 20, height: 10 } });
 const MOVE = cmd({ kind: "MoveNodes", moves: [{ id: "n1", position: { x: 1, y: 1 } }] });
 const EDGE = cmd({ kind: "CreateEdge", id: "e1", sourceNodeId: "n1", targetNodeId: "n2" });
@@ -36,7 +42,10 @@ const started = () => onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start
 
 describe("首次出示与开始/跳过", () => {
   it("restore not-started：自动出示 welcome 卡", () => {
-    const s = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "restore", status: "not-started" });
+    const s = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "not-started",
+    });
     expect(s.visible).toBe(true);
     expect(s.currentStep).toBe("welcome");
   });
@@ -86,13 +95,15 @@ describe("步骤推进（只认真实命令/动作）", () => {
   it("第 2 步：CreateNode/MoveNodes/CreateEdge 全部", () => {
     let s = started();
     for (const o of [CREATE, EDIT]) s = onboardingReducer(s, { type: "observe", observation: o });
-    for (const o of [CREATE, MOVE, EDGE]) s = onboardingReducer(s, { type: "observe", observation: o });
+    for (const o of [CREATE, MOVE, EDGE])
+      s = onboardingReducer(s, { type: "observe", observation: o });
     expect(s.currentStep).toBe("undo-or-theme");
   });
 
   it("第 3 步任一即可（undo / redo / SetDocumentStyle）", () => {
     let s = started();
-    for (const o of [CREATE, EDIT, CREATE, MOVE, EDGE]) s = onboardingReducer(s, { type: "observe", observation: o });
+    for (const o of [CREATE, EDIT, CREATE, MOVE, EDGE])
+      s = onboardingReducer(s, { type: "observe", observation: o });
     s = onboardingReducer(s, { type: "observe", observation: { kind: "history", action: "undo" } });
     expect(s.currentStep).toBe("save-or-export");
   });
@@ -101,7 +112,10 @@ describe("步骤推进（只认真实命令/动作）", () => {
     let s = started();
     for (const o of [CREATE, EDIT, CREATE, MOVE, EDGE, THEME])
       s = onboardingReducer(s, { type: "observe", observation: o });
-    s = onboardingReducer(s, { type: "observe", observation: { kind: "external", action: "save" } });
+    s = onboardingReducer(s, {
+      type: "observe",
+      observation: { kind: "external", action: "save" },
+    });
     expect(s.status).toBe("completed");
     expect(s.visible).toBe(false);
   });
@@ -117,7 +131,10 @@ describe("步骤推进（只认真实命令/动作）", () => {
   });
 
   it("restore in-progress：从首个未完成步骤继续", () => {
-    const s = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "restore", status: "in-progress" });
+    const s = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "in-progress",
+    });
     expect(s.currentStep).toBe("create-first");
     expect(s.visible).toBe(true);
   });

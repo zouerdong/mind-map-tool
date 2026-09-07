@@ -9,7 +9,16 @@
 //   onNodeDragStop 一次 MoveNodes（验收：拖动只提交一次 command）；
 // - selection / viewport / editingId 均 session-only，不进命令与文件。
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ReactFlow,
   useEdgesState,
@@ -23,8 +32,14 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { organizeCommand, type DocumentSession, type OrganizeCommandResult, type Point } from "@mindmap/core";
+import {
+  organizeCommand,
+  type DocumentSession,
+  type OrganizeCommandResult,
+  type Point,
+} from "@mindmap/core";
 import { measureNodeBox, type FontResolver } from "@mindmap/export/src/layout.js";
+import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
 import {
   documentDefaults,
@@ -39,6 +54,7 @@ import { MindNodeView } from "./mind-node.js";
 import { MindEdgeView } from "./mind-edge.js";
 import { ContextToolbar } from "./context-toolbar.js";
 import { themeTokens } from "../theme/theme-tokens.js";
+import type { GeometryBarrier } from "./geometry-barrier.js";
 import {
   MotionCoordinator,
   computeCoordinatedViewport,
@@ -54,6 +70,10 @@ import {
 export interface EditorCanvasProps {
   session: DocumentSession;
   fonts: FontResolver;
+  /** PRC-025 权威几何提交屏障：未 ready 前阻断 fallback size 持久化写入。 */
+  geometryBarrier?: GeometryBarrier;
+  /** 供上层（Save/Close 等）在提交前 flush 活动编辑器的当前文本。 */
+  activeEditorRef?: React.MutableRefObject<{ flush(): void } | null>;
   /** id 生成注入（默认 crypto.randomUUID；测试/harness 可替换）。 */
   nextNodeId?: () => string;
   nextEdgeId?: () => string;
@@ -145,6 +165,8 @@ function defaultId(prefix: string): string {
 export function EditorCanvas({
   session,
   fonts,
+  geometryBarrier,
+  activeEditorRef,
   nextNodeId,
   nextEdgeId,
   revision = 0,
@@ -161,6 +183,48 @@ export function EditorCanvas({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); // session-only
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
+
+  const [pendingNodes, setPendingNodes] = useState<
+    Map<string, { id: string; position: Point; text: string }>
+  >(new Map());
+  const [textOverrides, setTextOverrides] = useState<Map<string, string>>(new Map());
+
+  const applyPendingAndOverrides = useCallback(
+    (nodes: MindFlowNode[]): MindFlowNode[] => {
+      let result = nodes;
+      if (textOverrides.size > 0) {
+        result = result.map((n) => {
+          const o = textOverrides.get(n.id);
+          return o !== undefined ? { ...n, data: { ...n.data, text: o } } : n;
+        });
+      }
+      if (pendingNodes.size > 0) {
+        const existingIds = new Set(result.map((n) => n.id));
+        const pNodes: MindFlowNode[] = Array.from(pendingNodes.values())
+          .filter((p) => !existingIds.has(p.id))
+          .map((p) => ({
+            id: p.id,
+            type: "mind",
+            position: { x: p.position.x, y: p.position.y },
+            data: {
+              text: p.text,
+              runs: undefined,
+              kicker: undefined,
+              emphasis: false,
+              shape: documentDefaults(session.current.document).shape,
+              theme: session.current.document.document.theme,
+              font: documentDefaults(session.current.document).font,
+              framesVisible: session.current.document.document.framesVisible,
+            },
+            width: 60,
+            height: 37,
+          }));
+        result = [...result, ...pNodes];
+      }
+      return result;
+    },
+    [pendingNodes, session, textOverrides],
+  );
 
   const controller = useMemo(
     () =>
@@ -227,9 +291,14 @@ export function EditorCanvas({
       displayPositionsRef.current = new Map(
         view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
       );
-      setRfNodes(view.nodes);
+      setRfNodes(applyPendingAndOverrides(view.nodes));
       setRfEdges(view.edges);
       return;
+    }
+
+    if (isDocChange) {
+      setPendingNodes(new Map());
+      setTextOverrides(new Map());
     }
 
     // 检查是否发生了多节点布局重排（整理动作提交或 undo/redo）
@@ -314,9 +383,10 @@ export function EditorCanvas({
     displayPositionsRef.current = new Map(
       view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
     );
-    setRfNodes(view.nodes);
+    setRfNodes(applyPendingAndOverrides(view.nodes));
     setRfEdges(view.edges);
   }, [
+    applyPendingAndOverrides,
     docVersion,
     revision,
     reducedMotion,
@@ -327,6 +397,12 @@ export function EditorCanvas({
     session,
   ]);
 
+  useEffect(() => {
+    if (pendingNodes.size === 0 && textOverrides.size === 0) return;
+    const view = projectNowRef.current();
+    setRfNodes(applyPendingAndOverrides(view.nodes));
+  }, [pendingNodes, textOverrides, applyPendingAndOverrides, setRfNodes]);
+
   // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。
   // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
   const selectionRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
@@ -335,36 +411,43 @@ export function EditorCanvas({
   });
   // VRA-050：工具条需要响应选中（ref 不触发渲染）——同步一份 state；
   // primary = 最后选中的节点（主选：角标记 + 工具条目标）。
-  const [uiSelection, setUiSelection] = useState<{ nodes: string[]; edges: string[]; primary: string | null }>({
+  const [uiSelection, setUiSelection] = useState<{
+    nodes: string[];
+    edges: string[];
+    primary: string | null;
+  }>({
     nodes: [],
     edges: [],
     primary: null,
   });
   const primaryRef = useRef<string | null>(null);
-  const trackSelection = useCallback((source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
-    let touched = false;
-    for (const c of changes) {
-      if (c.type !== "select" || !("id" in c)) continue;
-      const selected = (c as { selected?: boolean }).selected;
-      if (selected === undefined) continue;
-      const id = (c as { id: string }).id;
-      if (selected) {
-        selectionRef.current[source].add(id);
-        if (source === "nodes") primaryRef.current = id;
-        touched = true;
-      } else if (selectionRef.current[source].delete(id)) {
-        if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
-        touched = true;
+  const trackSelection = useCallback(
+    (source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
+      let touched = false;
+      for (const c of changes) {
+        if (c.type !== "select" || !("id" in c)) continue;
+        const selected = (c as { selected?: boolean }).selected;
+        if (selected === undefined) continue;
+        const id = (c as { id: string }).id;
+        if (selected) {
+          selectionRef.current[source].add(id);
+          if (source === "nodes") primaryRef.current = id;
+          touched = true;
+        } else if (selectionRef.current[source].delete(id)) {
+          if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
+          touched = true;
+        }
       }
-    }
-    if (touched) {
-      setUiSelection({
-        nodes: [...selectionRef.current.nodes],
-        edges: [...selectionRef.current.edges],
-        primary: primaryRef.current,
-      });
-    }
-  }, []);
+      if (touched) {
+        setUiSelection({
+          nodes: [...selectionRef.current.nodes],
+          edges: [...selectionRef.current.edges],
+          primary: primaryRef.current,
+        });
+      }
+    },
+    [],
+  );
 
   const onNodesChange = useCallback(
     (changes: NodeChange<MindFlowNode>[]) => {
@@ -418,9 +501,15 @@ export function EditorCanvas({
     (event: React.MouseEvent) => {
       const point = panePointFromEvent(event.nativeEvent, viewport);
       if (!point) return;
-      api.commit(controller.createNodeAt(point));
+      if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+        const id = (nextNodeId ?? (() => defaultId("n")))();
+        void geometryBarrier.enqueue({ kind: "create-node", id, position: point, text: "" });
+        setPendingNodes((prev) => new Map(prev).set(id, { id, position: point, text: "" }));
+      } else {
+        api.commit(controller.createNodeAt(point));
+      }
     },
-    [api, controller, viewport],
+    [api, controller, geometryBarrier, nextNodeId, viewport],
   );
 
   // 键盘全集（MM-089；editing 与 IME 组合期间全部隔离；键位占位可改——
@@ -493,7 +582,11 @@ export function EditorCanvas({
           const r = linkingReducer(linking, { type: "confirm" }, rfNodes);
           setLinking(r.state);
           if (r.confirmed) {
-            const cmd = controller.connect(r.confirmed.source, r.confirmed.target, session.current.document);
+            const cmd = controller.connect(
+              r.confirmed.source,
+              r.confirmed.target,
+              session.current.document,
+            );
             if (cmd) api.commit(cmd);
           }
           return;
@@ -542,13 +635,35 @@ export function EditorCanvas({
       x: pane.left + pane.width / 2,
       y: pane.top + pane.height / 2,
     });
-    const cmd = controller.createNodeAt({ x: center.x, y: center.y });
-    api.commit(cmd);
-    if (cmd.kind === "CreateNode") {
-      setFocusNodeId(cmd.id);
-      beginEdit(cmd.id);
+    const id = (nextNodeId ?? (() => defaultId("n")))();
+    const pos = {
+      x: Math.round(center.x * 1000) / 1000,
+      y: Math.round(center.y * 1000) / 1000,
+    };
+
+    if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+      void geometryBarrier.enqueue({ kind: "create-node", id, position: pos, text: "" });
+      setPendingNodes((prev) => new Map(prev).set(id, { id, position: pos, text: "" }));
+      setFocusNodeId(id);
+      beginEdit(id);
+    } else {
+      const cmd = controller.createNodeAt(pos);
+      api.commit(cmd);
+      if (cmd.kind === "CreateNode") {
+        setFocusNodeId(cmd.id);
+        beginEdit(cmd.id);
+      }
     }
-  }, [quickCreateSignal, api, beginEdit, controller, editingId, linking]);
+  }, [
+    quickCreateSignal,
+    api,
+    beginEdit,
+    controller,
+    editingId,
+    geometryBarrier,
+    linking,
+    nextNodeId,
+  ]);
 
   // 视野框架化（fitViewSignal）：文档加载后组合根自增信号，画布 frame 内容。
   // 刻意不做声明式 fitView——它会在空文档首次建点时误触发（跳 maxZoom）。
@@ -559,21 +674,80 @@ export function EditorCanvas({
     void rfInstanceRef.current?.fitView({ padding: 0.2 });
   }, [fitViewSignal]);
 
+  const onCommitEdit = useCallback(
+    (id: string, text: string) => {
+      setEditingId(null);
+      if (pendingNodes.has(id)) {
+        if (geometryBarrier) {
+          void geometryBarrier.enqueue({ kind: "edit-text", id, text });
+        }
+        setPendingNodes((prev) => {
+          const next = new Map(prev);
+          const n = next.get(id);
+          if (n) next.set(id, { ...n, text });
+          return next;
+        });
+        return;
+      }
+      const current =
+        session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
+      if (text === current) return;
+      if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+        void geometryBarrier.enqueue({ kind: "edit-text", id, text });
+        setTextOverrides((prev) => new Map(prev).set(id, text));
+      } else {
+        const cmd = controller.commitEditText(id, text, current);
+        if (cmd) api.commit(cmd);
+      }
+    },
+    [api, controller, geometryBarrier, pendingNodes, session],
+  );
+
+  const onCancelEdit = useCallback(() => {
+    if (editingId && pendingNodes.has(editingId)) {
+      const p = pendingNodes.get(editingId);
+      if (p && p.text === "") {
+        geometryBarrier?.cancelPendingNode(editingId);
+        setPendingNodes((prev) => {
+          const next = new Map(prev);
+          next.delete(editingId);
+          return next;
+        });
+      }
+    }
+    setEditingId(null);
+  }, [editingId, geometryBarrier, pendingNodes]);
+
+  const flushActiveEditor = useCallback(() => {
+    if (editingId !== null) {
+      const activeEl = document.querySelector<HTMLTextAreaElement>(
+        "textarea[aria-label='编辑节点文本']",
+      );
+      if (activeEl) {
+        onCommitEdit(editingId, activeEl.value);
+      }
+    }
+  }, [editingId, onCommitEdit]);
+
+  useEffect(() => {
+    if (activeEditorRef) {
+      activeEditorRef.current = { flush: flushActiveEditor };
+      return () => {
+        activeEditorRef.current = null;
+      };
+    }
+  }, [activeEditorRef, flushActiveEditor]);
+
   const editingValue = useMemo<EditingContextValue>(
     () => ({
       editingId,
       fonts,
       focusId: focusNodeId,
       linkCandidateId: linking.phase === "linking" ? linking.candidateId : null,
-      onCommitEdit: (id, text) => {
-        const current = session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
-        const cmd = controller.commitEditText(id, text, current);
-        setEditingId(null);
-        if (cmd) api.commit(cmd);
-      },
-      onCancelEdit: () => setEditingId(null),
+      onCommitEdit,
+      onCancelEdit,
     }),
-    [api, controller, editingId, focusNodeId, fonts, linking, session],
+    [editingId, focusNodeId, fonts, linking, onCancelEdit, onCommitEdit],
   );
 
   return (
@@ -603,7 +777,9 @@ export function EditorCanvas({
           edges={rfEdges}
           // MM-090-D9：背景设在 RF 本体——wrapper 上的背景会被 RF 内层默认
           // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
-          style={{ backgroundColor: themeTokens(session.current.document.document.theme).canvasBackground }}
+          style={{
+            backgroundColor: themeTokens(session.current.document.document.theme).canvasBackground,
+          }}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
           onNodesChange={onNodesChange}
@@ -639,7 +815,45 @@ export function EditorCanvas({
             document={session.current.document}
             primaryNodeId={uiSelection.primary}
             onCommand={(command) => {
-              session.commit(command); // 版本号驱动重投影（useCanvasSession）
+              if (command.kind === "SetNodeKicker") {
+                if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+                  void geometryBarrier.enqueue({
+                    kind: "set-kicker",
+                    id: command.id,
+                    kicker: command.kicker,
+                  });
+                } else {
+                  const fontId = documentDefaults(session.current.document).font;
+                  const node = session.current.document.document.nodes.find(
+                    (n) => n.id === command.id,
+                  );
+                  const measured = node
+                    ? measureNodeVisual({ ...node, kicker: command.kicker }, fontId, fonts)
+                    : undefined;
+                  session.commit({
+                    ...command,
+                    ...(measured !== undefined ? { measured } : {}),
+                  });
+                }
+              } else if (command.kind === "EditNodeText") {
+                if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+                  void geometryBarrier.enqueue({
+                    kind: "edit-text",
+                    id: command.id,
+                    text: command.text,
+                    ...(command.runs !== undefined ? { runs: command.runs } : {}),
+                  });
+                } else {
+                  const fontId = documentDefaults(session.current.document).font;
+                  const box = measureNodeBox(command.text, command.runs, fontId, fonts);
+                  session.commit({
+                    ...command,
+                    size: { width: box.width, height: box.height },
+                  });
+                }
+              } else {
+                session.commit(command); // 版本号驱动重投影（useCanvasSession）
+              }
             }}
           />
         </ReactFlow>

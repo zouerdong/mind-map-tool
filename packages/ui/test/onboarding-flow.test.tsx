@@ -35,15 +35,29 @@ function fakeChannel() {
   };
 }
 
-const CREATE: Command = { kind: "CreateNode", id: "n1", text: "", position: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
-const EDIT: Command = { kind: "EditNodeText", id: "n1", text: "一", size: { width: 20, height: 10 } };
+const CREATE: Command = {
+  kind: "CreateNode",
+  id: "n1",
+  text: "",
+  position: { x: 0, y: 0 },
+  size: { width: 10, height: 10 },
+};
+const EDIT: Command = {
+  kind: "EditNodeText",
+  id: "n1",
+  text: "一",
+  size: { width: 20, height: 10 },
+};
 const MOVE: Command = { kind: "MoveNodes", moves: [{ id: "n1", position: { x: 1, y: 1 } }] };
 const EDGE: Command = { kind: "CreateEdge", id: "e1", sourceNodeId: "n1", targetNodeId: "n2" };
 const THEME: Command = { kind: "SetDocumentStyle", theme: "dark" };
 
 describe("OnboardingOverlay", () => {
   it("welcome 卡：标题/正文/开始/跳过按钮齐全", () => {
-    const state = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "restore", status: "not-started" });
+    const state = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "not-started",
+    });
     render(
       <OnboardingOverlay
         state={state}
@@ -61,7 +75,13 @@ describe("OnboardingOverlay", () => {
   it("非模态且不拦截：遮罩 pointer-events:none、dialog aria-modal=false（AC-09 不阻塞）", () => {
     const state = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start" });
     const { container } = render(
-      <OnboardingOverlay state={state} tokens={LIGHT_TOKENS} onStart={() => {}} onSkip={() => {}} onHide={() => {}} />,
+      <OnboardingOverlay
+        state={state}
+        tokens={LIGHT_TOKENS}
+        onStart={() => {}}
+        onSkip={() => {}}
+        onHide={() => {}}
+      />,
     );
     const overlay = container.querySelector('[data-testid="onboarding-overlay"]') as HTMLElement;
     expect(overlay.style.pointerEvents).toBe("none");
@@ -93,7 +113,15 @@ describe("OnboardingOverlay", () => {
   it("× 隐藏按钮回调 onHide（不等于跳过）", () => {
     const state = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start" });
     const onHide = vi.fn();
-    render(<OnboardingOverlay state={state} tokens={LIGHT_TOKENS} onStart={() => {}} onSkip={() => {}} onHide={onHide} />);
+    render(
+      <OnboardingOverlay
+        state={state}
+        tokens={LIGHT_TOKENS}
+        onStart={() => {}}
+        onSkip={() => {}}
+        onHide={onHide}
+      />,
+    );
     fireEvent.click(screen.getByTestId("onboarding-hide"));
     expect(onHide).toHaveBeenCalled();
   });
@@ -147,16 +175,44 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
     });
   });
 
+  it("偏好读取失败不阻塞画布，并向宿主报告非致命提示", async () => {
+    const onPreferenceWarning = vi.fn();
+    const prefs = {
+      load: vi.fn().mockRejectedValue(new Error("permission denied")),
+      store: vi.fn(),
+    };
+    const channel = fakeChannel();
+
+    render(
+      <OnboardingFlow
+        observeCommands={channel.observeCommands}
+        preferences={prefs}
+        onPreferenceWarning={onPreferenceWarning}
+      />,
+    );
+
+    await screen.findByRole("dialog", { name: "欢迎使用脑图" });
+    expect(onPreferenceWarning).toHaveBeenCalledWith(expect.stringContaining("permission denied"));
+  });
+
   it("replaySignal 自增 → 从头重放", async () => {
     const store = new InMemoryPreferenceStore({ onboardingStatus: "completed" });
     const prefs = createOnboardingPreferences(store);
     const channel = fakeChannel();
     const { rerender } = render(
-      <OnboardingFlow observeCommands={channel.observeCommands} preferences={prefs} replaySignal={0} />,
+      <OnboardingFlow
+        observeCommands={channel.observeCommands}
+        preferences={prefs}
+        replaySignal={0}
+      />,
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     rerender(
-      <OnboardingFlow observeCommands={channel.observeCommands} preferences={prefs} replaySignal={1} />,
+      <OnboardingFlow
+        observeCommands={channel.observeCommands}
+        preferences={prefs}
+        replaySignal={1}
+      />,
     );
     // 重放从第一步（create-first）开始
     await screen.findByText("第 1 步 · 创建第一个节点");
@@ -172,7 +228,9 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
       void original(cb);
       return unsubscribe;
     };
-    const { unmount } = render(<OnboardingFlow observeCommands={channel.observeCommands as never} preferences={prefs} />);
+    const { unmount } = render(
+      <OnboardingFlow observeCommands={channel.observeCommands as never} preferences={prefs} />,
+    );
     await waitFor(() => expect(unsubscribe).not.toHaveBeenCalled());
     unmount();
     expect(unsubscribe).toHaveBeenCalled();

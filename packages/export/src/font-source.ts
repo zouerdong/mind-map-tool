@@ -12,6 +12,58 @@ export interface FontBundle {
   "lxgw-wenkai-regular": Uint8Array;
 }
 
+/** 导出资源上限：覆盖宿主注入的字体，避免异常资源绕过文档 50MB
+ * 上限后在 fontkit/resvg/pdf-lib 内部制造不可控分配。当前仓库字体包
+ * 总量约 42MB，预留到 64MB；单字体 32MB 足以容纳现有文楷。 */
+export const FONT_RESOURCE_LIMITS = {
+  maxBytesPerFont: 32 * 1024 * 1024,
+  maxBundleBytes: 64 * 1024 * 1024,
+} as const;
+
+export interface FontResourceLimitError {
+  code: "EXPORT_FONT_RESOURCE_LIMIT";
+  fontId: ExportFontId | null;
+  bytes: number;
+  max: number;
+  message: string;
+}
+
+export function validateFontBundle(
+  bundle: FontBundle,
+): { ok: true } | { ok: false; error: FontResourceLimitError } {
+  const entries = Object.entries(bundle) as Array<[ExportFontId, Uint8Array]>;
+  let total = 0;
+  for (const [fontId, bytes] of entries) {
+    const size = bytes.byteLength;
+    if (size > FONT_RESOURCE_LIMITS.maxBytesPerFont) {
+      return {
+        ok: false,
+        error: {
+          code: "EXPORT_FONT_RESOURCE_LIMIT",
+          fontId,
+          bytes: size,
+          max: FONT_RESOURCE_LIMITS.maxBytesPerFont,
+          message: `${fontId} exceeds the per-font resource limit`,
+        },
+      };
+    }
+    total += size;
+  }
+  if (total > FONT_RESOURCE_LIMITS.maxBundleBytes) {
+    return {
+      ok: false,
+      error: {
+        code: "EXPORT_FONT_RESOURCE_LIMIT",
+        fontId: null,
+        bytes: total,
+        max: FONT_RESOURCE_LIMITS.maxBundleBytes,
+        message: "font bundle exceeds the total resource limit",
+      },
+    };
+  }
+  return { ok: true };
+}
+
 interface CachedFont {
   unitsPerEm: number;
   ascent: number;
@@ -50,6 +102,8 @@ function metricsOf(f: CachedFont): FontMetrics {
 }
 
 export function createFontResolver(bundle: FontBundle): FontResolver {
+  const guard = validateFontBundle(bundle);
+  if (!guard.ok) throw new Error(guard.error.message);
   const notoRegular = loadFont(bundle["noto-sans-sc-regular"]);
   const notoBold = loadFont(bundle["noto-sans-sc-bold"]);
   const lxgwRegular = loadFont(bundle["lxgw-wenkai-regular"]);

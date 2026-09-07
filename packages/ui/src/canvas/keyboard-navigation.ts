@@ -69,8 +69,7 @@ export function nearestNodeInDirection(
  * 确认产出 {source, target}，由调用方走 InteractionController.connect。
  */
 export type LinkingState =
-  | { phase: "idle" }
-  | { phase: "linking"; sourceId: string; candidateId: string | null };
+  { phase: "idle" } | { phase: "linking"; sourceId: string; candidateId: string | null };
 
 export type LinkingAction =
   | { type: "begin"; sourceId: string }
@@ -98,7 +97,8 @@ export function linkingReducer(
       return { state: { ...state, candidateId: next }, confirmed: null };
     }
     case "confirm": {
-      if (state.phase !== "linking" || state.candidateId === null) return { state, confirmed: null };
+      if (state.phase !== "linking" || state.candidateId === null)
+        return { state, confirmed: null };
       return {
         state: { phase: "idle" },
         confirmed: { source: state.sourceId, target: state.candidateId },

@@ -109,10 +109,7 @@ describe("规整态正交形态（lineMorph=1，§1.4 全正交电路线）", ()
   });
 
   it("转折落位目标列前（tip - 24 - rank×spacing），全缝唯一", () => {
-    const edges: EdgePlanInput[] = [
-      edge("e1", 0, 0, 270, 0),
-      edge("e2", 0, 106, 270, 212),
-    ];
+    const edges: EdgePlanInput[] = [edge("e1", 0, 0, 270, 0), edge("e2", 0, 106, 270, 212)];
     const geoms = planEdgeGeometry(edges, "horizontal", 1);
     const turns = [...geoms.values()]
       .filter((g) => g.route.kind === "comb")
@@ -158,7 +155,10 @@ describe("跨层长边：贴边通道（§1.4 ②：边界外 56px、按序偏�
       const g = geoms.get(e.id)!;
       expect(g.route.kind, e.id).toBe("channel");
       const route = g.route as Extract<typeof g.route, { kind: "channel" }>;
-      const base = route.side === "up" ? minY - EDGE_GEOMETRY.channelOffset : maxY + EDGE_GEOMETRY.channelOffset;
+      const base =
+        route.side === "up"
+          ? minY - EDGE_GEOMETRY.channelOffset
+          : maxY + EDGE_GEOMETRY.channelOffset;
       expect(g.chain[2]!.y, e.id).toBeCloseTo(base + route.index * EDGE_GEOMETRY.channelSpacing, 6);
     }
   });
@@ -222,7 +222,9 @@ describe("形态参数与插值接口（VRA-060）", () => {
 
 describe("零共线重叠检测（§1.4 布线硬规则）", () => {
   it("共线并行段被识别", () => {
-    const a: EdgeGeometry = planEdgeGeometry([edge("a", 0, 0, 270, 100)], "horizontal", 1).get("a")!;
+    const a: EdgeGeometry = planEdgeGeometry([edge("a", 0, 0, 270, 100)], "horizontal", 1).get(
+      "a",
+    )!;
     const b: EdgeGeometry = planEdgeGeometry([edge("b", 40, 100, 310, 100)], "horizontal", 1).get(
       "b",
     )!;

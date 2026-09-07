@@ -6,23 +6,108 @@
     "shape": "card",
     "framesVisible": true,
     "nodes": [
-      { "id": "m-root", "text": "年度计划 Annual plan", "position": { "x": -60, "y": 40 }, "size": { "width": 200, "height": 68 } },
-      { "id": "m-hub", "text": "行动主线 Key thread", "position": { "x": 420, "y": 260 }, "size": { "width": 200, "height": 68 } },
-      { "id": "m-leaf-01", "text": "要点 01 Point", "position": { "x": 60, "y": 520 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-02", "text": "要点 02 Point", "position": { "x": 900, "y": 120 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-03", "text": "要点 03 Point", "position": { "x": 700, "y": 620 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-04", "text": "要点 04 Point", "position": { "x": -120, "y": 700 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-05", "text": "要点 05 Point", "position": { "x": 350, "y": 40 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-06", "text": "要点 06 Point", "position": { "x": 560, "y": 480 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-07", "text": "要点 07 Point", "position": { "x": 820, "y": 380 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-08", "text": "要点 08 Point", "position": { "x": 130, "y": 260 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-09", "text": "要点 09 Point", "position": { "x": 480, "y": 720 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-10", "text": "要点 10 Point", "position": { "x": 950, "y": 540 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-11", "text": "要点 11 Point", "position": { "x": -40, "y": 160 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-12", "text": "要点 12 Point", "position": { "x": 680, "y": -60 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-13", "text": "要点 13 Point", "position": { "x": 240, "y": 600 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-14", "text": "要点 14 Point", "position": { "x": 880, "y": 240 }, "size": { "width": 150, "height": 40 } },
-      { "id": "m-leaf-15", "text": "要点 15 Point", "position": { "x": 100, "y": 420 }, "size": { "width": 150, "height": 40 } }
+      {
+        "id": "m-root",
+        "text": "年度计划 Annual plan",
+        "position": { "x": -60, "y": 40 },
+        "size": { "width": 200, "height": 68 }
+      },
+      {
+        "id": "m-hub",
+        "text": "行动主线 Key thread",
+        "position": { "x": 420, "y": 260 },
+        "size": { "width": 200, "height": 68 }
+      },
+      {
+        "id": "m-leaf-01",
+        "text": "要点 01 Point",
+        "position": { "x": 60, "y": 520 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-02",
+        "text": "要点 02 Point",
+        "position": { "x": 900, "y": 120 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-03",
+        "text": "要点 03 Point",
+        "position": { "x": 700, "y": 620 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-04",
+        "text": "要点 04 Point",
+        "position": { "x": -120, "y": 700 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-05",
+        "text": "要点 05 Point",
+        "position": { "x": 350, "y": 40 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-06",
+        "text": "要点 06 Point",
+        "position": { "x": 560, "y": 480 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-07",
+        "text": "要点 07 Point",
+        "position": { "x": 820, "y": 380 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-08",
+        "text": "要点 08 Point",
+        "position": { "x": 130, "y": 260 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-09",
+        "text": "要点 09 Point",
+        "position": { "x": 480, "y": 720 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-10",
+        "text": "要点 10 Point",
+        "position": { "x": 950, "y": 540 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-11",
+        "text": "要点 11 Point",
+        "position": { "x": -40, "y": 160 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-12",
+        "text": "要点 12 Point",
+        "position": { "x": 680, "y": -60 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-13",
+        "text": "要点 13 Point",
+        "position": { "x": 240, "y": 600 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-14",
+        "text": "要点 14 Point",
+        "position": { "x": 880, "y": 240 },
+        "size": { "width": 150, "height": 40 }
+      },
+      {
+        "id": "m-leaf-15",
+        "text": "要点 15 Point",
+        "position": { "x": 100, "y": 420 },
+        "size": { "width": 150, "height": 40 }
+      }
     ],
     "edges": [
       { "id": "me-root-hub", "sourceNodeId": "m-root", "targetNodeId": "m-hub" },

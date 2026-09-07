@@ -134,4 +134,31 @@ describe("schema 校验", () => {
     expect(Object.hasOwn(doc.document, "viewport")).toBe(false);
     expect(Object.hasOwn(doc, "selection")).toBe(false);
   });
+
+  it("恶意 null/数组条目返回结构化错误，不抛出 TypeError", () => {
+    const malformed = [
+      () => ({ ...base(), document: { ...base().document, nodes: [null] } }),
+      () => ({ ...base(), document: { ...base().document, edges: [null] } }),
+      () => ({
+        ...base(),
+        document: {
+          ...base().document,
+          nodes: [
+            {
+              id: "a",
+              text: "A",
+              position: { x: 0, y: 0 },
+              size: { width: 1, height: 1 },
+              runs: [null],
+            },
+          ],
+        },
+      }),
+      () => ({ ...base(), document: { ...base().document, framesVisible: "false" } }),
+    ];
+    for (const make of malformed) {
+      expect(() => validateDocument(make())).not.toThrow();
+      expect(validateDocument(make()).ok).toBe(false);
+    }
+  });
 });

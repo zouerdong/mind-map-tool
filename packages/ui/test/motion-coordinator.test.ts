@@ -173,15 +173,23 @@ describe("MotionCoordinator 运行生命周期与帧驱动", () => {
   it("reduced-motion：直接呈现终态，时长归零", () => {
     const coordinator = new MotionCoordinator();
     const doc = makeDoc(2);
-    const from = new Map([["n1", { x: 0, y: 0 }], ["n2", { x: 50, y: 50 }]]);
-    const to = new Map([["n1", { x: 200, y: 100 }], ["n2", { x: 300, y: 200 }]]);
+    const from = new Map([
+      ["n1", { x: 0, y: 0 }],
+      ["n2", { x: 50, y: 50 }],
+    ]);
+    const to = new Map([
+      ["n1", { x: 200, y: 100 }],
+      ["n2", { x: 300, y: 200 }],
+    ]);
 
     let finalFrame = null as MotionFrame | null;
     const onComplete = vi.fn();
 
     coordinator.start(doc, from, to, {
       reducedMotion: true,
-      onFrame: (f) => { finalFrame = f; },
+      onFrame: (f) => {
+        finalFrame = f;
+      },
       onComplete,
     });
 
@@ -195,8 +203,16 @@ describe("MotionCoordinator 运行生命周期与帧驱动", () => {
   it("拖动打断：被拖节点立即交出控制，其余节点继续整理", () => {
     const coordinator = new MotionCoordinator();
     const doc = makeDoc(3);
-    const from = new Map([["n1", { x: 0, y: 0 }], ["n2", { x: 0, y: 50 }], ["n3", { x: 0, y: 100 }]]);
-    const to = new Map([["n1", { x: 100, y: 0 }], ["n2", { x: 200, y: 50 }], ["n3", { x: 300, y: 100 }]]);
+    const from = new Map([
+      ["n1", { x: 0, y: 0 }],
+      ["n2", { x: 0, y: 50 }],
+      ["n3", { x: 0, y: 100 }],
+    ]);
+    const to = new Map([
+      ["n1", { x: 100, y: 0 }],
+      ["n2", { x: 200, y: 50 }],
+      ["n3", { x: 300, y: 100 }],
+    ]);
 
     coordinator.start(doc, from, to, { manualTick: true });
     const t0 = (coordinator as unknown as { t0: number }).t0;
@@ -220,8 +236,14 @@ describe("MotionCoordinator 运行生命周期与帧驱动", () => {
   it("reverseTo（undo 接续）：从当前显示位置恢复历史态，lineMorph 回退至 0", () => {
     const coordinator = new MotionCoordinator();
     const doc = makeDoc(2);
-    const scattered = new Map([["n1", { x: -50, y: 20 }], ["n2", { x: 80, y: 300 }]]);
-    const organized = new Map([["n1", { x: 0, y: 0 }], ["n2", { x: 150, y: 0 }]]);
+    const scattered = new Map([
+      ["n1", { x: -50, y: 20 }],
+      ["n2", { x: 80, y: 300 }],
+    ]);
+    const organized = new Map([
+      ["n1", { x: 0, y: 0 }],
+      ["n2", { x: 150, y: 0 }],
+    ]);
 
     // 先运行整理
     coordinator.start(doc, scattered, organized, { manualTick: true });

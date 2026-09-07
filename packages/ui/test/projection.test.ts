@@ -67,12 +67,20 @@ describe("projectDocument", () => {
       framesVisible: true,
     });
     const view = projectDocument(makeDoc());
-    expect(view.nodes.every((n) => n.data.theme === "light" && n.data.font === "noto-sans-sc")).toBe(true);
+    expect(
+      view.nodes.every((n) => n.data.theme === "light" && n.data.font === "noto-sans-sc"),
+    ).toBe(true);
   });
 
   it("投影产物不含画布内部状态（selection/viewport/measured）", () => {
     const serialized = JSON.stringify(projectDocument(makeDoc()));
-    for (const banned of ['"selected"', '"viewport"', '"measured"', '"dragging"', '"handleBounds"']) {
+    for (const banned of [
+      '"selected"',
+      '"viewport"',
+      '"measured"',
+      '"dragging"',
+      '"handleBounds"',
+    ]) {
       expect(serialized).not.toContain(banned);
     }
   });
@@ -81,7 +89,13 @@ describe("projectDocument", () => {
     const doc = makeDoc();
     const view = projectDocument(doc);
     expect(projectionIsStable(doc, view)).toBe(true);
-    const tampered = { ...view, nodes: [{ ...view.nodes[0]!, data: { ...view.nodes[0]!.data, text: "篡改" } }, ...view.nodes.slice(1)] };
+    const tampered = {
+      ...view,
+      nodes: [
+        { ...view.nodes[0]!, data: { ...view.nodes[0]!.data, text: "篡改" } },
+        ...view.nodes.slice(1),
+      ],
+    };
     expect(projectionIsStable(doc, tampered)).toBe(false);
   });
 });
@@ -96,7 +110,13 @@ describe("命令后重投影一致性（无双状态漂移）", () => {
       return state;
     };
 
-    apply({ kind: "CreateNode", id: "n3", text: "新", position: { x: 300, y: 0 }, size: { width: 60, height: 37 } });
+    apply({
+      kind: "CreateNode",
+      id: "n3",
+      text: "新",
+      position: { x: 300, y: 0 },
+      size: { width: 60, height: 37 },
+    });
     expect(projectionIsStable(state.document, projectDocument(state.document))).toBe(true);
     expect(projectDocument(state.document).nodes).toHaveLength(3);
 

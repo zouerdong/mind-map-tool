@@ -3,11 +3,18 @@
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
 import type { ExportScene } from "./scene.js";
 import { checkExportSize } from "./scene.js";
-import { resvgFontBuffers, type FontBundle } from "./font-source.js";
+import {
+  resvgFontBuffers,
+  validateFontBundle,
+  type FontBundle,
+  type FontResourceLimitError,
+} from "./font-source.js";
 
 export type PngResult =
   | { ok: true; bytes: Uint8Array; width: number; height: number }
-  | { ok: false; error: { code: "EXPORT_SIZE_LIMIT"; w: number; h: number } };
+  | { ok: false; error: { code: "EXPORT_SIZE_LIMIT"; w: number; h: number } }
+  | { ok: false; error: { code: "EXPORT_WASM_UNAVAILABLE"; message: string } }
+  | { ok: false; error: FontResourceLimitError };
 
 let wasmReady: Promise<void> | null = null;
 
@@ -27,6 +34,8 @@ export async function renderPng(
   bundle: FontBundle,
   scale = 2,
 ): Promise<PngResult> {
+  const fontGuard = validateFontBundle(bundle);
+  if (!fontGuard.ok) return fontGuard;
   const guard = checkExportSize(scene, scale);
   if (!guard.ok) return { ok: false, error: guard.error };
   const resvg = new Resvg(svgBytes, {

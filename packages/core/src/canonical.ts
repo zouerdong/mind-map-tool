@@ -81,7 +81,9 @@ function nodeLine(n: MindNode, last: boolean): string {
 function edgeLine(e: MindEdge, last: boolean): string {
   // [ADR 0010 v2] lineStyle 紧随 targetNodeId（solid 缺省不输出）
   const style =
-    e.lineStyle === "dashed" || e.lineStyle === "dotted" ? `, "lineStyle": ${esc(e.lineStyle)}` : "";
+    e.lineStyle === "dashed" || e.lineStyle === "dotted"
+      ? `, "lineStyle": ${esc(e.lineStyle)}`
+      : "";
   return `{ "id": ${esc(e.id)}, "sourceNodeId": ${esc(e.sourceNodeId)}, "targetNodeId": ${esc(e.targetNodeId)}${style} }${last ? "" : ","}`;
 }
 

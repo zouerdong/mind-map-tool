@@ -148,7 +148,12 @@ export function edgeAppearance(style: LineStyle, palette: VisualPalette): EdgeAp
       dash: EDGE_VISUAL.dashDotted,
       roundCap: true,
     };
-  return { stroke: palette.edgePrimary, width: EDGE_VISUAL.widthPrimary, dash: null, roundCap: false };
+  return {
+    stroke: palette.edgePrimary,
+    width: EDGE_VISUAL.widthPrimary,
+    dash: null,
+    roundCap: false,
+  };
 }
 
 export function nodeRoleOf(node: Pick<MindNode, "emphasis">): NodeRole {
@@ -262,7 +267,9 @@ export function layoutNodeVisual(
     contentHeight,
     measured: {
       width: round3(cardWidthOf(contentWidth)),
-      height: round3(VISUAL_TYPOGRAPHY.paddingTop + contentHeight + VISUAL_TYPOGRAPHY.paddingBottom),
+      height: round3(
+        VISUAL_TYPOGRAPHY.paddingTop + contentHeight + VISUAL_TYPOGRAPHY.paddingBottom,
+      ),
     },
   };
 }

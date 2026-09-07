@@ -69,7 +69,9 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
         doc.document.font,
       ),
       ...(runs ? { runs } : {}),
-      ...(visual?.kicker !== undefined && visual.kicker.length > 0 ? { kicker: visual.kicker } : {}),
+      ...(visual?.kicker !== undefined && visual.kicker.length > 0
+        ? { kicker: visual.kicker }
+        : {}),
       ...(visual?.emphasis ? { emphasis: true } : {}),
     };
     doc.document.nodes.push(node);

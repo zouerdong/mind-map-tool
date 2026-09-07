@@ -83,9 +83,7 @@ export function OnboardingOverlay({
         inset: 0,
         pointerEvents: "none", // 遮罩不拦截：画布可操作、关闭不受阻
         background: tokens.onboardingScrim,
-        ...(
-          reducedMotion ? {} : { transition: "background 150ms ease" }
-        ),
+        ...(reducedMotion ? {} : { transition: "background 150ms ease" }),
       }}
     >
       <section

@@ -6,11 +6,7 @@
 // 更新 golden：REGEN=1 npx vitest run tests/golden/export（变更报告中必须列明原因）。
 
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  findCollinearOverlaps,
-  LIGHT_PALETTE,
-  planEdgeGeometry,
-} from "@mindmap/export";
+import { findCollinearOverlaps, LIGHT_PALETTE, planEdgeGeometry } from "@mindmap/export";
 import {
   renderAll,
   loadManifest,
@@ -31,11 +27,7 @@ interface Box {
 }
 
 /** 轴对齐线段是否穿越矩形内部（接触边界不算，1e-6 容差）。 */
-function segEntersBox(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  bx: Box,
-): boolean {
+function segEntersBox(a: { x: number; y: number }, b: { x: number; y: number }, bx: Box): boolean {
   const eps = 1e-6;
   const horizontal = Math.abs(a.y - b.y) < eps;
   const vertical = Math.abs(a.x - b.x) < eps;
@@ -302,10 +294,13 @@ describe("导出 golden", () => {
         .filter((v) => v !== null);
       const geoms = planEdgeGeometry(inputs, "horizontal", 1);
       const extremes = [...geoms.values()].flatMap((g) => g.extremes);
-      const nodeBoxes = doc.document.nodes.map((n) => [n.position, {
-        x: n.position.x + n.size.width,
-        y: n.position.y + n.size.height,
-      } as { x: number; y: number }]);
+      const nodeBoxes = doc.document.nodes.map((n) => [
+        n.position,
+        {
+          x: n.position.x + n.size.width,
+          y: n.position.y + n.size.height,
+        } as { x: number; y: number },
+      ]);
       const all = [...extremes, ...nodeBoxes.flat()];
       const minX = Math.min(...all.map((p) => p.x));
       const maxX = Math.max(...all.map((p) => p.x));

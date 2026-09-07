@@ -285,8 +285,18 @@ export class MotionCoordinator {
         id: e.id,
         sourceId: srcNode.id,
         targetId: tgtNode.id,
-        source: { x: srcPos.x, y: srcPos.y, width: srcNode.size.width, height: srcNode.size.height },
-        target: { x: tgtPos.x, y: tgtPos.y, width: tgtNode.size.width, height: tgtNode.size.height },
+        source: {
+          x: srcPos.x,
+          y: srcPos.y,
+          width: srcNode.size.width,
+          height: srcNode.size.height,
+        },
+        target: {
+          x: tgtPos.x,
+          y: tgtPos.y,
+          width: tgtNode.size.width,
+          height: tgtNode.size.height,
+        },
       });
     }
     this.frozenRoutes = planEdgeRoutes(targetInputs, this.direction, { obstacles: targetBoxes });
@@ -407,7 +417,11 @@ export class MotionCoordinator {
       // 保持被拖拽打断的节点位置
       for (const [id, p] of this.interruptedNodes) this.currentPositions.set(id, p);
       this.currentLineMorph = this.lineMorphTo;
-      const finalFrame = this.calculateFrame(this.currentPositions, this.currentLineMorph, "completed");
+      const finalFrame = this.calculateFrame(
+        this.currentPositions,
+        this.currentLineMorph,
+        "completed",
+      );
       this.onFrameCallback?.(finalFrame);
       this.onCompleteCallback?.();
       this.rafId = null;
@@ -453,8 +467,18 @@ export class MotionCoordinator {
         id: e.id,
         sourceId: srcNode.id,
         targetId: tgtNode.id,
-        source: { x: srcPos.x, y: srcPos.y, width: srcNode.size.width, height: srcNode.size.height },
-        target: { x: tgtPos.x, y: tgtPos.y, width: tgtNode.size.width, height: tgtNode.size.height },
+        source: {
+          x: srcPos.x,
+          y: srcPos.y,
+          width: srcNode.size.width,
+          height: srcNode.size.height,
+        },
+        target: {
+          x: tgtPos.x,
+          y: tgtPos.y,
+          width: tgtNode.size.width,
+          height: tgtNode.size.height,
+        },
       });
     }
 

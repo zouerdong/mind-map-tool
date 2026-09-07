@@ -23,39 +23,20 @@ const b64 = (bytes: Uint8Array) => {
 beforeEach(() => invokeMock.mockReset());
 
 describe("TauriFileAdapter", () => {
-  it("openDocument：取消返回 null，不抛错", async () => {
-    invokeMock.mockResolvedValueOnce(null);
+  // MRT-004 Wave 2：renderer 直连打开（对话框/按路径）已退役——打开一律
+  // 经 host launch intent（platform_request_open_intent）与按窗分配的
+  // platform_open_assigned_document(deliveryId)。保留 FilePort 契约方法，
+  // 生产调用必须稳定报错（不静默失败、不发 IPC）。
+  it("openDocument：已退役——稳定报错且不触发 IPC", async () => {
     const port = new TauriFileAdapter();
-    expect(await port.openDocument()).toBeNull();
-    expect(invokeMock).toHaveBeenCalledWith("platform_open_document", undefined);
+    await expect(port.openDocument()).rejects.toThrow(/已退役/);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it("openDocument：contentJson 还原为 canonical bytes，handle/token 原样透传", async () => {
-    invokeMock.mockResolvedValueOnce({
-      contentJson: '{"schemaVersion":1}',
-      documentTargetHandle: "h-1",
-      versionToken: "tok-1",
-      displayPath: "/tmp/a.mm",
-    });
+  it("openPath：已退役——稳定报错且不触发 IPC", async () => {
     const port = new TauriFileAdapter();
-    const opened = await port.openDocument();
-    expect(new TextDecoder().decode(opened!.contentBytes)).toBe('{"schemaVersion":1}');
-    expect(opened!.documentTargetHandle).toBe("h-1");
-    expect(opened!.versionToken as string).toBe("tok-1");
-  });
-
-  it("openPath：无对话框按路径打开，bytes/handle/token 还原", async () => {
-    invokeMock.mockResolvedValueOnce({
-      contentJson: '{"p":1}',
-      documentTargetHandle: "h-9",
-      versionToken: "tok-9",
-      displayPath: "/tmp/launch.mm",
-    });
-    const port = new TauriFileAdapter();
-    const opened = await port.openPath("/tmp/launch.mm");
-    expect(invokeMock).toHaveBeenCalledWith("platform_open_path", { path: "/tmp/launch.mm" });
-    expect(new TextDecoder().decode(opened.contentBytes)).toBe('{"p":1}');
-    expect(opened.versionToken as string).toBe("tok-9");
+    await expect(port.openPath("/tmp/launch.mm")).rejects.toThrow(/已退役/);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it("requestTargetAuthorization：kind 与 suggestedName 透传，ref 标记 opaque", async () => {
@@ -93,7 +74,11 @@ describe("TauriFileAdapter", () => {
   });
 
   it("commitDocument save-as：携带一次性授权引用", async () => {
-    invokeMock.mockResolvedValueOnce({ documentTargetHandle: "h-2", versionToken: "t", displayPath: "/p" });
+    invokeMock.mockResolvedValueOnce({
+      documentTargetHandle: "h-2",
+      versionToken: "t",
+      displayPath: "/p",
+    });
     const port = new TauriFileAdapter();
     await port.commitDocument({
       kind: "save-as",
@@ -159,5 +144,14 @@ describe("TauriPreferencesAdapter", () => {
     const prefs = new TauriPreferencesAdapter();
     const err = await prefs.load().catch((e) => e);
     expect(err.code).toBe("PREFERENCES_IO_ERROR");
+  });
+
+  it("偏好 JSON 损坏时回退为空快照并提供一次性恢复提示", async () => {
+    invokeMock.mockRejectedValueOnce({ code: "PREFERENCES_CORRUPT", message: "invalid json" });
+    const prefs = new TauriPreferencesAdapter();
+
+    await expect(prefs.load()).resolves.toEqual({});
+    expect(prefs.consumeWarning?.()).toContain("偏好文件损坏");
+    expect(prefs.consumeWarning?.()).toBeNull();
   });
 });

@@ -31,9 +31,17 @@ describe("ADR 0010：读旧写新", () => {
       JSON.stringify({
         schemaVersion: 1,
         document: {
-          theme: "light", font: "noto-sans-sc", shape: "card", framesVisible: true,
+          theme: "light",
+          font: "noto-sans-sc",
+          shape: "card",
+          framesVisible: true,
           nodes: [
-            { id: "a", text: "旧文件节点", position: { x: 12.5, y: -30 }, size: { width: 88, height: 44 } },
+            {
+              id: "a",
+              text: "旧文件节点",
+              position: { x: 12.5, y: -30 },
+              size: { width: 88, height: 44 },
+            },
           ],
           edges: [],
         },
@@ -101,10 +109,16 @@ describe("ADR 0010：fail-closed 非法字段", () => {
     JSON.stringify({
       schemaVersion: 2,
       document: {
-        theme: "light", font: "noto-sans-sc", shape: "card", framesVisible: true,
+        theme: "light",
+        font: "noto-sans-sc",
+        shape: "card",
+        framesVisible: true,
         nodes: [
           {
-            id: "a", text: "t", position: { x: 0, y: 0 }, size: { width: 10, height: 10 },
+            id: "a",
+            text: "t",
+            position: { x: 0, y: 0 },
+            size: { width: 10, height: 10 },
             ...(kicker !== undefined ? { kicker } : {}),
             ...(emphasis !== undefined ? { emphasis } : {}),
           },
@@ -125,7 +139,10 @@ describe("ADR 0010：fail-closed 非法字段", () => {
     const badEdge = JSON.stringify({
       schemaVersion: 2,
       document: {
-        theme: "light", font: "noto-sans-sc", shape: "card", framesVisible: true,
+        theme: "light",
+        font: "noto-sans-sc",
+        shape: "card",
+        framesVisible: true,
         nodes: [node("a"), node("b")],
         edges: [{ id: "e", sourceNodeId: "a", targetNodeId: "b", lineStyle: "wavy" }],
       },
@@ -142,7 +159,9 @@ describe("ADR 0010：三条样式命令", () => {
   it("SetNodeKicker + measured 尺寸原子提交；undo 一次恢复 kicker 与 size", () => {
     const s = setup();
     const r = applyCommand(s, {
-      kind: "SetNodeKicker", id: "n1", kicker: "灵感",
+      kind: "SetNodeKicker",
+      id: "n1",
+      kicker: "灵感",
       measured: { width: 120, height: 68 },
     });
     expect(r.ok).toBe(true);
@@ -164,8 +183,18 @@ describe("ADR 0010：三条样式命令", () => {
     for (const cmd of [
       { kind: "SetNodeKicker" as const, id: "n1", kicker: "a\nb" },
       { kind: "SetNodeKicker" as const, id: "n1", kicker: "x".repeat(41) },
-      { kind: "SetNodeKicker" as const, id: "n1", kicker: "ok", measured: { width: 0, height: 10 } },
-      { kind: "SetNodeKicker" as const, id: "n1", kicker: "ok", measured: { width: NaN, height: 10 } },
+      {
+        kind: "SetNodeKicker" as const,
+        id: "n1",
+        kicker: "ok",
+        measured: { width: 0, height: 10 },
+      },
+      {
+        kind: "SetNodeKicker" as const,
+        id: "n1",
+        kicker: "ok",
+        measured: { width: NaN, height: 10 },
+      },
       { kind: "SetNodeKicker" as const, id: "ghost", kicker: "ok" },
     ]) {
       const r = applyCommand(s, cmd);
@@ -178,30 +207,51 @@ describe("ADR 0010：三条样式命令", () => {
     const s = setup();
     const r1 = applyCommand(s, { kind: "SetNodeEmphasis", id: "n1", emphasis: true });
     expect(r1.ok && r1.stateNode.document.document.nodes[0]!.emphasis).toBe(true);
-    const r2 = applyCommand(r1.ok ? r1.stateNode : s, { kind: "SetEdgeLineStyle", id: "e1", lineStyle: "dotted" });
+    const r2 = applyCommand(r1.ok ? r1.stateNode : s, {
+      kind: "SetEdgeLineStyle",
+      id: "e1",
+      lineStyle: "dotted",
+    });
     expect(r2.ok && r2.stateNode.document.document.edges[0]!.lineStyle).toBe("dotted");
     // undo（逆序）：先撤 lineStyle，再撤 emphasis
-    const u1 = applyCommand(r2.ok ? r2.stateNode : s, r2.ok ? r2.inverse! : { kind: "SetNodeEmphasis", id: "n1", emphasis: false });
+    const u1 = applyCommand(
+      r2.ok ? r2.stateNode : s,
+      r2.ok ? r2.inverse! : { kind: "SetNodeEmphasis", id: "n1", emphasis: false },
+    );
     expect(u1.ok && u1.stateNode.document.document.edges[0]!.lineStyle).toBeUndefined();
-    const u2 = applyCommand(u1.ok ? u1.stateNode : s, r1.ok ? r1.inverse! : { kind: "SetNodeEmphasis", id: "n1", emphasis: false });
+    const u2 = applyCommand(
+      u1.ok ? u1.stateNode : s,
+      r1.ok ? r1.inverse! : { kind: "SetNodeEmphasis", id: "n1", emphasis: false },
+    );
     expect(u2.ok && u2.stateNode.document.document.nodes[0]!.emphasis).toBeUndefined();
     // solid = 缺省（不落盘语义在命令层同样归一）
-    const r3 = applyCommand(u2.ok ? u2.stateNode : s, { kind: "SetEdgeLineStyle", id: "e1", lineStyle: "solid" });
+    const r3 = applyCommand(u2.ok ? u2.stateNode : s, {
+      kind: "SetEdgeLineStyle",
+      id: "e1",
+      lineStyle: "solid",
+    });
     expect(r3.ok && r3.stateNode.document.document.edges[0]!.lineStyle).toBeUndefined();
   });
 
   it("删除恢复（RestoreSelection）保留 kicker/emphasis/lineStyle", () => {
-    const s = makeStateNode(withNode((n) => {
-      n.kicker = "K";
-      n.emphasis = true;
-    }));
+    const s = makeStateNode(
+      withNode((n) => {
+        n.kicker = "K";
+        n.emphasis = true;
+      }),
+    );
     const styled = applyCommand(s, { kind: "SetEdgeLineStyle", id: "e1", lineStyle: "dashed" });
     expect(styled.ok).toBe(true);
     const del = applyCommand(styled.ok ? styled.stateNode : s, {
-      kind: "DeleteSelection", nodeIds: ["n1"], edgeIds: [],
+      kind: "DeleteSelection",
+      nodeIds: ["n1"],
+      edgeIds: [],
     });
     expect(del.ok).toBe(true);
-    const restore = applyCommand(del.ok ? del.stateNode : s, del.ok ? del.inverse! : { kind: "DeleteSelection", nodeIds: ["n1"], edgeIds: [] });
+    const restore = applyCommand(
+      del.ok ? del.stateNode : s,
+      del.ok ? del.inverse! : { kind: "DeleteSelection", nodeIds: ["n1"], edgeIds: [] },
+    );
     expect(restore.ok).toBe(true);
     if (!restore.ok) return;
     const n = restore.stateNode.document.document.nodes.find((x) => x.id === "n1")!;

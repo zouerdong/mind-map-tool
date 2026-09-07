@@ -5,6 +5,7 @@
 用途：G-VIS 校准材料——同一参考方向的完整状态矩阵（暖白/黑板 × 14 状态）与 800ms 整理动效（打断/undo/reduced-motion/关键帧步进）。
 
 边界：
+
 - 浏览器隔离原型，**不是生产 React Flow 实现**；通过 ≠ 产品通过（生产由 VRA-050/060/080 取证）。
 - 字体用系统中文栈近似（PingFang/冬青等），生产为 Noto Sans SC / LXGW WenKai（FontResolver 同源测量）。
 - kicker/强调/线型来自 `reference-dag-12.visual.json` 过渡标注（schema 字段待 G-SCHEMA）。

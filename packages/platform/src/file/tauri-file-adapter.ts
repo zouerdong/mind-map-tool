@@ -9,41 +9,37 @@ import {
   type CommitReceipt,
   type ExportCommitResult,
   type GrantedTargetAuthorization,
-  type OpenedDocumentIpc,
 } from "../ipc/types.js";
 import { toPlatformError } from "./errors.js";
-import {
-  asDocumentTargetHandle,
-  asVersionToken,
-  type CommitDocumentRequest,
-  type FilePort,
-  type OpenedDocument,
-  type TargetAuthorizationRef,
+import type {
+  CommitDocumentRequest,
+  FilePort,
+  OpenedDocument,
+  TargetAuthorizationRef,
 } from "./types.js";
 
-const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true }); // canonical JSON 必须是合法 UTF-8
 
 export class TauriFileAdapter implements FilePort {
+  /**
+   * MRT-004 Wave 2：renderer 直连对话框打开已退役——工具条"打开…"改经
+   * host launch intent（platform_request_open_intent），打开文档一律由
+   * host 按窗口分配（deliveryId）。保留方法以维持 FilePort 契约（浏览器
+   * dev/测试消费者）；生产调用稳定报错，不静默失败。
+   */
   async openDocument(): Promise<OpenedDocument | null> {
-    const raw = await this.call<OpenedDocumentIpc | null>(IPC_COMMANDS.openDocument, null);
-    if (raw === null) return null; // 用户取消
-    return {
-      contentBytes: toBytes(raw.contentJson),
-      documentTargetHandle: asDocumentTargetHandle(raw.documentTargetHandle),
-      versionToken: asVersionToken(raw.versionToken),
-      displayPath: raw.displayPath,
-    };
+    throw toPlatformError({
+      code: "FILE_IO_ERROR",
+      message: "直接打开已退役（MRT-004 Wave 2）：请经 host launch intent 打开文件。",
+    });
   }
 
   async openPath(path: string): Promise<OpenedDocument> {
-    const raw = await this.call<OpenedDocumentIpc>(IPC_COMMANDS.openPath, { path });
-    return {
-      contentBytes: toBytes(raw.contentJson),
-      documentTargetHandle: asDocumentTargetHandle(raw.documentTargetHandle),
-      versionToken: asVersionToken(raw.versionToken),
-      displayPath: raw.displayPath,
-    };
+    void path;
+    throw toPlatformError({
+      code: "FILE_IO_ERROR",
+      message: "按路径直接打开已退役（MRT-004 Wave 2）：打开由 host 按窗口分配。",
+    });
   }
 
   async requestTargetAuthorization(
@@ -97,10 +93,6 @@ export class TauriFileAdapter implements FilePort {
 }
 
 // ---- 编码工具（避免依赖 Node Buffer；Web 环境可用） ----
-
-function toBytes(json: string): Uint8Array {
-  return encoder.encode(json);
-}
 
 function fromBytes(bytes: Uint8Array): string {
   return decoder.decode(bytes);

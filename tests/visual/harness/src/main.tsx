@@ -15,7 +15,16 @@ interface HarnessWindow extends Window {
   __READY?: boolean;
   __session?: DocumentSession;
   __organize?: (direction?: "horizontal" | "vertical") => void;
-  __getNodes?: () => Array<{ id: string; x: number; y: number; width: number; height: number; text: string; bg: string; color: string }>;
+  __getNodes?: () => Array<{
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text: string;
+    bg: string;
+    color: string;
+  }>;
   __getEdges?: () => Array<{ id: string; d: string; stroke: string; arrowD?: string }>;
   __getOrganizeResult?: () => { movedCount: number; targetPositions: Map<string, Point> } | null;
 }
@@ -26,7 +35,8 @@ function App() {
   const url = new URL(window.location.href);
   const fixtureName = url.searchParams.get("fixture") || "reference-dag-12";
   const initialTheme = (url.searchParams.get("theme") as "light" | "dark") || "light";
-  const initialDirection = (url.searchParams.get("direction") as "horizontal" | "vertical") || "horizontal";
+  const initialDirection =
+    (url.searchParams.get("direction") as "horizontal" | "vertical") || "horizontal";
   const reducedMotion = url.searchParams.get("reducedMotion") === "1";
 
   const [session, setSession] = useState<DocumentSession | null>(null);
@@ -77,7 +87,16 @@ function App() {
 
     window.__getNodes = () => {
       const nodeEls = document.querySelectorAll(".react-flow__node");
-      const list: Array<{ id: string; x: number; y: number; width: number; height: number; text: string; bg: string; color: string }> = [];
+      const list: Array<{
+        id: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        text: string;
+        bg: string;
+        color: string;
+      }> = [];
       nodeEls.forEach((el) => {
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);

@@ -6,18 +6,78 @@
     "shape": "card",
     "framesVisible": true,
     "nodes": [
-      { "id": "n-inbox", "text": "收件箱 Inbox", "position": { "x": 640, "y": 660 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-capture", "text": "捕捉灵感 Capture", "position": { "x": -140, "y": 60 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-notes", "text": "知识库 Notes", "position": { "x": 620, "y": -90 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-review-loop", "text": "反馈环 Review loop", "position": { "x": 150, "y": 320 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-hooks", "text": "自动化 Hooks", "position": { "x": 960, "y": 190 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-skills", "text": "技能 Skills", "position": { "x": 40, "y": 540 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-subtasks", "text": "子任务 Subtasks", "position": { "x": 480, "y": 430 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-evals", "text": "评估 Evals", "position": { "x": 990, "y": 330 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-design", "text": "需求与设计\nRequirements & design", "position": { "x": 810, "y": 580 }, "size": { "width": 230, "height": 84 } },
-      { "id": "n-peer", "text": "同伴审阅 Peer review", "position": { "x": 100, "y": 730 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-cicd", "text": "持续集成 CI/CD", "position": { "x": -80, "y": 400 }, "size": { "width": 188, "height": 68 } },
-      { "id": "n-close", "text": "闭环收尾\nClosing the loop", "position": { "x": 420, "y": 750 }, "size": { "width": 230, "height": 84 } }
+      {
+        "id": "n-inbox",
+        "text": "收件箱 Inbox",
+        "position": { "x": 640, "y": 660 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-capture",
+        "text": "捕捉灵感 Capture",
+        "position": { "x": -140, "y": 60 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-notes",
+        "text": "知识库 Notes",
+        "position": { "x": 620, "y": -90 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-review-loop",
+        "text": "反馈环 Review loop",
+        "position": { "x": 150, "y": 320 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-hooks",
+        "text": "自动化 Hooks",
+        "position": { "x": 960, "y": 190 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-skills",
+        "text": "技能 Skills",
+        "position": { "x": 40, "y": 540 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-subtasks",
+        "text": "子任务 Subtasks",
+        "position": { "x": 480, "y": 430 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-evals",
+        "text": "评估 Evals",
+        "position": { "x": 990, "y": 330 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-design",
+        "text": "需求与设计\nRequirements & design",
+        "position": { "x": 810, "y": 580 },
+        "size": { "width": 230, "height": 84 }
+      },
+      {
+        "id": "n-peer",
+        "text": "同伴审阅 Peer review",
+        "position": { "x": 100, "y": 730 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-cicd",
+        "text": "持续集成 CI/CD",
+        "position": { "x": -80, "y": 400 },
+        "size": { "width": 188, "height": 68 }
+      },
+      {
+        "id": "n-close",
+        "text": "闭环收尾\nClosing the loop",
+        "position": { "x": 420, "y": 750 },
+        "size": { "width": 230, "height": 84 }
+      }
     ],
     "edges": [
       { "id": "e-1", "sourceNodeId": "n-capture", "targetNodeId": "n-design" },

@@ -9,14 +9,27 @@ function sampleDoc(): MindMapDocumentV1 {
   const doc = emptyDocument();
   doc.document.nodes.push(
     {
-      id: "n1", text: "需求与设计\nRequirements & design",
-      position: { x: -30.1234, y: 0 }, size: { width: 230, height: 84 },
-      kicker: "灵感 IDEA", emphasis: true,
+      id: "n1",
+      text: "需求与设计\nRequirements & design",
+      position: { x: -30.1234, y: 0 },
+      size: { width: 230, height: 84 },
+      kicker: "灵感 IDEA",
+      emphasis: true,
       runs: [{ start: 0, end: 5, bold: true }],
     },
-    { id: "n2", text: "闭环收尾 Closing the loop", position: { x: 400, y: 100 }, size: { width: 188, height: 68 } },
+    {
+      id: "n2",
+      text: "闭环收尾 Closing the loop",
+      position: { x: 400, y: 100 },
+      size: { width: 188, height: 68 },
+    },
   );
-  doc.document.edges.push({ id: "e1", sourceNodeId: "n1", targetNodeId: "n2", lineStyle: "dashed" });
+  doc.document.edges.push({
+    id: "e1",
+    sourceNodeId: "n1",
+    targetNodeId: "n2",
+    lineStyle: "dashed",
+  });
   return doc;
 }
 
@@ -38,7 +51,12 @@ describe("Graph JSON 导出", () => {
     expect(g.graph.nodes[0]!.text).toBe("需求与设计\nRequirements & design");
     // 超长首行截断带省略号
     const doc = emptyDocument();
-    doc.document.nodes.push({ id: "x", text: "长".repeat(100), position: { x: 0, y: 0 }, size: { width: 10, height: 10 } });
+    doc.document.nodes.push({
+      id: "x",
+      text: "长".repeat(100),
+      position: { x: 0, y: 0 },
+      size: { width: 10, height: 10 },
+    });
     const label = toGraphJson(doc).graph.nodes[0]!.label;
     expect(label.length).toBeLessThanOrEqual(60);
     expect(label.endsWith("…")).toBe(true);
@@ -83,8 +101,13 @@ describe("Graph JSON 导出", () => {
       JSON.stringify({
         schemaVersion: 1,
         document: {
-          theme: "light", font: "noto-sans-sc", shape: "card", framesVisible: true,
-          nodes: [{ id: "a", text: "旧", position: { x: 1, y: 2 }, size: { width: 10, height: 10 } }],
+          theme: "light",
+          font: "noto-sans-sc",
+          shape: "card",
+          framesVisible: true,
+          nodes: [
+            { id: "a", text: "旧", position: { x: 1, y: 2 }, size: { width: 10, height: 10 } },
+          ],
           edges: [],
         },
       }),

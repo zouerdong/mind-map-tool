@@ -58,10 +58,13 @@ export function documentDefaults(doc: MindMapDocumentV1) {
     font: d.font,
     shape: d.shape,
     framesVisible: d.framesVisible,
-  } satisfies Pick< MindNodeData, "theme" | "font" | "shape" | "framesVisible">;
+  } satisfies Pick<MindNodeData, "theme" | "font" | "shape" | "framesVisible">;
 }
 
-export function projectNode(node: MindNode, defaults: ReturnType<typeof documentDefaults>): MindFlowNode {
+export function projectNode(
+  node: MindNode,
+  defaults: ReturnType<typeof documentDefaults>,
+): MindFlowNode {
   return {
     id: node.id,
     type: "mind",
@@ -104,9 +107,7 @@ export function projectEdge(edge: MindEdge, theme: ThemeName): MindFlowEdge {
     style: {
       stroke,
       strokeWidth: lineStyle === "solid" ? 2 : 1.5,
-      ...(edgeDash(lineStyle) !== undefined
-        ? { strokeDasharray: edgeDash(lineStyle) }
-        : {}),
+      ...(edgeDash(lineStyle) !== undefined ? { strokeDasharray: edgeDash(lineStyle) } : {}),
     },
     markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 16, height: 16 },
   };

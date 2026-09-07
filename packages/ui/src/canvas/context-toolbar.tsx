@@ -10,7 +10,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Panel } from "@xyflow/react";
-import type { Command, FontToken, LineStyle, MindMapDocumentV1, MindNode, TextRun } from "@mindmap/core";
+import type {
+  Command,
+  FontToken,
+  LineStyle,
+  MindMapDocumentV1,
+  MindNode,
+  TextRun,
+} from "@mindmap/core";
 import { themeTokens } from "../theme/theme-tokens.js";
 
 export interface ContextToolbarSelection {
@@ -26,14 +33,25 @@ interface ContextToolbarProps {
   primaryNodeId: string | null;
 }
 
-export function ContextToolbar({ selection, document: doc, onCommand, primaryNodeId }: ContextToolbarProps) {
+export function ContextToolbar({
+  selection,
+  document: doc,
+  onCommand,
+  primaryNodeId,
+}: ContextToolbarProps) {
   const theme = doc.document.theme;
   const t = themeTokens(theme);
   const nodeSel = selection.nodes;
   const edgeSel = selection.edges;
   const nothing = nodeSel.length === 0 && edgeSel.length === 0;
-  const primary = primaryNodeId !== null ? doc.document.nodes.find((n) => n.id === primaryNodeId) ?? null : null;
-  const primaryEdge = edgeSel.length > 0 ? doc.document.edges.find((e) => e.id === edgeSel[edgeSel.length - 1]) ?? null : null;
+  const primary =
+    primaryNodeId !== null
+      ? (doc.document.nodes.find((n) => n.id === primaryNodeId) ?? null)
+      : null;
+  const primaryEdge =
+    edgeSel.length > 0
+      ? (doc.document.edges.find((e) => e.id === edgeSel[edgeSel.length - 1]) ?? null)
+      : null;
 
   const barStyle: React.CSSProperties = {
     display: "flex",
@@ -45,7 +63,11 @@ export function ContextToolbar({ selection, document: doc, onCommand, primaryNod
     boxShadow: "0 6px 18px rgba(0,0,0,.12)",
     zIndex: 20,
   };
-  const btn = (label: string, onClick: () => void, opts?: { title?: string; active?: boolean; bold?: boolean; underline?: boolean }): React.JSX.Element => (
+  const btn = (
+    label: string,
+    onClick: () => void,
+    opts?: { title?: string; active?: boolean; bold?: boolean; underline?: boolean },
+  ): React.JSX.Element => (
     <button
       key={label}
       type="button"
@@ -69,13 +91,21 @@ export function ContextToolbar({ selection, document: doc, onCommand, primaryNod
     </button>
   );
   const sep = (key: string) => (
-    <span key={key} style={{ width: 1, background: theme === "dark" ? "#35312A" : "#E3DFD5", margin: "3px 2px" }} />
+    <span
+      key={key}
+      style={{ width: 1, background: theme === "dark" ? "#35312A" : "#E3DFD5", margin: "3px 2px" }}
+    />
   );
 
   if (nothing) return null;
 
   return (
-    <Panel position="top-center" data-testid="context-toolbar" role="toolbar" aria-label="上下文工具">
+    <Panel
+      position="top-center"
+      data-testid="context-toolbar"
+      role="toolbar"
+      aria-label="上下文工具"
+    >
       <div style={barStyle}>
         {primary !== null ? (
           <NodeTools
@@ -90,17 +120,35 @@ export function ContextToolbar({ selection, document: doc, onCommand, primaryNod
         ) : null}
         {primary !== null && primaryEdge !== null ? sep("mid") : null}
         {primaryEdge !== null ? (
-          <EdgeTools edgeId={primaryEdge.id} lineStyle={primaryEdge.lineStyle ?? "solid"} onCommand={onCommand} render={{ btn, t }} />
+          <EdgeTools
+            edgeId={primaryEdge.id}
+            lineStyle={primaryEdge.lineStyle ?? "solid"}
+            onCommand={onCommand}
+            render={{ btn, t }}
+          />
         ) : null}
         {nodeSel.length > 0
-          ? btn("删除", () => onCommand({ kind: "DeleteSelection", nodeIds: [...nodeSel], edgeIds: [...edgeSel] }), { title: "删除选中（⌫）" })
+          ? btn(
+              "删除",
+              () =>
+                onCommand({
+                  kind: "DeleteSelection",
+                  nodeIds: [...nodeSel],
+                  edgeIds: [...edgeSel],
+                }),
+              { title: "删除选中（⌫）" },
+            )
           : null}
       </div>
     </Panel>
   );
 }
 
-type BtnRender = (label: string, onClick: () => void, opts?: { title?: string; active?: boolean; bold?: boolean; underline?: boolean }) => React.JSX.Element;
+type BtnRender = (
+  label: string,
+  onClick: () => void,
+  opts?: { title?: string; active?: boolean; bold?: boolean; underline?: boolean },
+) => React.JSX.Element;
 
 interface RenderCtx {
   btn: BtnRender;
@@ -134,7 +182,11 @@ function NodeTools({
 
   return (
     <>
-      {btn(node.emphasis === true ? "强调✓" : "强调", () => onCommand({ kind: "SetNodeEmphasis", id: nodeId, emphasis: node.emphasis !== true }), { title: "普通/强调角色" })}
+      {btn(
+        node.emphasis === true ? "强调✓" : "强调",
+        () => onCommand({ kind: "SetNodeEmphasis", id: nodeId, emphasis: node.emphasis !== true }),
+        { title: "普通/强调角色" },
+      )}
       {selectionCount === 1 ? (
         <input
           data-testid="kicker-input"
@@ -155,27 +207,108 @@ function NodeTools({
             onCommand({ kind: "SetNodeKicker", id: nodeId, kicker });
           }}
           style={{
-            font: "inherit", fontSize: 12, width: 90, padding: "3px 7px",
-            border: `1px solid ${t.shellSubtle}`, borderRadius: 6,
-            background: "transparent", color: t.shellText,
+            font: "inherit",
+            fontSize: 12,
+            width: 90,
+            padding: "3px 7px",
+            border: `1px solid ${t.shellSubtle}`,
+            borderRadius: 6,
+            background: "transparent",
+            color: t.shellText,
           }}
         />
       ) : null}
-      {btn(font === "noto-sans-sc" ? "楷体" : "黑体", () => onCommand({ kind: "SetDocumentStyle", font: otherFont }), { title: `文档字体切换（当前 ${font}）` })}
-      {btn("A−", () => onCommand({ kind: "EditNodeText", id: nodeId, text: node.text, size: node.size, runs: stepFontSize(node, -2) }), { title: "字号 −2" })}
-      {btn("A+", () => onCommand({ kind: "EditNodeText", id: nodeId, text: node.text, size: node.size, runs: stepFontSize(node, 2) }), { title: "字号 +2" })}
-      {btn("B", () => onCommand({ kind: "EditNodeText", id: nodeId, text: node.text, size: node.size, runs: toggleWhole(node, "bold") }), { title: "整节点粗体", bold: true, active: wholeRunBold })}
-      {btn("U", () => onCommand({ kind: "EditNodeText", id: nodeId, text: node.text, size: node.size, runs: toggleWhole(node, "underline") }), { title: "整节点下划线", underline: true })}
+      {btn(
+        font === "noto-sans-sc" ? "楷体" : "黑体",
+        () => onCommand({ kind: "SetDocumentStyle", font: otherFont }),
+        { title: `文档字体切换（当前 ${font}）` },
+      )}
+      {btn(
+        "A−",
+        () =>
+          onCommand({
+            kind: "EditNodeText",
+            id: nodeId,
+            text: node.text,
+            size: node.size,
+            runs: stepFontSize(node, -2),
+          }),
+        { title: "字号 −2" },
+      )}
+      {btn(
+        "A+",
+        () =>
+          onCommand({
+            kind: "EditNodeText",
+            id: nodeId,
+            text: node.text,
+            size: node.size,
+            runs: stepFontSize(node, 2),
+          }),
+        { title: "字号 +2" },
+      )}
+      {btn(
+        "B",
+        () =>
+          onCommand({
+            kind: "EditNodeText",
+            id: nodeId,
+            text: node.text,
+            size: node.size,
+            runs: toggleWhole(node, "bold"),
+          }),
+        { title: "整节点粗体", bold: true, active: wholeRunBold },
+      )}
+      {btn(
+        "U",
+        () =>
+          onCommand({
+            kind: "EditNodeText",
+            id: nodeId,
+            text: node.text,
+            size: node.size,
+            runs: toggleWhole(node, "underline"),
+          }),
+        { title: "整节点下划线", underline: true },
+      )}
       {sep("shape")}
-      {btn(node.shape === "ellipse" ? "卡片" : "手绘圈", () => onCommand({ kind: "SetNodeShape", id: nodeId, shape: node.shape === "ellipse" ? null : "ellipse" }), { title: "单节点形状" })}
-      {btn(doc.document.framesVisible === false ? "显示框线" : "隐藏框线", () => onCommand({ kind: "SetDocumentStyle", framesVisible: doc.document.framesVisible === false }), { title: "文档级框线显隐" })}
+      {btn(
+        node.shape === "ellipse" ? "卡片" : "手绘圈",
+        () =>
+          onCommand({
+            kind: "SetNodeShape",
+            id: nodeId,
+            shape: node.shape === "ellipse" ? null : "ellipse",
+          }),
+        { title: "单节点形状" },
+      )}
+      {btn(
+        doc.document.framesVisible === false ? "显示框线" : "隐藏框线",
+        () =>
+          onCommand({
+            kind: "SetDocumentStyle",
+            framesVisible: doc.document.framesVisible === false,
+          }),
+        { title: "文档级框线显隐" },
+      )}
     </>
   );
 }
 
-function EdgeTools({ edgeId, lineStyle, onCommand, render }: { edgeId: string; lineStyle: LineStyle; onCommand: (c: Command) => void; render: { btn: RenderCtx["btn"]; t: RenderCtx["t"] } }) {
+function EdgeTools({
+  edgeId,
+  lineStyle,
+  onCommand,
+  render,
+}: {
+  edgeId: string;
+  lineStyle: LineStyle;
+  onCommand: (c: Command) => void;
+  render: { btn: RenderCtx["btn"]; t: RenderCtx["t"] };
+}) {
   const { btn } = render;
-  const set = (s: LineStyle) => () => onCommand({ kind: "SetEdgeLineStyle", id: edgeId, lineStyle: s });
+  const set = (s: LineStyle) => () =>
+    onCommand({ kind: "SetEdgeLineStyle", id: edgeId, lineStyle: s });
   return (
     <>
       {btn("实线", set("solid"), { active: lineStyle === "solid" })}
@@ -190,7 +323,10 @@ function stepFontSize(node: MindNode, step: number): TextRun[] {
   if (node.runs === undefined || node.runs.length === 0) {
     return [{ start: 0, end: node.text.length, fontSize: clampSize(16 + step) }];
   }
-  return node.runs.map((r) => ({ ...r, ...(r.fontSize !== undefined ? { fontSize: clampSize(r.fontSize + step) } : {}) }));
+  return node.runs.map((r) => ({
+    ...r,
+    ...(r.fontSize !== undefined ? { fontSize: clampSize(r.fontSize + step) } : {}),
+  }));
 }
 function clampSize(v: number): number {
   return Math.min(72, Math.max(8, Math.round(v)));

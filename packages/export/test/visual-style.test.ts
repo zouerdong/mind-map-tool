@@ -132,7 +132,11 @@ describe("节点测量（kicker + runs 正文，UI/导出同源）", () => {
 
   it("眉题加高：+14.3 行高 + 6 gap（§1.3 卡高基准 68 ≈ 单眉题+单行正文）", () => {
     const plain = measureNodeVisual({ text: "捕捉" }, "noto-sans-sc", fonts);
-    const withKicker = measureNodeVisual({ text: "捕捉", kicker: "灵感 IDEA" }, "noto-sans-sc", fonts);
+    const withKicker = measureNodeVisual(
+      { text: "捕捉", kicker: "灵感 IDEA" },
+      "noto-sans-sc",
+      fonts,
+    );
     expect(withKicker.height - plain.height).toBeCloseTo(14.3 + 6, 6);
     expect(withKicker.height).toBeCloseTo(66.7, 6);
   });
@@ -200,7 +204,11 @@ describe("完整节点布局（相对框几何）", () => {
   });
 
   it("确定性：同输入两次布局完全一致", () => {
-    const node = { text: "Alpha\nBeta 中文", kicker: "眉题", runs: [{ start: 0, end: 1, bold: true }] };
+    const node = {
+      text: "Alpha\nBeta 中文",
+      kicker: "眉题",
+      runs: [{ start: 0, end: 1, bold: true }],
+    };
     expect(layoutNodeVisual(node, "card", "noto-sans-sc", fonts)).toEqual(
       layoutNodeVisual(node, "card", "noto-sans-sc", fonts),
     );

@@ -34,7 +34,10 @@ export interface LaunchRouterCallbacks {
  *   没有 clean 空闲窗口 → 新窗口（绝不覆盖 dirty 窗）。
  * - activation：无窗口 → 新建空白；有窗口 → 不动作（不碰 dirty 窗）。
  */
-export function decideWindowAction(intent: LaunchIntentPayload, windows: WindowContext[]): WindowAction {
+export function decideWindowAction(
+  intent: LaunchIntentPayload,
+  windows: WindowContext[],
+): WindowAction {
   if (intent.kind === "activation") {
     return windows.length === 0 ? { type: "new-blank-window" } : { type: "none" };
   }

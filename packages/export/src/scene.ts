@@ -98,11 +98,7 @@ export interface SceneUnderlineItem {
 }
 
 export type SceneItem =
-  | SceneEdgeItem
-  | SceneFrameRectItem
-  | SceneFrameEllipseItem
-  | SceneTextItem
-  | SceneUnderlineItem;
+  SceneEdgeItem | SceneFrameRectItem | SceneFrameEllipseItem | SceneTextItem | SceneUnderlineItem;
 
 export interface ExportScene {
   empty: boolean;

@@ -5,11 +5,7 @@ import type { Command } from "@mindmap/core";
 
 /** 步骤 semantic id（稳定标识，文案/锚点映射用，不得随 UI 结构改名）。 */
 export type OnboardingStepId =
-  | "welcome"
-  | "create-first"
-  | "second-connect"
-  | "undo-or-theme"
-  | "save-or-export";
+  "welcome" | "create-first" | "second-connect" | "undo-or-theme" | "save-or-export";
 
 export type OnboardingStatus = "not-started" | "in-progress" | "completed" | "skipped";
 
@@ -45,9 +41,24 @@ export interface OnboardingStepSpec {
 
 export const ONBOARDING_STEPS: readonly OnboardingStepSpec[] = [
   { id: "welcome", anchor: null, observe: [], mode: "all" }, // 入口卡：显式开始/跳过
-  { id: "create-first", anchor: "canvas.pane", observe: ["CreateNode", "EditNodeText"], mode: "all" },
-  { id: "second-connect", anchor: "canvas.pane", observe: ["CreateNode", "MoveNodes", "CreateEdge"], mode: "all" },
-  { id: "undo-or-theme", anchor: "theme.toggle", observe: ["undo", "redo", "SetDocumentStyle"], mode: "any" },
+  {
+    id: "create-first",
+    anchor: "canvas.pane",
+    observe: ["CreateNode", "EditNodeText"],
+    mode: "all",
+  },
+  {
+    id: "second-connect",
+    anchor: "canvas.pane",
+    observe: ["CreateNode", "MoveNodes", "CreateEdge"],
+    mode: "all",
+  },
+  {
+    id: "undo-or-theme",
+    anchor: "theme.toggle",
+    observe: ["undo", "redo", "SetDocumentStyle"],
+    mode: "any",
+  },
   { id: "save-or-export", anchor: null, observe: ["action:save", "action:export"], mode: "any" },
 ];
 

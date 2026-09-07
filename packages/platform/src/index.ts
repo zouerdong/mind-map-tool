@@ -29,14 +29,24 @@ export { asDocumentTargetHandle, asTargetAuthorizationRef, asVersionToken } from
 export { TauriFileAdapter } from "./file/tauri-file-adapter.js";
 
 // 生命周期
+// LaunchRouter（MM-060 单窗口决策）已由 host LaunchCoordinator 取代
+// （MRT-004 Wave 2 生产接线）；保留导出供既有契约测试。
 export { decideWindowAction, intentDedupeKey, LaunchRouter } from "./lifecycle/launch-router.js";
-export type { LaunchActionHandler } from "./lifecycle/tauri-adapter.js";
-export { TauriLifecycleAdapter } from "./lifecycle/tauri-adapter.js";
 export type { WindowAction, WindowContext } from "./lifecycle/launch-router.js";
 // 原生关闭协议（MRT-003）
 export { CloseRequestGate, toClosePlatformError } from "./lifecycle/close-protocol.js";
 export type { CloseLifecyclePort, CloseTransport } from "./lifecycle/close-protocol.js";
 export { TauriCloseLifecycleAdapter } from "./lifecycle/tauri-close-adapter.js";
+// Per-window bootstrap 协议（MRT-004A/A1；Tauri 装配 Wave 2 §5C）
+export { WindowBootstrapAdapter } from "./lifecycle/window-bootstrap.js";
+export type {
+  BootstrapActionOutcome,
+  BootstrapReportHooks,
+  PendingReport,
+  WindowBootstrap,
+  WindowBootstrapPorts,
+} from "./lifecycle/window-bootstrap.js";
+export { createTauriBootstrapPorts } from "./lifecycle/tauri-window-bootstrap.js";
 
 // 偏好
 export type { PreferencesPort, PreferencesSnapshot, PreferenceValue } from "./preferences/types.js";

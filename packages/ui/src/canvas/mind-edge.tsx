@@ -40,12 +40,7 @@ function MindEdgeViewImpl({
 
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={path}
-        style={style}
-        {...markerProps}
-      />
+      <BaseEdge id={id} path={path} style={style} {...markerProps} />
       {customArrow ? (
         <path
           d={customArrow}

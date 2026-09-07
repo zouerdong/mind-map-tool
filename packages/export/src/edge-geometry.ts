@@ -292,7 +292,9 @@ export function planEdgeRoutes(
     }
     // 引出垂直段基准：源列包络外 6px（纵向布局取同列最下缘）
     const sourceKey = Math.round(direction === "horizontal" ? e.source.x : e.source.y);
-    const envelope = columnEdge.get(sourceKey) ?? (direction === "horizontal" ? e.source.x + e.source.width : e.source.y + e.source.height);
+    const envelope =
+      columnEdge.get(sourceKey) ??
+      (direction === "horizontal" ? e.source.x + e.source.width : e.source.y + e.source.height);
     const exitBase = envelope + 6;
     let route: EdgeRoute;
     if (useChannel) {
@@ -345,7 +347,8 @@ export function planEdgeRoutes(
   }
 
   // ③ 同缝进入序（comb + channel 共用同一序）：目标更高的边转折更近目标列 → 转折全缝唯一
-  const byKey = (p: Member, q: Member) => p.key - q.key || (p.tie < q.tie ? -1 : p.tie > q.tie ? 1 : 0);
+  const byKey = (p: Member, q: Member) =>
+    p.key - q.key || (p.tie < q.tie ? -1 : p.tie > q.tie ? 1 : 0);
   for (const [lane, list] of seamGroups) {
     const ordered = [...list].sort(byKey);
     const spacing = seamSpacing(ordered.length, seam);
@@ -617,8 +620,7 @@ export function planEdgeGeometry(
       direction === "horizontal"
         ? Math.abs(p1.y - tip.y) < EDGE_GEOMETRY.nearCollinear
         : Math.abs(p1.x - tip.x) < EDGE_GEOMETRY.nearCollinear;
-    const effective: EdgeRoute =
-      collinear && route.kind === "comb" ? { kind: "straight" } : route;
+    const effective: EdgeRoute = collinear && route.kind === "comb" ? { kind: "straight" } : route;
 
     const rawChain = chainOf(p1, tip, effective, direction, gb);
     // 主线在箭头底边中点收笔：沿末段方向回退 arrowLength，保持折线严格正交
@@ -727,7 +729,13 @@ export function edgePathD(g: EdgeGeometry, lineMorph: number): string {
 
 // ---------- 形态插值（VRA-060：冻结拓扑后同帧插值，禁止离散重选路径） ----------
 
-export function bezierPoints(p0: Pt, c1: Pt, c2: Pt, p3: Pt, n = EDGE_GEOMETRY.resampleSegments): Pt[] {
+export function bezierPoints(
+  p0: Pt,
+  c1: Pt,
+  c2: Pt,
+  p3: Pt,
+  n = EDGE_GEOMETRY.resampleSegments,
+): Pt[] {
   const pts: Pt[] = [];
   for (let i = 0; i <= n; i++) {
     const t = i / n;
@@ -804,14 +812,31 @@ function segmentsOf(g: EdgeGeometry): Segment[] {
   for (let i = 1; i < g.chain.length; i++) {
     const a = g.chain[i - 1]!;
     const b = g.chain[i]!;
-    if (Math.abs(a.y - b.y) < 1e-6) out.push({ edge: g.id, axis: "h", line: a.y, from: Math.min(a.x, b.x), to: Math.max(a.x, b.x) });
-    else if (Math.abs(a.x - b.x) < 1e-6) out.push({ edge: g.id, axis: "v", line: a.x, from: Math.min(a.y, b.y), to: Math.max(a.y, b.y) });
+    if (Math.abs(a.y - b.y) < 1e-6)
+      out.push({
+        edge: g.id,
+        axis: "h",
+        line: a.y,
+        from: Math.min(a.x, b.x),
+        to: Math.max(a.x, b.x),
+      });
+    else if (Math.abs(a.x - b.x) < 1e-6)
+      out.push({
+        edge: g.id,
+        axis: "v",
+        line: a.x,
+        from: Math.min(a.y, b.y),
+        to: Math.max(a.y, b.y),
+      });
   }
   return out;
 }
 
 /** 正交段两两比较：同轴同线且投影重叠 > eps 即为共线重叠（交叉允许，重叠禁止）。 */
-export function findCollinearOverlaps(geoms: Iterable<EdgeGeometry>, eps = 0.5): CollinearOverlap[] {
+export function findCollinearOverlaps(
+  geoms: Iterable<EdgeGeometry>,
+  eps = 0.5,
+): CollinearOverlap[] {
   const segs: Segment[] = [];
   for (const g of geoms) segs.push(...segmentsOf(g));
   const out: CollinearOverlap[] = [];

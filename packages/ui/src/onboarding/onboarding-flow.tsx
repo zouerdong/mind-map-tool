@@ -22,6 +22,8 @@ export interface OnboardingFlowProps {
   theme?: "light" | "dark";
   /** 外部重放信号（自增触发）。 */
   replaySignal?: number;
+  /** 偏好损坏/写入失败时的非致命提示；不阻塞画布与引导。 */
+  onPreferenceWarning?: (message: string) => void;
 }
 
 export function OnboardingFlow({
@@ -29,6 +31,7 @@ export function OnboardingFlow({
   preferences,
   theme = "light",
   replaySignal = 0,
+  onPreferenceWarning,
 }: OnboardingFlowProps) {
   const [state, dispatch] = useReducer(onboardingReducer, INITIAL_ONBOARDING_STATE);
   const tokens: ThemeTokens = theme === "dark" ? DARK_TOKENS : LIGHT_TOKENS;
@@ -36,13 +39,25 @@ export function OnboardingFlow({
   // 启动：载入本机偏好（completed/skipped 不再自动弹出；in-progress 继续）。
   useEffect(() => {
     let cancelled = false;
-    void preferences.load().then((status) => {
-      if (!cancelled) dispatch({ type: "restore", status });
-    });
+    void preferences
+      .load()
+      .then((status) => {
+        if (cancelled) return;
+        const warning = preferences.consumeWarning?.();
+        if (warning) onPreferenceWarning?.(warning);
+        dispatch({ type: "restore", status });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        onPreferenceWarning?.(
+          `本机偏好读取失败，已使用默认设置：${error instanceof Error ? error.message : String(error)}`,
+        );
+        dispatch({ type: "restore", status: "not-started" });
+      });
     return () => {
       cancelled = true;
     };
-  }, [preferences]);
+  }, [onPreferenceWarning, preferences]);
 
   // 命令观察：状态机推进只依赖 observation（真实命令/动作）。
   useEffect(() => {
@@ -63,10 +78,13 @@ export function OnboardingFlow({
     if (state.status === lastPersisted.current) return;
     if (state.status === "not-started") return;
     lastPersisted.current = state.status;
-    void preferences.store(state.status).catch(() => {
+    void preferences.store(state.status).catch((error: unknown) => {
       // 偏好写失败不阻塞引导/编辑（本机偏好可丢失，PRD 不要求强一致）。
+      onPreferenceWarning?.(
+        `本机偏好保存失败，引导仍可继续：${error instanceof Error ? error.message : String(error)}`,
+      );
     });
-  }, [state.status, preferences]);
+  }, [onPreferenceWarning, state.status, preferences]);
 
   const handlers = useMemo(
     () => ({

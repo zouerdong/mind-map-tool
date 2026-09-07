@@ -30,20 +30,22 @@ const fakeFonts: FontResolver = {
 };
 
 function setup() {
-  const session = new DocumentSession(makeStateNode({
-    schemaVersion: 1,
-    document: {
-      theme: "light",
-      font: "noto-sans-sc",
-      shape: "card",
-      framesVisible: true,
-      nodes: [
-        { id: "a", text: "甲", position: { x: 0, y: 0 }, size: { width: 100, height: 40 } },
-        { id: "b", text: "乙", position: { x: 300, y: 0 }, size: { width: 100, height: 40 } },
-      ],
-      edges: [],
-    },
-  }).document);
+  const session = new DocumentSession(
+    makeStateNode({
+      schemaVersion: 1,
+      document: {
+        theme: "light",
+        font: "noto-sans-sc",
+        shape: "card",
+        framesVisible: true,
+        nodes: [
+          { id: "a", text: "甲", position: { x: 0, y: 0 }, size: { width: 100, height: 40 } },
+          { id: "b", text: "乙", position: { x: 300, y: 0 }, size: { width: 100, height: 40 } },
+        ],
+        edges: [],
+      },
+    }).document,
+  );
   let nextId = 0;
   const utils = render(
     <EditorCanvas session={session} fonts={fakeFonts} nextNodeId={() => `kb-${nextId++}`} />,
@@ -70,7 +72,9 @@ describe("全键盘建图（AC-17）", () => {
     keyDown("ArrowRight"); // 无焦点 → 首个 a
     keyDown("ArrowRight"); // a → b（右侧最近）
     await waitFor(() => {
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47");
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain(
+        "#D06B47",
+      );
     });
     void host;
   });
@@ -85,9 +89,7 @@ describe("全键盘建图（AC-17）", () => {
     fireEvent.keyDown(editor, { key: "Enter" }); // 换行（textarea 默认，不提交）
     expect(session.current.document.document.nodes[0]?.text).toBe("甲");
     fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
-    await waitFor(() =>
-      expect(session.current.document.document.nodes[0]?.text).toBe("新标题"),
-    );
+    await waitFor(() => expect(session.current.document.document.nodes[0]?.text).toBe("新标题"));
   });
 
   it("quick-create：信号自增 → 视口中心建节点并自动进编辑（原设计，用户决策 2026-08-29）", async () => {
@@ -125,7 +127,9 @@ describe("全键盘建图（AC-17）", () => {
     keyDown("ArrowRight");
     // 候选高亮（Claude 橙）
     await waitFor(() =>
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47"),
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain(
+        "#D06B47",
+      ),
     );
     keyDown("Enter");
     await waitFor(() => {
@@ -175,7 +179,9 @@ describe("全键盘建图（AC-17）", () => {
     // 焦点仍在 a：再按 Right 应到 b；若组合期已移动则这次会失败（b 无右侧）
     keyDown("ArrowRight");
     await waitFor(() =>
-      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain("#D06B47"),
+      expect(document.querySelector('[aria-label="节点：乙"]')?.getAttribute("style")).toContain(
+        "#D06B47",
+      ),
     );
   });
 });

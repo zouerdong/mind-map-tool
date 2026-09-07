@@ -68,7 +68,10 @@ function MindNodeViewImpl({
   // 角标记（主选/键盘焦点；形状通道，色弱可辨）
   const corner = 9;
   const corners: Array<[number, number, number, number]> = [
-    [-6, -6, 1, 1], [1, -6, -1, 1], [-6, 1, 1, -1], [1, 1, -1, -1],
+    [-6, -6, 1, 1],
+    [1, -6, -1, 1],
+    [-6, 1, 1, -1],
+    [1, 1, -1, -1],
   ];
 
   return (
@@ -96,8 +99,16 @@ function MindNodeViewImpl({
       tabIndex={-1}
     >
       {/* G-VIS D7：整理默认横向（右出左入）；纵向可选时由 VRA-060 协调切换 */}
-      <Handle type="target" position={Position.Left} style={{ opacity: selected || focused ? 0.9 : 0.35 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: selected || focused ? 0.9 : 0.35 }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ opacity: selected || focused ? 0.9 : 0.35 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ opacity: selected || focused ? 0.9 : 0.35 }}
+      />
 
       {editing ? (
         <NodeTextEditor

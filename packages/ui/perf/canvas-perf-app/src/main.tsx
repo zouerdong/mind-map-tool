@@ -33,9 +33,11 @@ async function boot() {
   createRoot(document.getElementById("root")!).render(
     createElement(EditorCanvas, { session, fonts }),
   );
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    (window as { __READY?: boolean }).__READY = true;
-  }));
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      (window as { __READY?: boolean }).__READY = true;
+    }),
+  );
 }
 
 void boot();

@@ -9,7 +9,7 @@ import fontkitForPdf from "@pdf-lib/fontkit";
 import type { ExportScene } from "./scene.js";
 import { THEME_TOKENS } from "./scene.js";
 import { LAYOUT } from "./layout.js";
-import type { FontBundle } from "./font-source.js";
+import { validateFontBundle, type FontBundle, type FontResourceLimitError } from "./font-source.js";
 
 function hexToRgb(hex: string) {
   const v = parseInt(hex.slice(1), 16);
@@ -32,7 +32,10 @@ export async function renderPdf(
 ): Promise<
   | { ok: true; bytes: Uint8Array }
   | { ok: false; error: { code: "PDF_LAYOUT_FAILED"; message: string } }
+  | { ok: false; error: FontResourceLimitError }
 > {
+  const fontGuard = validateFontBundle(bundle);
+  if (!fontGuard.ok) return fontGuard;
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkitForPdf);
   pdf.setProducer("mind-map-tool");

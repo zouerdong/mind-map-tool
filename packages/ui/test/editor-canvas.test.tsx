@@ -113,7 +113,9 @@ describe("EditorCanvas", () => {
         font: "noto-sans-sc",
         shape: "card",
         framesVisible: true,
-        nodes: [{ id: "x", text: "外部加载", position: { x: 0, y: 0 }, size: { width: 100, height: 37 } }],
+        nodes: [
+          { id: "x", text: "外部加载", position: { x: 0, y: 0 }, size: { width: 100, height: 37 } },
+        ],
         edges: [],
       },
     } satisfies MindMapDocumentV1);

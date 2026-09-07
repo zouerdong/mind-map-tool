@@ -11,7 +11,10 @@ function node(id: string, x: number, y: number, w = 100, h = 40, text = id): Min
 }
 function doc(nodes: MindNode[], edges: Array<[string, string]>): MindMapDocumentV1 {
   const d: MindMapDocumentData = {
-    theme: "light", font: "noto-sans-sc", shape: "card", framesVisible: true,
+    theme: "light",
+    font: "noto-sans-sc",
+    shape: "card",
+    framesVisible: true,
     nodes,
     edges: edges.map(([s, t], i) => ({ id: `e-${i}`, sourceNodeId: s, targetNodeId: t })),
   };
@@ -33,12 +36,24 @@ const P = (positions: Map<string, { x: number; y: number }>, id: string) => {
   if (!p) throw new Error(`missing position for ${id}`);
   return p;
 };
-function rectsOverlap(a: MindNode, pa: { x: number; y: number }, b: MindNode, pb: { x: number; y: number }): boolean {
-  return pa.x < pb.x + b.size.width && pb.x < pa.x + a.size.width &&
-         pa.y < pb.y + b.size.height && pb.y < pa.y + a.size.height;
+function rectsOverlap(
+  a: MindNode,
+  pa: { x: number; y: number },
+  b: MindNode,
+  pb: { x: number; y: number },
+): boolean {
+  return (
+    pa.x < pb.x + b.size.width &&
+    pb.x < pa.x + a.size.width &&
+    pa.y < pb.y + b.size.height &&
+    pb.y < pa.y + a.size.height
+  );
 }
 /** 通用断言：全节点恰好一次、坐标 finite、无矩形重叠。 */
-function expectLayoutInvariants(nodes: MindNode[], positions: Map<string, { x: number; y: number }>) {
+function expectLayoutInvariants(
+  nodes: MindNode[],
+  positions: Map<string, { x: number; y: number }>,
+) {
   expect(positions.size).toBe(nodes.length);
   for (const n of nodes) {
     const p = positions.get(n.id)!;
@@ -47,14 +62,23 @@ function expectLayoutInvariants(nodes: MindNode[], positions: Map<string, { x: n
   }
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      expect(rectsOverlap(nodes[i]!, P(positions, nodes[i]!.id), nodes[j]!, P(positions, nodes[j]!.id))).toBe(false);
+      expect(
+        rectsOverlap(nodes[i]!, P(positions, nodes[i]!.id), nodes[j]!, P(positions, nodes[j]!.id)),
+      ).toBe(false);
     }
   }
 }
 
 describe("organize：层级与汇聚", () => {
   it("三角 DAG a→c,a→b,b→c：a=层0、b=层1、c=层2（最长路径；跨层边 a→c 不把 c 拉回）", () => {
-    const d = doc([node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)], [["a", "c"], ["a", "b"], ["b", "c"]]);
+    const d = doc(
+      [node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)],
+      [
+        ["a", "c"],
+        ["a", "b"],
+        ["b", "c"],
+      ],
+    );
     const p = ok(organize(d));
     expect(p.get("a")).toEqual({ x: 0, y: 0 });
     expect(p.get("b")).toEqual({ x: 100 + ORGANIZE_GAPS.layerGap, y: 0 }); // 层1
@@ -65,21 +89,42 @@ describe("organize：层级与汇聚", () => {
   it("全部 6 种边顺序置换产生完全相同布局（边序无关）", () => {
     const base = doc(
       [node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)],
-      [["a", "c"], ["a", "b"], ["b", "c"]],
+      [
+        ["a", "c"],
+        ["a", "b"],
+        ["b", "c"],
+      ],
     );
     const expected = posKey(organize(base));
     const perms: Array<Array<[string, string]>> = [
-      [["a", "b"], ["a", "c"], ["b", "c"]],
-      [["a", "b"], ["b", "c"], ["a", "c"]],
-      [["a", "c"], ["b", "c"], ["a", "b"]],
-      [["b", "c"], ["a", "b"], ["a", "c"]],
-      [["b", "c"], ["a", "c"], ["a", "b"]],
+      [
+        ["a", "b"],
+        ["a", "c"],
+        ["b", "c"],
+      ],
+      [
+        ["a", "b"],
+        ["b", "c"],
+        ["a", "c"],
+      ],
+      [
+        ["a", "c"],
+        ["b", "c"],
+        ["a", "b"],
+      ],
+      [
+        ["b", "c"],
+        ["a", "b"],
+        ["a", "c"],
+      ],
+      [
+        ["b", "c"],
+        ["a", "c"],
+        ["a", "b"],
+      ],
     ];
     for (const edges of perms) {
-      const d = doc(
-        [node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)],
-        edges,
-      );
+      const d = doc([node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)], edges);
       expect(posKey(organize(d))).toEqual(expected);
     }
   });
@@ -87,7 +132,12 @@ describe("organize：层级与汇聚", () => {
   it("diamond：a→b,a→c,b→d,c→d → b/c 同层，d 严格靠后", () => {
     const d = doc(
       [node("a", 0, 0), node("b", 0, 0), node("c", 0, 0), node("d", 0, 0)],
-      [["a", "b"], ["a", "c"], ["b", "d"], ["c", "d"]],
+      [
+        ["a", "b"],
+        ["a", "c"],
+        ["b", "d"],
+        ["c", "d"],
+      ],
     );
     const p = ok(organize(d));
     expect(P(p, "b").x).toBe(P(p, "c").x); // 同层同列
@@ -99,7 +149,10 @@ describe("organize：层级与汇聚", () => {
   it("多根汇聚：两个根都指向同一汇聚节点，汇聚放一次且严格靠后", () => {
     const d = doc(
       [node("r1", 0, 0), node("r2", 0, 0), node("s", 0, 0)],
-      [["r1", "s"], ["r2", "s"]],
+      [
+        ["r1", "s"],
+        ["r2", "s"],
+      ],
     );
     const p = ok(organize(d));
     expect(P(p, "r1").x).toBe(P(p, "r2").x);
@@ -110,7 +163,10 @@ describe("organize：层级与汇聚", () => {
   it("与当前坐标无关：同拓扑不同散乱输入（含负坐标）结果相同", () => {
     const nodesA = [node("a", -140, 60), node("b", 620, -90), node("c", 990, 330)];
     const nodesB = [node("a", 0, 0), node("b", 10, 10), node("c", 20, 20)];
-    const edges: Array<[string, string]> = [["a", "b"], ["b", "c"]];
+    const edges: Array<[string, string]> = [
+      ["a", "b"],
+      ["b", "c"],
+    ];
     expect(posKey(organize(doc(nodesA, edges)))).toEqual(posKey(organize(doc(nodesB, edges))));
   });
 });
@@ -119,7 +175,11 @@ describe("organize：环与孤立", () => {
   it("双向边/环：SCC 分量内同层并排，不删除不翻向（边数不变）", () => {
     const d = doc(
       [node("a", 0, 0), node("b", 0, 0), node("c", 0, 0)],
-      [["a", "b"], ["b", "a"], ["b", "c"]],
+      [
+        ["a", "b"],
+        ["b", "a"],
+        ["b", "c"],
+      ],
     );
     const p = ok(organize(d));
     expect(P(p, "a").x).toBe(P(p, "b").x); // a↔b 同一分量 → 同层
@@ -128,7 +188,14 @@ describe("organize：环与孤立", () => {
   });
 
   it("三节点环：全部同层并排", () => {
-    const d = doc([node("a", 0, 0), node("b", 0, 0), node("c", 0, 0)], [["a", "b"], ["b", "c"], ["c", "a"]]);
+    const d = doc(
+      [node("a", 0, 0), node("b", 0, 0), node("c", 0, 0)],
+      [
+        ["a", "b"],
+        ["b", "c"],
+        ["c", "a"],
+      ],
+    );
     const p = ok(organize(d));
     expect(P(p, "a").x).toBe(P(p, "b").x);
     expect(P(p, "b").x).toBe(P(p, "c").x);
@@ -168,8 +235,17 @@ describe("organize：尺寸感知与参考 DAG", () => {
   it("同层不同尺寸：层内间距按真实高度累计；下一列位置按本列最大宽度", () => {
     // a→b、a→c（b/c 同层堆叠）；b→d（d 在下一列，验证列宽取层内最大宽 120）
     const d = doc(
-      [node("a", 0, 0, 100, 40), node("b", 0, 0, 120, 80), node("c", 0, 0, 100, 40), node("d", 0, 0, 100, 40)],
-      [["a", "b"], ["a", "c"], ["b", "d"]],
+      [
+        node("a", 0, 0, 100, 40),
+        node("b", 0, 0, 120, 80),
+        node("c", 0, 0, 100, 40),
+        node("d", 0, 0, 100, 40),
+      ],
+      [
+        ["a", "b"],
+        ["a", "c"],
+        ["b", "d"],
+      ],
     );
     const p = ok(organize(d));
     // 层1（b、c 堆叠，b 先——文档序）：b=(层1x, 0)、c=(层1x, 80+38)
@@ -197,10 +273,19 @@ describe("organize：尺寸感知与参考 DAG", () => {
       node("n-close", 420, 750, 230, 84, "闭环收尾 Closing the loop"),
     ];
     const edges: Array<[string, string]> = [
-      ["n-capture", "n-design"], ["n-capture", "n-close"], ["n-notes", "n-skills"],
-      ["n-notes", "n-subtasks"], ["n-notes", "n-evals"], ["n-review-loop", "n-subtasks"],
-      ["n-review-loop", "n-evals"], ["n-hooks", "n-cicd"], ["n-skills", "n-design"],
-      ["n-skills", "n-peer"], ["n-evals", "n-peer"], ["n-peer", "n-cicd"], ["n-cicd", "n-close"],
+      ["n-capture", "n-design"],
+      ["n-capture", "n-close"],
+      ["n-notes", "n-skills"],
+      ["n-notes", "n-subtasks"],
+      ["n-notes", "n-evals"],
+      ["n-review-loop", "n-subtasks"],
+      ["n-review-loop", "n-evals"],
+      ["n-hooks", "n-cicd"],
+      ["n-skills", "n-design"],
+      ["n-skills", "n-peer"],
+      ["n-evals", "n-peer"],
+      ["n-peer", "n-cicd"],
+      ["n-cicd", "n-close"],
     ];
     const d = doc(nodes, edges);
     const p = ok(organize(d));
@@ -221,7 +306,14 @@ describe("organize：规模与失败", () => {
     let seed = 42;
     const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     const nodes: MindNode[] = Array.from({ length: 300 }, (_, i) =>
-      node(`n${i}`, Math.floor(rand() * 2000) - 500, Math.floor(rand() * 2000) - 500, 100 + Math.floor(rand() * 60), 40));
+      node(
+        `n${i}`,
+        Math.floor(rand() * 2000) - 500,
+        Math.floor(rand() * 2000) - 500,
+        100 + Math.floor(rand() * 60),
+        40,
+      ),
+    );
     const edges: Array<[string, string]> = [];
     const seen = new Set<string>();
     while (edges.length < 450) {
@@ -238,7 +330,10 @@ describe("organize：规模与失败", () => {
 
   it("10,000 节点单链：不栈溢出，超出坐标上限返回结构化 COORD_LIMIT，不产坐标", () => {
     const nodes: MindNode[] = Array.from({ length: 10_000 }, (_, i) => node(`c${i}`, 0, 0));
-    const edges: Array<[string, string]> = Array.from({ length: 9_999 }, (_, i) => [`c${i}`, `c${i + 1}`] as [string, string]);
+    const edges: Array<[string, string]> = Array.from(
+      { length: 9_999 },
+      (_, i) => [`c${i}`, `c${i + 1}`] as [string, string],
+    );
     const result = organize(doc(nodes, edges));
     expect(result.ok).toBe(false);
     if (!result.ok) {

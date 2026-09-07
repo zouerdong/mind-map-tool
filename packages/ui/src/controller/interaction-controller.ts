@@ -80,7 +80,10 @@ export function createInteractionController(deps: InteractionControllerDeps) {
       const d = doc.document;
       if (d.edges.some((e) => e.sourceNodeId === sourceNodeId && e.targetNodeId === targetNodeId))
         return null;
-      if (!d.nodes.some((n) => n.id === sourceNodeId) || !d.nodes.some((n) => n.id === targetNodeId))
+      if (
+        !d.nodes.some((n) => n.id === sourceNodeId) ||
+        !d.nodes.some((n) => n.id === targetNodeId)
+      )
         return null;
       return {
         kind: "CreateEdge",

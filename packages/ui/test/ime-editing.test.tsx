@@ -23,7 +23,9 @@ const fakeFonts: FontResolver = {
 describe("NodeTextEditor（直接渲染）", () => {
   it("组合期间的 Enter 不提交（IME 确认优先）", async () => {
     let committed: string | null = null;
-    render(<NodeTextEditor initialText="旧" onCommit={(t) => (committed = t)} onCancel={() => {}} />);
+    render(
+      <NodeTextEditor initialText="旧" onCommit={(t) => (committed = t)} onCancel={() => {}} />,
+    );
     const editor = screen.getByLabelText("编辑节点文本") as HTMLTextAreaElement;
 
     fireEvent.change(editor, { target: { value: "旧中文" } });
@@ -43,7 +45,13 @@ describe("NodeTextEditor（直接渲染）", () => {
   it("Escape 取消、不提交", () => {
     let committed: string | null = null;
     let cancelled = false;
-    render(<NodeTextEditor initialText="旧" onCommit={(t) => (committed = t)} onCancel={() => (cancelled = true)} />);
+    render(
+      <NodeTextEditor
+        initialText="旧"
+        onCommit={(t) => (committed = t)}
+        onCancel={() => (cancelled = true)}
+      />,
+    );
     const editor = screen.getByLabelText("编辑节点文本");
     fireEvent.change(editor, { target: { value: "改" } });
     fireEvent.keyDown(editor, { key: "Escape" });

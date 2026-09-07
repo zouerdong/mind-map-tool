@@ -26,7 +26,17 @@ export interface NodeTextEditorProps {
   onMeasure?: (box: { width: number; height: number }) => void;
 }
 
-export function NodeTextEditor({ initialText, onCommit, onCancel, fontFamily, fontSize, textColor, background, measureBox, onMeasure }: NodeTextEditorProps) {
+export function NodeTextEditor({
+  initialText,
+  onCommit,
+  onCancel,
+  fontFamily,
+  fontSize,
+  textColor,
+  background,
+  measureBox,
+  onMeasure,
+}: NodeTextEditorProps) {
   const [value, setValue] = useState(initialText);
   const [composing, setComposing] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);

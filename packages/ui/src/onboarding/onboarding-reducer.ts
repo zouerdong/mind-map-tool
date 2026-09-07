@@ -31,7 +31,9 @@ function stepAfter(id: OnboardingStepId): OnboardingStepId | null {
 }
 
 /** 进入某步骤：只产出三字段（不 spread 旧 state，避免覆盖 status 等）。 */
-function beginStep(step: OnboardingStepId): Pick<OnboardingState, "currentStep" | "stepProgress" | "visible"> {
+function beginStep(
+  step: OnboardingStepId,
+): Pick<OnboardingState, "currentStep" | "stepProgress" | "visible"> {
   return { currentStep: step, stepProgress: [], visible: true };
 }
 

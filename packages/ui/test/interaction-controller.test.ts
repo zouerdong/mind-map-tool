@@ -133,7 +133,11 @@ describe("deleteSelection / setTheme / setNodeShape", () => {
   it("主题与形状命令", () => {
     const c = setup();
     expect(c.setTheme("dark")).toEqual({ kind: "SetDocumentStyle", theme: "dark" });
-    expect(c.setNodeShape("a", "ellipse")).toEqual({ kind: "SetNodeShape", id: "a", shape: "ellipse" });
+    expect(c.setNodeShape("a", "ellipse")).toEqual({
+      kind: "SetNodeShape",
+      id: "a",
+      shape: "ellipse",
+    });
     expect(c.setNodeShape("a", null)).toEqual({ kind: "SetNodeShape", id: "a", shape: null });
   });
 });

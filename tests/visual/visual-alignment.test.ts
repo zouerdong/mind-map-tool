@@ -14,11 +14,7 @@ import {
   type MindMapDocumentV1,
   type Point,
 } from "@mindmap/core";
-import {
-  LIGHT_PALETTE,
-  DARK_PALETTE,
-  createExportRenderer,
-} from "@mindmap/export";
+import { LIGHT_PALETTE, DARK_PALETTE, createExportRenderer } from "@mindmap/export";
 import { MotionCoordinator } from "@mindmap/ui";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -349,13 +345,19 @@ describe("VRA-080 视觉与动效真实验收", () => {
       session.commit(organizeRes.command);
 
       expect(session.canUndo).toBe(true);
-      expect(session.document.document.nodes[0].position).toEqual(organizeRes.command.moves[0].position);
+      expect(session.document.document.nodes[0].position).toEqual(
+        organizeRes.command.moves[0].position,
+      );
 
       session.undo();
-      expect(session.document.document.nodes[0].position).toEqual(scatteredDoc.document.nodes[0].position);
+      expect(session.document.document.nodes[0].position).toEqual(
+        scatteredDoc.document.nodes[0].position,
+      );
 
       session.redo();
-      expect(session.document.document.nodes[0].position).toEqual(organizeRes.command.moves[0].position);
+      expect(session.document.document.nodes[0].position).toEqual(
+        organizeRes.command.moves[0].position,
+      );
     });
 
     it("在 17 节点树拓扑结构上验证运动收束节奏与终态", () => {

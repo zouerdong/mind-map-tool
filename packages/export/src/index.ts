@@ -20,26 +20,16 @@ export * from "./graph-json.js";
 export * from "./font-source.js";
 export * from "./scene.js";
 export * from "./svg.js";
-export * from "./render-png.js";
-export * from "./render-pdf.js";
+// PNG/PDF 实现通过 renderer 方法按需加载；避免把 resvg/pdf-lib 送进
+// 首次导出模块。需要底层函数的测试/工具直接导入对应文件。
 
 import type { MindMapDocumentV1 } from "@mindmap/core";
 import { createFontResolver, SVG_FONT_FAMILY, type FontBundle } from "./font-source.js";
 import { buildScene, type ExportScene, type SceneError, type SceneOptions } from "./scene.js";
 import { sceneToSvg } from "./svg.js";
-import { renderPng, initResvgWasm, type PngResult } from "./render-png.js";
-import { renderPdf } from "./render-pdf.js";
-import {
-  layoutNodeText,
-  measureNodeBox,
-  type FontResolver,
-  type NodeLayout,
-} from "./layout.js";
-import {
-  layoutNodeVisual,
-  measureNodeVisual,
-  type NodeVisualLayout,
-} from "./visual-style.js";
+import type { PngResult } from "./render-png.js";
+import { layoutNodeText, measureNodeBox, type FontResolver, type NodeLayout } from "./layout.js";
+import { layoutNodeVisual, measureNodeVisual, type NodeVisualLayout } from "./visual-style.js";
 import { planEdgeGeometry, type EdgePlanInput, type EdgeGeometry } from "./edge-geometry.js";
 import type { FontToken, MindNode, NodeShape, Size, TextRun } from "@mindmap/core";
 
@@ -91,7 +81,7 @@ export async function createExportRenderer(
   options: CreateRendererOptions,
 ): Promise<ExportRenderer> {
   const fonts = createFontResolver(options.fonts);
-  if (options.resvgWasm) await initResvgWasm(options.resvgWasm);
+  const resvgWasm = options.resvgWasm;
   return {
     layoutNodeText: (text, runs, fontId) => layoutNodeText(text, runs, fontId, fonts),
     measureNodeBox: (text, runs, fontId) => measureNodeBox(text, runs, fontId, fonts),
@@ -103,7 +93,23 @@ export async function createExportRenderer(
     buildScene: (doc, sceneOptions) =>
       buildScene(doc, fonts, (token) => SVG_FONT_FAMILY[token as FontToken] ?? token, sceneOptions),
     renderSvg: (scene) => sceneToSvg(scene),
-    renderPng: (svgBytes, scene, scale = 2) => renderPng(svgBytes, scene, options.fonts, scale),
-    renderPdf: async (scene) => renderPdf(scene, options.fonts),
+    renderPng: async (svgBytes, scene, scale = 2) => {
+      if (!resvgWasm) {
+        return {
+          ok: false,
+          error: {
+            code: "EXPORT_WASM_UNAVAILABLE",
+            message: "PNG 导出所需的 resvg WASM 尚未加载",
+          },
+        };
+      }
+      const { initResvgWasm, renderPng } = await import("./render-png.js");
+      await initResvgWasm(resvgWasm);
+      return renderPng(svgBytes, scene, options.fonts, scale);
+    },
+    renderPdf: async (scene) => {
+      const { renderPdf } = await import("./render-pdf.js");
+      return renderPdf(scene, options.fonts);
+    },
   };
 }

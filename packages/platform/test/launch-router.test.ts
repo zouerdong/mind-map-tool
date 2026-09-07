@@ -79,13 +79,19 @@ describe("LaunchRouter", () => {
   };
 
   it("AppReady 前缓存 early intents，ready 后统一 flush", () => {
-    const { router, actions, acks } = setup([{ windowId: "main", occupiedPath: null, dirty: false }]);
+    const { router, actions, acks } = setup([
+      { windowId: "main", occupiedPath: null, dirty: false },
+    ]);
     const early = fileIntent("/early.mm");
     router.onIntent(early);
     expect(actions).toHaveLength(0);
     router.markAppReady();
     expect(actions).toHaveLength(1);
-    expect(actions[0]?.action).toEqual({ type: "open-in-window", windowId: "main", canonicalPath: "/early.mm" });
+    expect(actions[0]?.action).toEqual({
+      type: "open-in-window",
+      windowId: "main",
+      canonicalPath: "/early.mm",
+    });
     expect(acks).toEqual([early.intentId]);
   });
 
@@ -96,8 +102,13 @@ describe("LaunchRouter", () => {
       {
         onWindowAction: (a) => {
           actions.push(a);
-          if (a.type === "open-in-window") windows = [{ windowId: a.windowId, occupiedPath: a.canonicalPath, dirty: false }];
-          if (a.type === "open-new-window") windows = [...windows, { windowId: "new", occupiedPath: a.canonicalPath, dirty: false }];
+          if (a.type === "open-in-window")
+            windows = [{ windowId: a.windowId, occupiedPath: a.canonicalPath, dirty: false }];
+          if (a.type === "open-new-window")
+            windows = [
+              ...windows,
+              { windowId: "new", occupiedPath: a.canonicalPath, dirty: false },
+            ];
         },
         onAck: () => {},
       },

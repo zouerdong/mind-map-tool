@@ -113,6 +113,8 @@ export type SchemaError =
   | { code: "RUNS_BAD"; index: number; reason: string };
 
 const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 
 export function validateDocument(
   input: unknown,
@@ -133,6 +135,8 @@ export function validateDocument(
     return { ok: false, error: { code: "BAD_FONT", actual: d.font } };
   if (d.shape !== "card" && d.shape !== "ellipse")
     return { ok: false, error: { code: "BAD_SHAPE", actual: d.shape } };
+  if (d.framesVisible !== undefined && typeof d.framesVisible !== "boolean")
+    return { ok: false, error: { code: "BAD_FRAMES_VISIBLE", actual: d.framesVisible } };
   if (!Array.isArray(d.nodes)) return { ok: false, error: { code: "NODES_NOT_ARRAY" } };
   if (!Array.isArray(d.edges)) return { ok: false, error: { code: "EDGES_NOT_ARRAY" } };
   if (d.nodes.length > LIMITS.maxNodes)
@@ -158,7 +162,9 @@ export function validateDocument(
 
   const nodeIds = new Set<string>();
   for (let i = 0; i < d.nodes.length; i++) {
-    const n = d.nodes[i] as Record<string, unknown>;
+    const raw = d.nodes[i];
+    if (!isRecord(raw)) return { ok: false, error: { code: "NODE_BAD_ID", index: i } };
+    const n = raw;
     if (typeof n.id !== "string" || n.id.length === 0 || n.id.length > 256)
       return { ok: false, error: { code: "NODE_BAD_ID", index: i } };
     if (typeof n.text !== "string" || n.text.length > LIMITS.maxTextLength)
@@ -203,7 +209,10 @@ export function validateDocument(
         return { ok: false, error: { code: "RUNS_BAD", index: i, reason: "not-array" } };
       let prevEnd = -1;
       for (let r = 0; r < n.runs.length; r++) {
-        const run = n.runs[r] as Record<string, unknown>;
+        const rawRun = n.runs[r];
+        if (!isRecord(rawRun))
+          return { ok: false, error: { code: "RUNS_BAD", index: i, reason: `object-${r}` } };
+        const run = rawRun;
         const start = run.start,
           end = run.end;
         if (
@@ -225,6 +234,7 @@ export function validateDocument(
         if (
           run.fontSize !== undefined &&
           (typeof run.fontSize !== "number" ||
+            !Number.isFinite(run.fontSize) ||
             run.fontSize < RUN_LIMITS.minFontSize ||
             run.fontSize > RUN_LIMITS.maxFontSize)
         )
@@ -240,7 +250,9 @@ export function validateDocument(
   const edgeIds = new Set<string>();
   const directions = new Set<string>();
   for (let i = 0; i < d.edges.length; i++) {
-    const e = d.edges[i] as Record<string, unknown>;
+    const raw = d.edges[i];
+    if (!isRecord(raw)) return { ok: false, error: { code: "EDGE_BAD_ID", index: i } };
+    const e = raw;
     if (typeof e.id !== "string" || e.id.length === 0 || e.id.length > 256)
       return { ok: false, error: { code: "EDGE_BAD_ID", index: i } };
     if (typeof e.sourceNodeId !== "string" || typeof e.targetNodeId !== "string")
@@ -303,7 +315,11 @@ export function validateDocument(
         }),
         edges: d.edges.map((raw) => {
           const e = raw as MindEdge;
-          const edge: MindEdge = { id: e.id, sourceNodeId: e.sourceNodeId, targetNodeId: e.targetNodeId };
+          const edge: MindEdge = {
+            id: e.id,
+            sourceNodeId: e.sourceNodeId,
+            targetNodeId: e.targetNodeId,
+          };
           if (e.lineStyle === "dashed" || e.lineStyle === "dotted") edge.lineStyle = e.lineStyle;
           return edge;
         }),

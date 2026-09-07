@@ -21,7 +21,9 @@ export function sceneToSvg(scene: ExportScene): Uint8Array {
   parts.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${scene.width}" height="${scene.height}" viewBox="0 0 ${scene.width} ${scene.height}">`,
   );
-  parts.push(`<rect x="0" y="0" width="${scene.width}" height="${scene.height}" fill="${t.canvas}"/>`);
+  parts.push(
+    `<rect x="0" y="0" width="${scene.width}" height="${scene.height}" fill="${t.canvas}"/>`,
+  );
 
   for (const item of scene.items) {
     switch (item.kind) {
@@ -35,18 +37,14 @@ export function sceneToSvg(scene: ExportScene): Uint8Array {
         break;
       }
       case "frame-rect": {
-        const stroke = item.stroke
-          ? ` stroke="${item.stroke}" stroke-width="1"`
-          : ` stroke="none"`;
+        const stroke = item.stroke ? ` stroke="${item.stroke}" stroke-width="1"` : ` stroke="none"`;
         parts.push(
           `<rect x="${num(item.x)}" y="${num(item.y)}" width="${num(item.w)}" height="${num(item.h)}" rx="${num(item.rx)}" fill="${item.fill}"${stroke}/>`,
         );
         break;
       }
       case "frame-ellipse": {
-        const stroke = item.stroke
-          ? ` stroke="${item.stroke}" stroke-width="1"`
-          : ` stroke="none"`;
+        const stroke = item.stroke ? ` stroke="${item.stroke}" stroke-width="1"` : ` stroke="none"`;
         parts.push(
           `<ellipse cx="${num(item.cx)}" cy="${num(item.cy)}" rx="${num(item.rx)}" ry="${num(item.ry)}" fill="${item.fill}"${stroke}/>`,
         );

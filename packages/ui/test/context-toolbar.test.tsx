@@ -27,7 +27,13 @@ function doc(): MindMapDocumentV1 {
       shape: "card",
       framesVisible: true,
       nodes: [
-        { id: "a", text: "起点", position: { x: 0, y: 0 }, size: { width: 100, height: 40 }, kicker: "IDEA" },
+        {
+          id: "a",
+          text: "起点",
+          position: { x: 0, y: 0 },
+          size: { width: 100, height: 40 },
+          kicker: "IDEA",
+        },
         { id: "b", text: "目标", position: { x: 200, y: 0 }, size: { width: 100, height: 40 } },
       ],
       edges: [{ id: "e1", sourceNodeId: "a", targetNodeId: "b", lineStyle: "dashed" }],
@@ -60,7 +66,16 @@ describe("上下文工具条（VRA-050）", () => {
     renderCanvas();
     expect(screen.queryByTestId("context-toolbar")).toBeNull();
     await selectNode("a");
-    for (const title of ["普通/强调角色", "字号 −2", "字号 +2", "整节点粗体", "整节点下划线", "单节点形状", "文档级框线显隐", "删除选中（⌫）"]) {
+    for (const title of [
+      "普通/强调角色",
+      "字号 −2",
+      "字号 +2",
+      "整节点粗体",
+      "整节点下划线",
+      "单节点形状",
+      "文档级框线显隐",
+      "删除选中（⌫）",
+    ]) {
       expect(screen.getByTitle(title), title).toBeTruthy();
     }
     expect(screen.getByTestId("kicker-input")).toBeTruthy();
@@ -78,7 +93,9 @@ describe("上下文工具条（VRA-050）", () => {
     // undo 一次恢复
     session.undo();
     await waitFor(() => {
-      expect(session.current.document.document.nodes.find((x) => x.id === "a")?.emphasis).toBeUndefined();
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "a")?.emphasis,
+      ).toBeUndefined();
     });
   });
 
@@ -89,7 +106,9 @@ describe("上下文工具条（VRA-050）", () => {
     fireEvent.change(input, { target: { value: "工具 TOOL" } });
     fireEvent.blur(input);
     await waitFor(() => {
-      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.kicker).toBe("工具 TOOL");
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.kicker).toBe(
+        "工具 TOOL",
+      );
     });
   });
 
@@ -104,7 +123,9 @@ describe("上下文工具条（VRA-050）", () => {
     });
     session.undo();
     await waitFor(() => {
-      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.runs).toBeUndefined();
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
+      ).toBeUndefined();
     });
   });
 });

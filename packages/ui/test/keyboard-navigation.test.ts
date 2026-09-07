@@ -72,7 +72,11 @@ describe("linkingReducer（键盘连线流）", () => {
     expect(done.state.phase).toBe("idle");
 
     // cancel 路径
-    const s2Begin = linkingReducer({ phase: "idle" }, { type: "begin", sourceId: "a" }, nodes).state;
+    const s2Begin = linkingReducer(
+      { phase: "idle" },
+      { type: "begin", sourceId: "a" },
+      nodes,
+    ).state;
     const s2 = linkingReducer(s2Begin, { type: "retarget", direction: "right" }, nodes).state;
     const cancelled = linkingReducer(s2, { type: "cancel" }, nodes);
     expect(cancelled.state.phase).toBe("idle");

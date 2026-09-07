@@ -36,6 +36,12 @@ export type {
 // 画布
 export { EditorCanvas } from "./canvas/editor-canvas.js";
 export type { EditorCanvasProps } from "./canvas/editor-canvas.js";
+export { GeometryBarrier } from "./canvas/geometry-barrier.js";
+export type {
+  GeometryBarrierOptions,
+  GeometryIntent,
+  FontMetricsState,
+} from "./canvas/geometry-barrier.js";
 export { MindNodeView } from "./canvas/mind-node.js";
 export { MindEdgeView } from "./canvas/mind-edge.js";
 export { NodeTextEditor, isCompositionEvent } from "./canvas/node-text-editor.js";
@@ -57,10 +63,7 @@ export type {
 } from "./canvas/motion-coordinator.js";
 
 // 键盘导航与连线流（MM-089）
-export {
-  linkingReducer,
-  nearestNodeInDirection,
-} from "./canvas/keyboard-navigation.js";
+export { linkingReducer, nearestNodeInDirection } from "./canvas/keyboard-navigation.js";
 export type {
   LinkingAction,
   LinkingState,
@@ -100,7 +103,10 @@ export {
   InMemoryPreferenceStore,
   ONBOARDING_STATUS_KEY,
 } from "./onboarding/onboarding-preferences.js";
-export type { OnboardingPreferencesPort, PreferenceStore } from "./onboarding/onboarding-preferences.js";
+export type {
+  OnboardingPreferencesPort,
+  PreferenceStore,
+} from "./onboarding/onboarding-preferences.js";
 export { ONBOARDING_COPY, ONBOARDING_REPLAY_LABEL } from "./onboarding/onboarding-copy.js";
 export { OnboardingOverlay } from "./onboarding/onboarding-overlay.js";
 export type { OnboardingOverlayProps } from "./onboarding/onboarding-overlay.js";
