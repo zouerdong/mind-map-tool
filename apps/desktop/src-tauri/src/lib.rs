@@ -95,7 +95,7 @@ pub fn run() {
 
     let service_for_windows = service.clone();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init({
@@ -110,8 +110,15 @@ pub fn run() {
         .manage(service)
         .manage(runtime.clone())
         .manage(close_store.clone())
-        .manage(GlobalShortcutState::new())
-        .manage(perf_probe)
+        .manage(GlobalShortcutState::new());
+    // PRR-010 perf state：仅启用时注册。命令签名的 State<Arc<PerfProbe>>
+    // 按 TypeId 解析——此前误把 Option<PerfProbe> 交给 manage，命令永远
+    // 解析不到 state，invoke 失败被前端 catch 成"未启用"，renderer-ready
+    // 静默丢失（PRR-070 真实候选实测暴露；mock 协议测试覆盖不到此接线）。
+    if let Some(probe) = perf_probe {
+        builder = builder.manage(Arc::new(probe));
+    }
+    builder
         .setup({
             let runtime = runtime.clone();
             move |app| {
