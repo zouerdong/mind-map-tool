@@ -1,0 +1,7 @@
+{
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.example.com; object-src 'none'"
+    }
+  }
+}

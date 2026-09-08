@@ -181,40 +181,12 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     });
   }, [bump, ports, session]);
 
-  // MRT-011 / PRC-025：先完成画布首帧，再后台预热导出 chunk/字体/WASM；
-  // 资源就绪后刷新几何屏障中待提交的意图并触发刷新，保证持久化 size 均源自真实字体。
-  useEffect(() => {
-    const warmup = ports.renderer.warmup;
-    const whenReady =
-      ports.renderer.whenReady?.bind(ports.renderer) ??
-      (ports.whenMetricsReady
-        ? () => ports.whenMetricsReady!()
-        : ports.renderer.whenMetricsReady
-          ? () => ports.renderer.whenMetricsReady!()
-          : undefined);
-    if (!whenReady) return;
-    let cancelled = false;
-    warmup?.call(ports.renderer);
-    void whenReady()
-      .then(async () => {
-        if (!cancelled) {
-          await geometryBarrier.flush();
-          bump();
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setNotice({
-            tone: "error",
-            text: `导出资源加载失败，编辑仍可继续：${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-      geometryBarrier.dispose();
-    };
-  }, [bump, geometryBarrier, ports.renderer]);
+  // PRR-066 / ADR 0011 动态加载分支：导出资源（export chunk、三份 WOFF2、
+  // resvg WASM）不再在 mount 后无条件预热——空白画布 RSS 与启动计时不得
+  // 被未使用的导出栈占用。首个依赖真实字体度量的意图由 GeometryBarrier
+  // 自动启动一次 in-flight 加载并恰好提交一次（见 geometry-barrier.ts）；
+  // Save/Close-Save/Export 等待同一次加载。此处仅保留卸载清理。
+  useEffect(() => () => geometryBarrier.dispose(), [geometryBarrier]);
 
   const deps = useMemo(() => ({ filePort: ports.filePort }), [ports.filePort]);
 

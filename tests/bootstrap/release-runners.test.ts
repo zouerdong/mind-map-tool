@@ -151,9 +151,24 @@ SC="\${MINDMAP_PERF_SCENARIO:-launch}"
 emit() { printf '%s\\n' "$1"; }
 if [ "$SC" = "rss" ]; then
   emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
-  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":51200}"
-  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":52224}"
-  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-complete\\"}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":51200,\\"settleMs\\":30000}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":52224,\\"settleMs\\":30000}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-complete\\",\\"settleMs\\":30000}"
+else
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+fi
+exit 0
+`;
+
+/** PRR-066 反例 mock：rss 事件只声明 2s 稳定窗（旧协议），必须判 INCOMPLETE。 */
+const PERF_PROTOCOL_BIN_SHORT_SETTLE = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+SC="\${MINDMAP_PERF_SCENARIO:-launch}"
+emit() { printf '%s\\n' "$1"; }
+if [ "$SC" = "rss" ]; then
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":51200,\\"settleMs\\":2000}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-complete\\",\\"settleMs\\":2000}"
 else
   emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
 fi
@@ -673,8 +688,11 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(raw.rssSamples).toEqual([50, 51]);
       expect(raw.rssResult.measurementSource).toBe("native-candidate");
       expect(raw.rssResult.readyEvent.milestone).toBe("renderer-ready");
+      expect(raw.rssResult.settleMs).toBe(30000);
+      expect(raw.measurementMode).toBe("release");
       expect(raw.samplingProtocol.coldDefinition.length).toBeGreaterThan(0);
       expect(raw.samplingProtocol.warmDefinition.length).toBeGreaterThan(0);
+      expect(raw.samplingProtocol.rssSettleDefinition).toContain("30000");
       expect(raw.fixture.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect(typeof raw.startedAt).toBe("string");
       expect(typeof raw.finishedAt).toBe("string");
@@ -685,6 +703,107 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(summary.results.coldStartP95Ms).toBeGreaterThan(0);
       // HOME 隔离目录在采样后清理
       expect(existsSync(join(FIXTURE_DIR, "evidence/perf-homes"))).toBe(false);
+    });
+
+    it("PRR-066：rss 事件只声明 2s settleMs 时判 INCOMPLETE（30 秒稳定窗协议）", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp, PERF_PROTOCOL_BIN_SHORT_SETTLE);
+
+      const res = runNode(PERF_RUNNER, [
+        "--scope",
+        "release",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence",
+        "--samples",
+        "20",
+        "--skip-canvas",
+        "--skip-scenarios",
+        "canvas,edit,save,png-export",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("INCOMPLETE");
+      const raw = JSON.parse(
+        readFileSync(join(FIXTURE_DIR, "evidence/release-performance-raw.json"), "utf8"),
+      );
+      expect(raw.rssSamples).toEqual([]);
+      expect(raw.rssResult.status).toBe("INCOMPLETE");
+      expect(raw.rssResult.reason).toContain("settleMs");
+      expect(raw.incompleteReasons.some((r: string) => r.includes("settleMs"))).toBe(true);
+    });
+
+    it("PRR-066：候选与证据同属 .tmp/prr-066-* 诊断边界时以 diagnostic 模式采样", () => {
+      const regPath = createSyntheticRegister("approved");
+      const diagDir = join(ROOT, ".tmp/prr-066-runner-test");
+      rmSync(diagDir, { recursive: true, force: true });
+      const candidateApp = join(diagDir, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp, PERF_PROTOCOL_BIN);
+
+      try {
+        const res = runNode(PERF_RUNNER, [
+          "--scope",
+          "release",
+          "--scope-from",
+          regPath,
+          "--candidate",
+          ".tmp/prr-066-runner-test/bundle/macos/Mind Map.app",
+          "--evidence-dir",
+          ".tmp/prr-066-runner-test/evidence",
+          "--samples",
+          "20",
+          "--skip-canvas",
+          "--skip-scenarios",
+          "canvas,edit,save,png-export",
+        ]);
+
+        // canvas 等跳过 → INCOMPLETE，但诊断边界被接受（未因 candidate 不在
+        // G2 candidateOutputPaths 而拒绝），rss 正常采集并标记诊断模式
+        expect(res.stdout).toContain("INCOMPLETE");
+        const raw = JSON.parse(
+          readFileSync(join(diagDir, "evidence/release-performance-raw.json"), "utf8"),
+        );
+        expect(raw.measurementMode).toBe("diagnostic-preflight");
+        expect(raw.rssSamples).toEqual([50, 51]);
+        expect(raw.rssResult.settleMs).toBe(30000);
+        const summary = JSON.parse(
+          readFileSync(join(diagDir, "evidence/release-performance-summary.json"), "utf8"),
+        );
+        expect(summary.measurementMode).toBe("diagnostic-preflight");
+      } finally {
+        rmSync(diagDir, { recursive: true, force: true });
+      }
+    });
+
+    it("PRR-066：candidate 在诊断边界而 evidence 在边界外时拒绝（不得混用边界）", () => {
+      const regPath = createSyntheticRegister("approved");
+      const diagDir = join(ROOT, ".tmp/prr-066-runner-test-mixed");
+      rmSync(diagDir, { recursive: true, force: true });
+      const candidateApp = join(diagDir, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp);
+
+      try {
+        const res = runNode(PERF_RUNNER, [
+          "--scope",
+          "release",
+          "--scope-from",
+          regPath,
+          "--candidate",
+          ".tmp/prr-066-runner-test-mixed/bundle/macos/Mind Map.app",
+          "--evidence-dir",
+          ".tmp/release-runner-fixtures/evidence",
+          "--samples",
+          "20",
+        ]);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toContain("同属 PRR-066 诊断边界");
+      } finally {
+        rmSync(diagDir, { recursive: true, force: true });
+      }
     });
   });
 });

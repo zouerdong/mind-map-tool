@@ -1,7 +1,8 @@
 // scan-network-endpoints.mjs — 断言源码中不存在网络端点（本地优先产品，
 // AC-13：无服务器、云、遥测、未审阅网络调用）。允许清单之外的任何
 // fetch/http/ws/axios 等即 FAIL。
-// 用法：node scripts/quality/scan-network-endpoints.mjs
+// 用法：node scripts/quality/scan-network-endpoints.mjs [--tauri-conf <path>]
+// （--tauri-conf 仅供测试注入 fixture 配置；缺省扫描生产 tauri.conf.json）
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { existsSync } from "node:fs";
@@ -10,6 +11,11 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
+
+const argv = process.argv.slice(2);
+const confFlagIdx = argv.indexOf("--tauri-conf");
+const tauriConfFlag =
+  confFlagIdx !== -1 ? argv[confFlagIdx + 1] : "apps/desktop/src-tauri/tauri.conf.json";
 
 const SCAN_DIRS = [
   "packages/core/src",
@@ -76,8 +82,10 @@ for (const dir of SCAN_DIRS) {
 }
 
 // PRC-040: 生产 CSP 与最小权限 Capability 审计
-const tauriConfPath = resolve(ROOT, "apps/desktop/src-tauri/tauri.conf.json");
-if (existsSync(tauriConfPath)) {
+const tauriConfPath = resolve(ROOT, tauriConfFlag);
+if (!tauriConfFlag || !existsSync(tauriConfPath)) {
+  violations.push(`tauri.conf.json 不存在：${tauriConfFlag ?? "(missing)"}`);
+} else {
   try {
     const tauriConf = JSON.parse(readFileSync(tauriConfPath, "utf8"));
     const csp = tauriConf?.app?.security?.csp;
@@ -89,7 +97,24 @@ if (existsSync(tauriConfPath)) {
       if (csp.includes("default-src *") || csp.includes("script-src *")) {
         violations.push("tauri.conf.json: CSP 包含未受限通配符 (*)");
       }
-      if (csp.includes("unsafe-eval")) {
+      // PRR-066：按 CSP 指令 token 精确判定——只允许 'wasm-unsafe-eval'
+      // （本地打包 resvg WASM 编译，WKWebView 实测必需），继续拒绝普通
+      // 'unsafe-eval'（带引号或不带引号的完整 token；不得用子串匹配，
+      // 否则 'wasm-unsafe-eval' 会被误伤）。
+      const directives = csp
+        .split(";")
+        .map((d) => d.trim())
+        .filter(Boolean);
+      const scriptTokens =
+        (
+          directives.find((d) => d.split(/\s+/)[0] === "script-src") ??
+          directives.find((d) => d.split(/\s+/)[0] === "default-src") ??
+          ""
+        )
+          .trim()
+          .split(/\s+/)
+          .slice(1) ?? [];
+      if (scriptTokens.includes("unsafe-eval") || scriptTokens.includes("'unsafe-eval'")) {
         violations.push("tauri.conf.json: CSP 禁止包含 unsafe-eval");
       }
       // PRR-065：Tauri 2 本机 IPC 端点 http://ipc.localhost 是明确允许的

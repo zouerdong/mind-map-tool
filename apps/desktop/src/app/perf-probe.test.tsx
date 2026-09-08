@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DocumentSession, type MindMapDocumentV1 } from "@mindmap/core";
 import type * as PortsModule from "./ports.js";
 import { FakeFilePort, FakeExportRenderer } from "./fake-ports.js";
+import { ExportRendererError } from "./export-commands.js";
 
 // resetModules 会重新执行 mock factory——用 vi.hoisted 保证 invoke spy
 // 跨模块重载是同一个实例，primeProbe 的实现不被丢弃。
@@ -227,7 +228,17 @@ describe("perf probe (PRR-010)", () => {
       expect(samples.length).toBeGreaterThan(0);
       expect(samples.every((value) => Number.isFinite(value) && value > 0)).toBe(true);
     }
-    expect(data?.frameP95Ms).toBeTypeOf("number");
+    const p95 = (samples: number[]) => {
+      const sorted = [...samples].sort((a, b) => a - b);
+      return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+    };
+    expect(data?.frameP95Ms).toBe(
+      Math.max(
+        p95(data.panFrameSamples as number[])!,
+        p95(data.nodeDragFrameSamples as number[])!,
+        p95(data.zoomFrameSamples as number[])!,
+      ),
+    );
   });
 
   it("save 场景：Save As 建立 handle 后 ordinary save 全链计时", async () => {
@@ -284,5 +295,79 @@ describe("perf probe (PRR-010)", () => {
     ]);
     const data = reportedEvents[1]!.data as { reason: string };
     expect(data.reason).toContain("fixture");
+  });
+
+  it("PNG 失败同时保留错误码与底层消息", async () => {
+    const doc = fixtureDocument(4);
+    primeProbe({
+      runId: "run-png-failed",
+      scenario: "png-export",
+      fixtureJson: JSON.stringify(doc),
+      samples: 1,
+      windowGeneration: 1,
+    });
+    const renderer = new FakeExportRenderer();
+    renderer.renderPng = vi.fn().mockRejectedValue(new Error("WASM bootstrap failed"));
+    const filePort = new FakeFilePort();
+    filePort.nextSaveDialog = "/tmp/perf-sample.png";
+    const session = new DocumentSession(fixtureDocument());
+    const runPerfProbe = await importFreshProbe();
+    await runPerfProbe({
+      session,
+      filePort,
+      renderer,
+      loadDocument: (next) => {
+        session.load(next);
+        stubCanvasDom(next.document.nodes.length);
+      },
+      notifySaved: () => {},
+      notifyExported: () => {},
+    });
+    await flushMicrotasks();
+    const data = reportedEvents[1]!.data as { reason: string };
+    expect(data.reason).toContain("UNKNOWN");
+    expect(data.reason).toContain("WASM bootstrap failed");
+  });
+
+  it("WASM 边界失败以稳定 code EXPORT_WASM_UNAVAILABLE 上报，携带底层原因", async () => {
+    const doc = fixtureDocument(4);
+    primeProbe({
+      runId: "run-png-wasm",
+      scenario: "png-export",
+      fixtureJson: JSON.stringify(doc),
+      samples: 1,
+      windowGeneration: 1,
+    });
+    const renderer = new FakeExportRenderer();
+    // 复现 production 边界（ports.ts LazyTauriExportRenderer）：renderer
+    // 结构化失败 → ExportRendererError(code) → exportFlow toError 透传。
+    renderer.renderPng = vi
+      .fn()
+      .mockRejectedValue(
+        new ExportRendererError(
+          "EXPORT_WASM_UNAVAILABLE",
+          "PNG 渲染失败：resvg WASM 初始化/渲染失败：CompileError: WebAssembly.instantiate(): Type mismatch",
+        ),
+      );
+    const filePort = new FakeFilePort();
+    filePort.nextSaveDialog = "/tmp/perf-sample.png";
+    const session = new DocumentSession(fixtureDocument());
+    const runPerfProbe = await importFreshProbe();
+    await runPerfProbe({
+      session,
+      filePort,
+      renderer,
+      loadDocument: (next) => {
+        session.load(next);
+        stubCanvasDom(next.document.nodes.length);
+      },
+      notifySaved: () => {},
+      notifyExported: () => {},
+    });
+    await flushMicrotasks();
+    const data = reportedEvents[1]!.data as { reason: string };
+    expect(data.reason).toContain("EXPORT_WASM_UNAVAILABLE");
+    expect(data.reason).toContain("CompileError");
+    expect(data.reason).not.toMatch(/error\/UNKNOWN/);
   });
 });

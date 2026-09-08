@@ -387,6 +387,11 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
         ) {
           fail(`${label}.raw RSS 不是 renderer-ready 后的 native candidate 采样`);
         }
+        // PRR-066：30 秒稳定窗协议——rss 证据必须声明 ≥30000 的 settleMs，
+        // 不足或缺失不得作为 "stable RSS" 发布证据。
+        if (!Number.isInteger(raw?.rssResult?.settleMs) || raw.rssResult.settleMs < 30_000) {
+          fail(`${label}.raw rssResult.settleMs 缺失或不足 30000（30 秒稳定窗协议）`);
+        }
         if (raw?.canvasResult?.measurementSource !== "native-candidate")
           fail(`${label}.raw canvasResult 不是 native candidate 数据`);
         const canvasGroups = [

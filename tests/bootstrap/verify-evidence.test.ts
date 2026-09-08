@@ -242,6 +242,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
     rssResult: {
       measurementSource: "native-candidate",
       readyEvent: { milestone: "renderer-ready" },
+      settleMs: 30_000,
     },
     canvasResult,
     incompleteReasons: [],
@@ -534,5 +535,42 @@ describe("verify-evidence releaseScope verification", () => {
     const res = runVerifier(["--manifest", fixturePath]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("canvas frame samples");
+  });
+
+  it("PRR-066: fails when RSS evidence lacks a >=30s settleMs declaration", () => {
+    const manifest = baseManifest();
+    // 合法 canvas（raw 样本可复算），隔离 settleMs 失败
+    const groups = {
+      pan: Array.from({ length: 20 }, () => 8),
+      drag: Array.from({ length: 20 }, () => 8),
+      zoom: Array.from({ length: 20 }, () => 8),
+    };
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: groups.pan,
+      nodeDragFrameSamples: groups.drag,
+      zoomFrameSamples: groups.zoom,
+    });
+    const rawPath = resolve(FIXTURE_DIR, "release-performance-raw.json");
+    const raw = JSON.parse(readFileSync(rawPath, "utf8"));
+    raw.rssResult.settleMs = 2_000; // 旧协议：2s 窗口冒充稳定窗
+    writeFileSync(rawPath, JSON.stringify(raw, null, 2));
+    const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
+    const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+    summary.rawSha256 = fileSha256(rawPath);
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    const command = manifest.commands.find((c: any) => c.id === "cmd-release-performance");
+    command.artifactSha256 = fileSha256(summaryPath);
+
+    const fixturePath = resolve(FIXTURE_DIR, "short-settle.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("settleMs 缺失或不足 30000");
   });
 });

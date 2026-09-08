@@ -150,6 +150,12 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
     await waitFor(() => {
       expect(renderer.fontMetricsState()).toBe("ready");
     });
+    // PRR-066 红灯 3：首意图自动 flush——字体 ready 后无需等到 Save，
+    // 几何命令即以真实度量提交（session dirty 是提交的可观察信号；
+    // rf-node 对 pending 节点也会渲染，不能作为提交判据）
+    await waitFor(() => {
+      expect(document.title.startsWith("● ")).toBe(true);
+    });
   });
 
   it("pending 期间 Save 会先等待 real font 刷新，落盘 size 是 realFont 测得而非 fallback", async () => {
@@ -233,16 +239,57 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
       />,
     );
 
-    // 让字体加载失败
+    // PRR-066：空白 mount 不再预热导出资源——失败只能由真实需求触发。
+    // 先让字体加载失败，再产生首个几何意图（双击建点）。
     defer.reject(new Error("网络字体加载超时"));
 
+    // 双击画布创建节点：pending 已翻转为 failed，意图保留并提示重试时机
+    fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 120, clientY: 80 });
     await waitFor(() => {
-      expect(screen.getByText(/导出资源加载失败/)).toBeDefined();
+      expect(screen.getByText(/字体资源加载失败/)).toBeDefined();
     });
 
-    // 尝试保存，不应该写入错误几何
+    // 尝试另存（⇧⌘S）：flush 重试仍失败 → 阻断保存，不写入错误几何
     fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
-
+    await waitFor(() => {
+      expect(screen.getByText(/字体资源加载失败，无法另存文档/)).toBeDefined();
+    });
     expect(filePort.savedDocuments.length).toBe(0);
+  });
+});
+
+describe("PRR-066: 导出资源按需加载（空白画布不预热）", () => {
+  it("仅 mount、空白画布稳定后，不调用 renderer warmup/whenReady/whenMetricsReady", async () => {
+    const filePort = new SpyingFilePort();
+    const renderer = new FakeExportRenderer();
+    const warmupSpy = vi.spyOn(renderer, "warmup");
+    const whenReadySpy = vi.spyOn(renderer, "whenReady");
+    const whenMetricsReadySpy = vi.spyOn(renderer, "whenMetricsReady");
+    const preferences = new FakePreferencesPort();
+    const loadSpy = vi.spyOn(preferences, "load");
+
+    render(
+      <MindMapApp
+        ports={{
+          filePort,
+          preferences,
+          renderer,
+          fonts: renderer.fonts(),
+          isBrowserDev: true,
+          globalShortcut: new FakeGlobalShortcut(),
+          closeLifecycle: new FakeCloseLifecyclePort(),
+          launch: new FakeLaunchPort(),
+        }}
+      />,
+    );
+
+    // 等 restore/onboarding 链路真实跑完再断言（避免异步未完成的假阴性）
+    await waitFor(() => expect(loadSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    // 空白画布零交互：导出栈（JS chunk、三份字体、resvg WASM）不得进入加载路径
+    expect(warmupSpy).not.toHaveBeenCalled();
+    expect(whenReadySpy).not.toHaveBeenCalled();
+    expect(whenMetricsReadySpy).not.toHaveBeenCalled();
   });
 });

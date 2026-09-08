@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-070_READY`（PRR-000～065 已完成并经独立审阅；负责人四组输入与 G2 已于 2026-09-08 到位；下一步从包含 PRR-065 审阅小修和本任务卡的 clean HEAD 完整重做原生候选矩阵）
+状态：`IN_PROGRESS / PRR-066_READY`（PRR-070 阶段 A 在 `0c8a93b` 因 production PNG/CSP、warm、RSS 与性能证据协议失败而停止；先执行 PRR-066，独立审阅后再从新 clean commit 重做 PRR-070）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -40,6 +40,8 @@ PRR-000 治理与证据基线
    └─ PRR-060 许可证与 notices
                 ↓
 PRR-065 零画布顶栏 + 原生命令承载
+                ↓
+PRR-066 PNG/CSP + 真正按需加载 + 性能协议整改
                 ↓
        clean source commit
                 ↓

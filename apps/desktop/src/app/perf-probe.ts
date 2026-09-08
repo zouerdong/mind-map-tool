@@ -169,7 +169,8 @@ export function frameStats(values: number[]): FrameStats {
 
 /** FlowResult 各终态的可读描述（cancelled/conflict 无 code 字段）。 */
 function describeFlow(result: { kind: string; code?: string; message?: string }): string {
-  return `${result.kind}${result.code ? `/${result.code}` : result.message ? `/${result.message}` : ""}`;
+  const detail = [result.code, result.message].filter(Boolean).join(": ");
+  return `${result.kind}${detail ? `/${detail}` : ""}`;
 }
 
 function pointerEvent(type: string, x: number, y: number, buttons: number): PointerEvent {
@@ -274,12 +275,17 @@ async function runCanvasScenario(config: PerfProbeConfig, deps: PerfScenarioDeps
     count: stats.reduce((sum, item) => sum + item.count, 0),
     max: stats.reduce<number | null>((max, item) => Math.max(max ?? 0, item.max ?? 0), null),
   });
-  // p95 需要原始帧间隔；各轮 tracker 只保留统计。为保 raw 可复算，把每轮
-  // p95/max/count 上报，frameP95Ms 取三类动作 max 的保守口径（与 web
-  // harness 相同的 max(pan, drag, zoom) 预算语义）。
-  const panWorst = Math.max(...panStats.map((item) => item.p95 ?? 0));
-  const dragWorst = Math.max(...dragStats.map((item) => item.p95 ?? 0));
-  const zoomWorst = Math.max(...zoomStats.map((item) => item.p95 ?? 0));
+  // p95 以每类动作的全部原始帧间隔复算，再取三类动作最大值；各轮 p95
+  // 仅作诊断。不能取“每轮 p95 的最大值”，否则单轮离群会被误报成整体
+  // p95，且无法与发布验收器从 raw samples 的独立复算保持一致。
+  const panFrameSamples = panStats.flatMap((item) => item.samples);
+  const nodeDragFrameSamples = dragStats.flatMap((item) => item.samples);
+  const zoomFrameSamples = zoomStats.flatMap((item) => item.samples);
+  const frameP95Ms = Math.max(
+    frameStats(panFrameSamples).p95 ?? 0,
+    frameStats(nodeDragFrameSamples).p95 ?? 0,
+    frameStats(zoomFrameSamples).p95 ?? 0,
+  );
   return {
     measurementSource: "native-candidate",
     fixtureNodes: doc.document.nodes.length,
@@ -291,10 +297,10 @@ async function runCanvasScenario(config: PerfProbeConfig, deps: PerfScenarioDeps
     panRoundP95Ms: panStats.map((item) => item.p95),
     nodeDragRoundP95Ms: dragStats.map((item) => item.p95),
     zoomRoundP95Ms: zoomStats.map((item) => item.p95),
-    panFrameSamples: panStats.flatMap((item) => item.samples),
-    nodeDragFrameSamples: dragStats.flatMap((item) => item.samples),
-    zoomFrameSamples: zoomStats.flatMap((item) => item.samples),
-    frameP95Ms: Math.max(panWorst, dragWorst, zoomWorst),
+    panFrameSamples,
+    nodeDragFrameSamples,
+    zoomFrameSamples,
+    frameP95Ms,
   };
 }
 
@@ -404,8 +410,12 @@ async function runSaveScenario(config: PerfProbeConfig, deps: PerfScenarioDeps) 
 async function runPngExportScenario(config: PerfProbeConfig, deps: PerfScenarioDeps) {
   const doc = loadFixture(config, deps);
   await whenNodeCountRendered(doc.document.nodes.length);
-  // 导出资源（字体/WASM）就绪后再计时（PRC-025 同口径）。
+  // 导出资源（字体/WASM）就绪后再计时（PRC-025 同口径）。PRR-066 起生产
+  // 不再预热导出栈：首次 whenReady 触发真实加载，其耗时只作诊断值
+  // （resourceLoadMs），绝不混入 2x PNG render p95 样本。
+  const resourceLoadStart = performance.now();
   if (deps.renderer.whenReady) await deps.renderer.whenReady();
+  const resourceLoadMs = Math.round(performance.now() - resourceLoadStart);
   const rounds = Math.max(1, Math.min(config.samples || 20, 100));
   const pngExportSamples: number[] = [];
   for (let round = 0; round < rounds; round++) {
@@ -426,6 +436,7 @@ async function runPngExportScenario(config: PerfProbeConfig, deps: PerfScenarioD
     measurementSource: "native-candidate",
     rounds,
     fixtureNodes: doc.document.nodes.length,
+    resourceLoadMs,
     pngExportSamples,
   };
 }

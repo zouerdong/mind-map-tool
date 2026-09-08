@@ -18,7 +18,7 @@ import {
   rmSync,
 } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve, dirname, extname, join, relative } from "node:path";
+import { resolve, dirname, extname, join, relative, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import {
@@ -448,12 +448,17 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
 // ==================== PRR-010 原生场景探针 ====================
 
 const SCENARIO_TIMEOUTS_MS = {
-  rss: 60_000,
+  // PRR-066：RSS 稳定窗 30s（质量规范 v1-quality-gates）+ 采样（最多
+  // 32×250ms）+ 启动，超时必须覆盖完整协议时长（不得超时后写 PASS）。
+  rss: 90_000,
   canvas: 180_000,
   edit: 120_000,
   save: 120_000,
   "png-export": 240_000,
 };
+
+/** RSS 稳定窗声明值下限（与 host perf/mod.rs 的 RSS_MIN_SETTLE_MS 同源）。 */
+const RSS_MIN_SETTLE_MS = 30_000;
 
 /**
  * 单次场景采样：以指定 env 启动候选，收集全部 perf 事件直到进程真实退出。
@@ -471,6 +476,7 @@ async function runScenarioSample(binPath, scenario, options = {}) {
   } = options;
   return new Promise((resolveRun) => {
     const runId = randomUUID();
+    const startedAtMs = performance.now();
     const events = [];
     let readyEvent = null;
     let timedOut = false;
@@ -491,6 +497,7 @@ async function runScenarioSample(binPath, scenario, options = {}) {
         readyEvent,
         exited: extra?.exited ?? false,
         code: extra?.code ?? null,
+        durationMs: Math.round(performance.now() - startedAtMs),
         ...(extra?.error ? { error: extra.error } : {}),
       });
     };
@@ -539,6 +546,7 @@ async function runScenarioSample(binPath, scenario, options = {}) {
         readyEvent: null,
         exited: false,
         code: 1,
+        durationMs: Math.round(performance.now() - startedAtMs),
         error: e.message,
       });
     }
@@ -613,15 +621,39 @@ if (scope === "release") {
     process.exit(1);
   }
 
-  // 1. G2 scope 校验
+  // PRR-066 诊断预检模式：候选与证据都在 PRR-066 卡批准的 .tmp/prr-066-*
+  // 边界内（独立 CARGO_TARGET_DIR 构建，不触碰 G2 正式 candidateOutputPaths
+  // 与旧 PRR-070 证据）。该模式产物只作 PRR-066 预检证据，不进入发布验收
+  // （PRR-070 从新 clean commit 以正式路径完整重做）；测量协议、样本数与
+  // 预算门与正式模式完全一致，exit code 语义不变。
+  const DIAGNOSTIC_PREFIX = "prr-066-";
+  const isDiagnosticPath = (absPath) => {
+    const rel = relative(ROOT, absPath);
+    if (rel.startsWith("..") || isAbsolute(rel)) return false;
+    const segments = rel.split(sep);
+    return segments[0] === ".tmp" && (segments[1] ?? "").startsWith(DIAGNOSTIC_PREFIX);
+  };
+  const candidateAbs = resolve(ROOT, candidate);
+  const evidenceDirAbs = resolve(ROOT, evidenceDir);
+  const candidateDiagnostic = isDiagnosticPath(candidateAbs);
+  const evidenceDiagnostic = isDiagnosticPath(evidenceDirAbs);
+  if (candidateDiagnostic !== evidenceDiagnostic) {
+    console.error(
+      "run-performance: FAIL — --candidate 与 --evidence-dir 必须同属 PRR-066 诊断边界或 G2 正式批准边界",
+    );
+    process.exit(1);
+  }
+  const diagnostic = candidateDiagnostic;
+
+  // 1. G2 scope 校验（诊断模式只绑定 host/action；正式模式绑定 candidate/
+  //    evidence 边界）
   let validated;
   try {
     validated = loadAndValidateG2Scope({
       scopeFrom,
       host: "tauri",
       action: "measure-performance",
-      candidate,
-      evidenceDir,
+      ...(diagnostic ? {} : { candidate, evidenceDir }),
       repoRoot: ROOT,
     });
   } catch (err) {
@@ -636,7 +668,6 @@ if (scope === "release") {
     process.exit(1);
   }
 
-  const candidateAbs = resolve(ROOT, candidate);
   if (!existsSync(candidateAbs)) {
     console.error(`run-performance: FAIL — 候选产物不存在: ${candidate}`);
     process.exit(1);
@@ -646,9 +677,8 @@ if (scope === "release") {
     process.exit(1);
   }
 
-  const evidenceDirAbs = resolve(ROOT, evidenceDir);
   if (outputRel && !isSameOrDescendant(evidenceDirAbs, resolve(ROOT, outputRel))) {
-    console.error("run-performance: FAIL — release output 必须位于 G2 批准的 evidence-dir 内");
+    console.error("run-performance: FAIL — release output 必须位于指定的 evidence-dir 内");
     process.exit(1);
   }
 
@@ -664,11 +694,27 @@ if (scope === "release") {
     : statSync(candidateAbs).size;
 
   let installerBytes = null;
-  for (const cop of validated.scope.candidateOutputPaths) {
-    if (cop.endsWith(".dmg")) {
-      const dmgAbs = resolve(ROOT, cop);
-      if (existsSync(dmgAbs) && !lstatSync(dmgAbs).isSymbolicLink() && lstatSync(dmgAbs).isFile()) {
-        installerBytes = statSync(dmgAbs).size;
+  if (diagnostic) {
+    // 诊断候选与 DMG 同一 bundle 结构：.../bundle/macos/*.app + .../bundle/dmg/*.dmg
+    const dmgDir = resolve(dirname(candidateAbs), "..", "dmg");
+    const dmgFiles = existsSync(dmgDir)
+      ? readdirSync(dmgDir).filter((f) => f.endsWith(".dmg"))
+      : [];
+    if (dmgFiles.length === 1) {
+      const dmgAbs = join(dmgDir, dmgFiles[0]);
+      if (lstatSync(dmgAbs).isFile()) installerBytes = statSync(dmgAbs).size;
+    }
+  } else {
+    for (const cop of validated.scope.candidateOutputPaths) {
+      if (cop.endsWith(".dmg")) {
+        const dmgAbs = resolve(ROOT, cop);
+        if (
+          existsSync(dmgAbs) &&
+          !lstatSync(dmgAbs).isSymbolicLink() &&
+          lstatSync(dmgAbs).isFile()
+        ) {
+          installerBytes = statSync(dmgAbs).size;
+        }
       }
     }
   }
@@ -742,6 +788,8 @@ if (scope === "release") {
   let editSamples = [];
   let saveSamples = [];
   let pngExportSamples = [];
+  // PRR-066：PNG 首次导出资源加载耗时（诊断值，不计入 2x PNG render p95）
+  let pngResourceLoadMs = null;
   const editResult = { status: "SKIPPED", reason: "edit probe skipped" };
   const saveResult = { status: "SKIPPED", reason: "save probe skipped" };
   const pngResult = { status: "SKIPPED", reason: "png-export probe skipped" };
@@ -754,6 +802,7 @@ if (scope === "release") {
       eventMilestones: run.events.map((event) => event.milestone),
       exited: run.exited,
       code: run.code,
+      durationMs: run.durationMs ?? null,
       ...(run.error ? { error: run.error } : {}),
     });
   };
@@ -770,12 +819,24 @@ if (scope === "release") {
     const rssKbValues = rssEvents.map((event) => event.rssKb);
     const hasInvalid = rssKbValues.some((value) => !Number.isFinite(value) || value <= 0);
     const completed = run.events.some((event) => event.milestone === "rss-complete");
+    // PRR-066：RSS 稳定窗协议——全部 rss 事件必须声明 ≥30s 的 settleMs
+    // 且一致；缺失/不足/矛盾都判 INCOMPLETE，不得用 2s 窗口的样本充当
+    // "30 秒 stable RSS" 发布证据。
+    const settleDeclarations = run.events
+      .filter((event) => event.milestone === "rss-sample" || event.milestone === "rss-complete")
+      .map((event) => event.settleMs);
+    const settleMsConsistent =
+      settleDeclarations.length > 0 &&
+      settleDeclarations.every((value) => Number.isInteger(value) && value >= RSS_MIN_SETTLE_MS) &&
+      new Set(settleDeclarations).size === 1;
+    const settledSettleMs = settleMsConsistent ? settleDeclarations[0] : null;
     if (
       run.exited &&
       run.code === 0 &&
       run.readyEvent &&
       completed &&
       !hasInvalid &&
+      settleMsConsistent &&
       rssKbValues.length > 0
     ) {
       rssSamples = rssKbValues.map((kb) => Math.round((kb / 1024) * 10) / 10);
@@ -784,13 +845,18 @@ if (scope === "release") {
         status: "OK",
         readyEvent: run.readyEvent,
         sampleCount: rssSamples.length,
+        settleMs: settledSettleMs,
       };
     } else {
       rssResult = {
         measurementSource: "not-measured",
         status: "INCOMPLETE",
         readyEvent: run.readyEvent,
-        reason: hasInvalid ? "rss-sample 含非有限、零或负样本" : scenarioFailureReason(run, "rss"),
+        reason: !settleMsConsistent
+          ? `rss 事件缺少一致的 ≥${RSS_MIN_SETTLE_MS}ms settleMs（30 秒稳定窗协议不满足）`
+          : hasInvalid
+            ? "rss-sample 含非有限、零或负样本"
+            : scenarioFailureReason(run, "rss"),
       };
     }
   }
@@ -866,6 +932,7 @@ if (scope === "release") {
     const data = scenarioResultData(run, "png-export");
     if (Array.isArray(data?.pngExportSamples)) {
       pngExportSamples = data.pngExportSamples;
+      pngResourceLoadMs = Number.isFinite(data?.resourceLoadMs) ? data.resourceLoadMs : null;
       pngResult.status = "OK";
       pngResult.reason = undefined;
     } else {
@@ -1000,6 +1067,9 @@ if (scope === "release") {
     "每样本在 G2 批准 evidence 边界内创建全新隔离 HOME（WebView 缓存与应用支持目录首次创建），采样后删除；renderer-ready 由 host 校验 runId/windowGeneration 后输出唯一 JSON，sampler 等待进程真实退出";
   const warmDefinition =
     "全部样本共享同一隔离 HOME，先执行一次不计入的预热启动再连续采样；renderer-ready 判定与 cold 相同";
+  // PRR-066：RSS 30 秒稳定窗协议（docs/quality/v1-quality-gates.md）；host
+  // 在 renderer-ready 后等待至少 30s 才开始采样，事件声明 settleMs 供复核。
+  const rssSettleDefinition = `renderer-ready 后等待至少 ${RSS_MIN_SETTLE_MS}ms 稳定窗再采样自身 RSS；全部 rss 事件声明一致且 ≥${RSS_MIN_SETTLE_MS} 的 settleMs，runner 与 verify-evidence 均校验`;
 
   const rawEvidence = {
     schemaVersion: 2,
@@ -1016,9 +1086,11 @@ if (scope === "release") {
     startedAt: samplingStartedAt,
     finishedAt: samplingFinishedAt,
     measurementSource: complete ? "native-candidate" : "incomplete-candidate-probe",
+    measurementMode: diagnostic ? "diagnostic-preflight" : "release",
     samplingProtocol: {
       coldDefinition,
       warmDefinition,
+      rssSettleDefinition,
     },
     fixture: {
       path: relative(ROOT, FIXTURE_SRC),
@@ -1033,6 +1105,7 @@ if (scope === "release") {
     editSamples,
     saveSamples,
     pngExportSamples,
+    pngResourceLoadMs,
     editResult,
     saveResult,
     pngResult,
@@ -1056,6 +1129,7 @@ if (scope === "release") {
     startedAt: samplingStartedAt,
     finishedAt: samplingFinishedAt,
     overall: complete ? (pass ? "PASS" : "FAIL") : "INCOMPLETE",
+    measurementMode: diagnostic ? "diagnostic-preflight" : "release",
     budgets: BUDGETS,
     results: {
       coldStartP95Ms: coldStats.p95,

@@ -1,8 +1,13 @@
-// 几何提交屏障（ADR 0011 / PRC-025）：
+// 几何提交屏障（ADR 0011 / PRC-025 / PRR-066）：
 // 在真实 bundled font resolver 就绪前，画布正常显示与输入，
 // 但不向 session 提交依赖 DEV_FONTS fallback 度量的持久化 size；
 // 字体 ready 后用真实 FontResolver 计算度量，恰好提交一次 command；
-// 触发 Save/Close-Save/Export 时，等待真实字体就绪后 flush 提交；
+// pending 态首个依赖真实字体度量的意图会自动启动一次 in-flight flush
+//（字体加载由真实需求触发——空白画布不预热导出资源，ADR 0011 动态
+// 加载分支），成功后提交并触发 onCommitted，失败经 onError 呈现且保留
+// 队列、不产生未处理拒绝；
+// 触发 Save/Close-Save/Export 时，等待同一 in-flight 字体加载后 flush
+// 提交，绝不持久化 fallback size；
 // 字体加载失败时零提交；单条提交失败时保留失败意图并阻断 canonical save，
 // 已成功提交的前序用户命令仍留在 session 历史中。
 
@@ -132,7 +137,29 @@ export class GeometryBarrier {
       }
     }
 
+    // PRR-066：pending 态首个依赖真实字体度量的意图自动启动一次
+    // in-flight flush——字体/导出资源由真实需求触发加载（空白画布 mount
+    // 不预热）。failed 态不自动重试：错误已由 onError 呈现，重试留给
+    // 下次显式 flush（保存/关闭保存/导出），与上方提示承诺一致。
+    if (state === "pending") this.scheduleBackgroundFlush();
+
     return Promise.resolve();
+  }
+
+  /**
+   * 后台自动 flush：与显式 flush() 共享同一 in-flight promise（Save/
+   * Close-Save/Export 等待的是同一次字体加载，绝不持久化 fallback
+   * size）。失败已由 drainQueue → onError 呈现且队列保留；这里吞掉
+   * rejection，避免无人 await 的 promise 制造未处理拒绝。
+   */
+  private scheduleBackgroundFlush(): void {
+    if (this.disposed || this.flushInFlight) return;
+    this.flushInFlight = this.drainQueue().finally(() => {
+      this.flushInFlight = null;
+    });
+    this.flushInFlight.catch(() => {
+      // 仅消化 rejection；onError 呈现与队列保留均在 drainQueue 内完成。
+    });
   }
 
   cancelPendingNode(id: string): void {
@@ -141,8 +168,12 @@ export class GeometryBarrier {
   }
 
   async flush(): Promise<void> {
-    if (this.disposed || this.queue.length === 0) return;
+    // 先并入 in-flight（含 PRR-066 后台自动 flush）：drain 消费队列的瞬间
+    // queue 可能为空，若先查空队列会绕过正在提交的意图（Save 拍快照落后
+    // 于刚落地的 commit）。空队列且无 in-flight 时直接返回——clean 文档的
+    // Save 不触发字体资源加载。
     if (this.flushInFlight) return this.flushInFlight;
+    if (this.disposed || this.queue.length === 0) return;
 
     this.flushInFlight = this.drainQueue().finally(() => {
       this.flushInFlight = null;

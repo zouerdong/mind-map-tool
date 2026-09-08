@@ -19,7 +19,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import type { ExportRenderer as NativeExportRenderer } from "@mindmap/export";
-import type { ExportRendererLike } from "./export-commands.js";
+import { ExportRendererError, type ExportRendererLike } from "./export-commands.js";
 
 /** 全局热键读写（MM-088；accelerator 字符串，键位专项讨论后可改）。 */
 export interface GlobalShortcutPort {
@@ -149,8 +149,9 @@ export function isTauriRuntime(): boolean {
 
 export async function createAppPorts(): Promise<AppPorts> {
   if (isTauriRuntime()) {
-    // 不在启动关键路径等待动态导出 chunk、三份字体或 resvg WASM；
-    // renderer 会在首帧之后由 MindMapApp warmup，导出动作也会按需兜底加载。
+    // PRR-066：不在启动关键路径等待动态导出 chunk、三份字体或 resvg WASM；
+    // 首个几何意图（GeometryBarrier 自动 flush）或真正导出动作才触发加载，
+    // 空白画布 mount 不预热（RSS 预算 120MB）。
     const renderer = createTauriExportRenderer();
     return {
       filePort: new TauriFileAdapter(),
@@ -201,13 +202,17 @@ function createTauriExportRenderer(): ExportRendererLike {
 
 /**
  * Tauri 导出资源的延迟 owner：实例本身在启动时只创建 fallback font proxy，
- * 动态 JS、字体和 WASM 只在首帧后 warmup 或第一次导出时进入加载路径。
+ * 动态 JS、字体和 WASM 只在真正需要时（首个几何意图 / 真正导出）进入加载
+ * 路径（PRR-066 / ADR 0011 动态加载分支；空白画布 mount 不预热）。
+ * 导出为具名类仅为测试缝隙（结构化错误与 fetch 原因保留的单元测试）。
  */
-class LazyTauriExportRenderer implements ExportRendererLike {
+export class LazyTauriExportRenderer implements ExportRendererLike {
   private renderer: NativeExportRenderer | null = null;
   private loading: Promise<NativeExportRenderer> | null = null;
   private resolvedFonts: FontResolver = DEV_FONTS;
   private metricsState: FontMetricsState = "pending";
+  /** WASM 资源 fetch 失败原因（仅 PNG 需要；SVG/PDF 与字体度量不因此失败）。 */
+  private wasmLoadError: string | null = null;
   private readonly fontProxy: FontResolver = {
     regular: (fontId) => this.resolvedFonts.regular(fontId),
     bold: (fontId) => this.resolvedFonts.bold(fontId),
@@ -250,7 +255,13 @@ class LazyTauriExportRenderer implements ExportRendererLike {
           return response.arrayBuffer();
         })
         .then((bytes) => new Uint8Array(bytes))
-        .catch(() => undefined),
+        .catch((error: unknown) => {
+          // PRR-066：保留 fetch 失败原因（PNG 导出时随结构化错误呈现），
+          // 不吞掉底层原因伪装成"资源不存在"；WASM 仅 PNG 需要，字体度量
+          // 与 SVG/PDF 导出不因此失败。
+          this.wasmLoadError = error instanceof Error ? error.message : String(error);
+          return undefined;
+        }),
     ]);
     const fetchBytes = async (url: string) => {
       const response = await fetch(url);
@@ -271,7 +282,9 @@ class LazyTauriExportRenderer implements ExportRendererLike {
 
   warmup(): void {
     void this.load().catch(() => {
-      // 首帧之后的预热失败不阻塞编辑；导出调用会再次尝试并返回可读错误。
+      // 预热失败不阻塞编辑；导出调用会再次尝试并返回可读错误。
+      // （PRR-066 起生产路径不再于空白画布 mount 后主动 warmup——首个
+      // 几何意图/真正导出才触发加载；方法保留给显式预热调用方。）
     });
   }
 
@@ -289,7 +302,21 @@ class LazyTauriExportRenderer implements ExportRendererLike {
 
   async renderPng(svg: Uint8Array, scene: unknown) {
     const result = await (await this.load()).renderPng(svg, scene as never);
-    if (!result.ok) throw new Error(`PNG 渲染失败：${JSON.stringify(result.error)}`);
+    if (!result.ok) {
+      // PRR-066：结构化 code（EXPORT_WASM_UNAVAILABLE 等）以
+      // ExportRendererError 透传给 exportFlow 的 toError，保留底层
+      // message，不再 UNKNOWN 化。
+      // EXPORT_SIZE_LIMIT 等错误没有 message 字段，回退到可读的尺寸说明。
+      const baseMessage =
+        "message" in result.error
+          ? result.error.message
+          : `尺寸超限（${result.error.w}×${result.error.h}）`;
+      const detail =
+        this.wasmLoadError !== null && result.error.code === "EXPORT_WASM_UNAVAILABLE"
+          ? `${baseMessage}（WASM 资源加载失败：${this.wasmLoadError}）`
+          : baseMessage;
+      throw new ExportRendererError(result.error.code, `PNG 渲染失败：${detail}`);
+    }
     return result.bytes;
   }
 

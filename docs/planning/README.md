@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-070_READY`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-000～060 已实现；PRR-065 的零 WebView chrome 与原生命令承载已在 `808959b`/`79f099c` 后完成独立审阅并修正快捷键、启动引导、监听失败、菜单 check 状态和窗口销毁清理。旧 PRR-070 试跑候选全部作废；PRR-070 只可从包含审阅小修与当前任务卡的 clean HEAD 完整重做，并在候选证据齐备后等待负责人 G-FINAL；PRR-080/090 未开始。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
+当前整改批次状态为 `IN_PROGRESS / PRR-066_READY`。PRR-070 阶段 A 在 source `0c8a93b` 的性能步骤正确停止：production PNG 被 CSP 阻断、30秒 stable RSS 协议未实现、空白启动 eager-load 完整导出栈、warm p95 超预算，canvas 另有 raw 聚合口径错误。独立复算与小修见 [阶段 A 性能审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)，后继只派发 [PRR-066 性能整改卡](./prr-066-performance-remediation-task-card-2026-09-08.md)。PRR-066 经独立审阅并形成新 clean commit 前，PRR-070/080/090 与 G-FINAL 全部保持阻塞；旧候选及证据只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 

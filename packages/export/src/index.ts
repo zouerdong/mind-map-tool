@@ -103,9 +103,24 @@ export async function createExportRenderer(
           },
         };
       }
-      const { initResvgWasm, renderPng } = await import("./render-png.js");
-      await initResvgWasm(resvgWasm);
-      return renderPng(svgBytes, scene, options.fonts, scale);
+      try {
+        const { initResvgWasm, renderPng } = await import("./render-png.js");
+        await initResvgWasm(resvgWasm);
+        return await renderPng(svgBytes, scene, options.fonts, scale);
+      } catch (error) {
+        // PRR-066：WASM init/render 失败（如 CSP 禁止编译时的
+        // CompileError）映射为稳定 code + 底层 message，不得以裸异常
+        // 冒泡成 UNKNOWN，也不得吞掉底层原因伪装成资源不存在。
+        return {
+          ok: false,
+          error: {
+            code: "EXPORT_WASM_UNAVAILABLE",
+            message: `resvg WASM 初始化/渲染失败：${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        };
+      }
     },
     renderPdf: async (scene) => {
       const { renderPdf } = await import("./render-pdf.js");

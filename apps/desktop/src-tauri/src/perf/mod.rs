@@ -33,9 +33,13 @@ pub const ENV_SAVE_TARGET: &str = "MINDMAP_PERF_SAVE_TARGET";
 pub const ENV_EXPORT_TARGET: &str = "MINDMAP_PERF_EXPORT_TARGET";
 pub const ENV_SAMPLES: &str = "MINDMAP_PERF_SAMPLES";
 
-/// rss 场景 renderer-ready 后的稳定等待（ms），与交互采样协议一致。
-const RSS_SETTLE_MS: u64 = 2_000;
+/// rss 场景 renderer-ready 后的稳定等待（ms）。质量规范（docs/quality/
+/// v1-quality-gates.md）要求窗口稳定 30 秒后采样；PRR-066 前的 2s 不满足
+/// 协议。事件携带 `settleMs` 供 runner 与 verify-evidence 复核声明值。
+const RSS_SETTLE_MS: u64 = 30_000;
 const RSS_SAMPLE_INTERVAL_MS: u64 = 250;
+/// runner/verifier 校验稳定窗声明值的下限（与 RSS_SETTLE_MS 同源协议）。
+pub const RSS_MIN_SETTLE_MS: u64 = 30_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scenario {
@@ -276,6 +280,7 @@ fn spawn_rss_sampling(app: AppHandle, probe: &PerfProbe, payload: PerfEventPaylo
                     "windowGeneration": generation,
                     "milestone": "rss-sample",
                     "rssKb": kb,
+                    "settleMs": RSS_SETTLE_MS,
                 }));
             }
             std::thread::sleep(Duration::from_millis(RSS_SAMPLE_INTERVAL_MS));
@@ -284,6 +289,7 @@ fn spawn_rss_sampling(app: AppHandle, probe: &PerfProbe, payload: PerfEventPaylo
             "runId": run_id,
             "windowGeneration": generation,
             "milestone": "rss-complete",
+            "settleMs": RSS_SETTLE_MS,
         }));
         app.exit(0);
     });
@@ -324,6 +330,18 @@ mod tests {
         assert_eq!(Scenario::parse("launch"), Some(Scenario::Launch));
         assert_eq!(Scenario::parse("png-export"), Some(Scenario::PngExport));
         assert_eq!(Scenario::parse("nonsense"), None);
+    }
+
+    /// PRR-066：RSS 稳定窗必须满足质量规范的 30 秒下限；事件声明的
+    /// settleMs 以该常数为唯一来源（runner/verifier 校验声明值 ≥30s）。
+    #[test]
+    fn rss_settle_window_meets_thirty_second_minimum() {
+        const {
+            assert!(
+                RSS_SETTLE_MS >= RSS_MIN_SETTLE_MS,
+                "RSS_SETTLE_MS 必须不小于 30s 稳定窗（docs/quality/v1-quality-gates.md）"
+            );
+        }
     }
 
     #[test]

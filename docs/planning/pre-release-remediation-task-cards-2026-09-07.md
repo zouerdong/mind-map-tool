@@ -1,10 +1,11 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-070_READY`
+状态：`IN_PROGRESS / PRR-066_READY`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
+性能回卡：[PRR-066 候选性能与 PNG/CSP 根因整改](./prr-066-performance-remediation-task-card-2026-09-08.md)
 
 ## 共同执行合同
 
@@ -44,9 +45,10 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 3B | PRR-030 | 可与 050/060 并行 | 生产配置与最低系统版本明确授权 | bundle/文件关联 |
 | 3C | PRR-060 | 可与 030/050 并行 | PRR-020 资产集合冻结且法律文本到位 | LICENSE/notices |
 | 4 | PRR-065 | 不可并行 | PRR-000～060 已集成；负责人要求打开即零菜单画布 | 零画布顶栏与原生命令承载 |
-| 5 | PRR-070 | 不可并行 | PRR-065 集成、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
-| 6 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
-| 7 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
+| 5 | PRR-066 | 不可并行 | PRR-070 阶段 A 性能回卡 | PNG/CSP、按需加载与性能协议整改 |
+| 6 | PRR-070 | 不可并行 | PRR-066 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
+| 7 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
+| 8 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
 
 并行只表示逻辑上可并行；若多个 Agent 直接共享同一 checkout，则必须改为串行，避免未提交文件相互覆盖。
 
@@ -62,6 +64,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | PRR-050 | Tauri file handle/coordinator/lifecycle、Rust tests | PRR-010 Rust 改动先集成 | 对 `apps/desktop/src-tauri/Cargo.toml` 运行 `cargo fmt --check`、`cargo test --locked`、`cargo clippy --locked --all-targets -- -D warnings` |
 | PRR-060 | LICENSE、THIRD_PARTY_NOTICES、许可 metadata/scanner/docs | bundle licenseFile 由 PRR-030 单点集成 | `pnpm license:scan`、build 后检查 app/DMG 携带文件 |
 | PRR-065 | 产品/架构文档、desktop command surface、原生菜单、关联测试 | 不改 core/schema/export/quality budget；完成后作废此前 PRR-070 试跑证据 | desktop/keyboard/menu/a11y/visual 专项 + 全量源码门 |
+| PRR-066 | PNG/CSP、按需字体/导出加载、perf probe/runner/verifier 与对应测试 | 不改预算/样本/percentile/字体范围；旧 PRR-070 证据只读 | production PNG、30秒 RSS、20样本 native preflight + 全量源码门 |
 | PRR-070 | 新 candidate/evidence 目录；原则上不再改 source/runner | 任一 source/runner 变化即作废重来 | 全量源码门、bundle/install/native/perf/visual 矩阵 |
 | PRR-080 | readiness manifest、acceptance request、验收索引 | 冻结后只读；不得修代码 | `pnpm quality -- --release-evidence <manifest>`、完整 Rust/审计门 |
 | PRR-090 | 独立 MM-110 与新 handoff | 只读冻结输入；发现问题退回对应 PRR | 独立 hash/预算/样本复算与高风险抽测 |
@@ -495,8 +498,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`READY / TWO_STAGE_OWNER_GATE`（PRR-065 独立审阅已接受并完成小修；旧 `caf1c20` 及其前后所有试跑候选/证据只读作废）
-依赖：PRR-000～065 已集成；包含本任务卡的当前 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`BLOCKED_BY_PRR-066`（source `0c8a93b` 阶段 A 在步骤6正确停止；该 candidate 与证据只读作废）
+依赖：PRR-000～066 已集成并经独立审阅；包含 PRR-066 的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标

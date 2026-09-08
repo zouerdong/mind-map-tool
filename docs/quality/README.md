@@ -14,6 +14,7 @@
 - [PRC-000～PRC-090 全面代码审阅](./pre-release-code-review-2026-09-07.md)：结论为 `REJECT / NOT_READY_TO_RELEASE`；旧候选、旧 MM-110 和旧交接包已降级为审计材料。
 - [终审整改开发指南](../planning/pre-release-remediation-development-guide-2026-09-07.md)与[任务卡](../planning/pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090 的实施与验收入口。
 - [PRR-000～050 实现审阅](./prr-000-050-implementation-review-2026-09-07.md)：实现层有条件接受；最终放行仍被负责人输入、PRR-030/060、冻结候选与 PRR-070～090 阻塞。
+- [PRR-070 阶段 A 性能审阅](./prr-070-stage-a-performance-review-2026-09-08.md)：`0c8a93b` 候选因 PNG/CSP、eager loading、RSS 协议和 warm 预算退回 PRR-066；canvas 实际18ms但旧报告口径不一致。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）
