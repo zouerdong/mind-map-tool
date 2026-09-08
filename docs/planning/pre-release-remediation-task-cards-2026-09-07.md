@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`PARTIAL_IMPLEMENTATION_REVIEWED / BLOCKED_BY_OWNER_INPUT`  
+状态：`IN_PROGRESS / PRR-065_READY`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -43,9 +43,10 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 3A | PRR-050 | 可与 030/060 并行，避开 PRR-010 的 Rust 冲突 | PRR-010 Rust 修改已集成 | active handle 生命周期 |
 | 3B | PRR-030 | 可与 050/060 并行 | 生产配置与最低系统版本明确授权 | bundle/文件关联 |
 | 3C | PRR-060 | 可与 030/050 并行 | PRR-020 资产集合冻结且法律文本到位 | LICENSE/notices |
-| 4 | PRR-070 | 不可并行 | 000～060 集成、clean commit、精确 G2 | 唯一新候选与原生证据 |
-| 5 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
-| 6 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
+| 4 | PRR-065 | 不可并行 | PRR-000～060 已集成；负责人要求打开即零菜单画布 | 零画布顶栏与原生命令承载 |
+| 5 | PRR-070 | 不可并行 | PRR-065 集成、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
+| 6 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
+| 7 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
 
 并行只表示逻辑上可并行；若多个 Agent 直接共享同一 checkout，则必须改为串行，避免未提交文件相互覆盖。
 
@@ -60,6 +61,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | PRR-040 | core command/history、UI font/geometry、对应测试 | 不修改 bundle/quality runner | typecheck、core/UI 专项、undo/redo、三格式导出 |
 | PRR-050 | Tauri file handle/coordinator/lifecycle、Rust tests | PRR-010 Rust 改动先集成 | 对 `apps/desktop/src-tauri/Cargo.toml` 运行 `cargo fmt --check`、`cargo test --locked`、`cargo clippy --locked --all-targets -- -D warnings` |
 | PRR-060 | LICENSE、THIRD_PARTY_NOTICES、许可 metadata/scanner/docs | bundle licenseFile 由 PRR-030 单点集成 | `pnpm license:scan`、build 后检查 app/DMG 携带文件 |
+| PRR-065 | 产品/架构文档、desktop command surface、原生菜单、关联测试 | 不改 core/schema/export/quality budget；完成后作废此前 PRR-070 试跑证据 | desktop/keyboard/menu/a11y/visual 专项 + 全量源码门 |
 | PRR-070 | 新 candidate/evidence 目录；原则上不再改 source/runner | 任一 source/runner 变化即作废重来 | 全量源码门、bundle/install/native/perf/visual 矩阵 |
 | PRR-080 | readiness manifest、acceptance request、验收索引 | 冻结后只读；不得修代码 | `pnpm quality -- --release-evidence <manifest>`、完整 Rust/审计门 |
 | PRR-090 | 独立 MM-110 与新 handoff | 只读冻结输入；发现问题退回对应 PRR | 独立 hash/预算/样本复算与高风险抽测 |
@@ -376,6 +378,119 @@ Save As、重新打开或窗口重建后，旧 document handle 不能继续驱�
 
 ---
 
+## PRR-065：零画布顶栏与 macOS 原生命令承载
+
+类型：产品视觉边界 / desktop command surface / 可访问性
+优先级：P0（PRR-070 新候选前必须完成）
+状态：`READY_FOR_IMPLEMENTATION`
+依赖：PRR-000～060 已集成；起点为 `main@89d7c76` 加本任务卡 planning patch
+后继：形成新的 clean source commit，然后从头执行 PRR-070
+
+### 负责人意图与本卡技术决议
+
+```text
+[from-user 2026-09-08]
+我的出发点是希望用户一打开这个程序，就是一张全干净的画布。看不到任何菜单。
+Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
+```
+
+本卡把“全干净”精确定义为：**生产 WebView 内容区打开后没有任何常驻菜单、顶栏、汉堡按钮、主题按钮、状态文字或自动 onboarding 遮罩；画布直接占满原生标题栏以下的全部内容区。**
+
+采用以下方案：
+
+1. 移除生产渲染树中的 40px `AppHeader`；不做 hover 自动显现，也不保留单个菜单按钮。
+2. 保留 macOS 标准原生标题栏、交通灯和屏幕顶部的系统应用菜单栏；不进入无边框、强制全屏、`LSUIElement` 或 private API 路线。
+3. 文件、编辑、视图、整理、主题、设置和帮助命令进入 macOS 原生应用菜单；既有快捷键继续可用，并与原生菜单共用同一个 renderer command dispatcher。
+4. 节点/边格式工具条只在有选择时出现；错误、冲突、恢复、导出、设置和引导只在用户动作或异常发生后临时出现。
+5. 首次启动不自动显示 onboarding；既有引导逻辑继续保留，只能由原生“帮助 → 开始/重放引导”或 `⌘⇧H` 显式打开。
+6. 文档名与 dirty 状态继续使用现有原生窗口标题（`● <name> — Mind Map`），不在画布内复制。
+7. React Flow attribution 沿用既有 G1 决定，`hideAttribution: false`；本卡不得隐藏、移动或以 CSS 遮盖。
+8. 本卡不新增可见 command palette、右键菜单或新依赖；Windows 原生命令表仅保持可移植契约，Windows 视觉实现继续 deferred。
+
+### 命令归属
+
+| 原生菜单 | 必需命令 | 约束 |
+| --- | --- | --- |
+| `Mind Map` | 关于、设置/全局热键、Services、Hide、Hide Others、Show All、Quit | Quit 继续走现有逐窗 fail-closed 关闭协议，不得恢复 AppKit 直接 terminate |
+| `文件` | 新建、打开、保存、另存为、导出、关闭窗口、新建窗口 | “新建当前文档”与“新建窗口”必须区分；不得绕过 dirty 确认和 handle/token 语义 |
+| `编辑` | 撤销、重做、剪切、复制、粘贴、全选 | textarea 编辑态使用原生文本语义；画布态使用 session/history；一次快捷键只执行一次 |
+| `视图` | 适应画布、整理、横向/纵向布局、暖白/黑板主题 | app-wide 菜单必须跟随最近聚焦窗口的文档主题和布局方向，不得把主题切换变成全局偏好 |
+| `帮助` | 开始/重放首次引导 | 首次启动不自动弹出；显式命令必须仍可完整启动引导 |
+
+应用级快捷键以 `apps/desktop/src/app/shortcut-table.md` 与 `keyboard.ts` 为单一事实源：`⌘N/O/S/⇧S/E/⇧L/⇧H`。画布 `⌘Z/⇧Z/A/±/0/L`、节点编辑与 IME 隔离规则保持不变；原生 accelerator 与 WebView `keydown` 不得双重派发。
+
+### 允许修改范围
+
+- `docs/product/v1-product-spec.md`
+- `docs/product/visual-state-tokens-2026-09-06.md`
+- `docs/architecture/visual-motion-architecture.md`
+- 新增 `docs/decisions/0012-zero-chrome-canvas-command-surface.md`
+- `apps/desktop/src/app/mindmap-app.tsx`
+- `apps/desktop/src/app/keyboard.ts`、`shortcut-table.md`
+- `apps/desktop/src/app/app-header.tsx`（只能解除生产引用或保留审计说明；未授权删除/重命名）
+- `apps/desktop/src-tauri/src/lib.rs`
+- 为单一命令 dispatcher、菜单状态同步或生命周期安全定向分发新增的 desktop/platform 单职责文件
+- 对应 TS/Rust/integration/a11y/visual tests 与 fixtures
+- 本任务卡、planning index、质量实现报告
+
+不得修改 core document schema、export renderer、字体、预算、readiness schema、G2/G-FINAL、生产 bundle identity、签名或发布配置。必须扩大范围时先返回 `BLOCKED`。
+
+### 红灯（先写）
+
+1. 空白启动、打开已有文档和新窗口三种情况下，WebView 中出现 `主工具条`、`文件 ▾`、`整理`、`视图`、主题按钮或 40px 顶部占位，测试必须失败。
+2. 首次偏好为 `not-started` 时自动出现 onboarding，测试必须失败；显式“帮助 → 开始引导”不能打开也必须失败。
+3. 任一原生菜单命令不可达、到达错误窗口、在窗口 closing/destroyed generation 上执行，必须失败。
+4. 一次 accelerator 同时触发 native event 与 renderer keydown，导致新建/保存/整理等执行两次，必须失败。
+5. dirty close、Save/Save As、open、export、快捷键、IME 或 textarea 原生编辑语义出现回归，必须失败。
+6. 原生菜单主题/布局 check state 与最近聚焦窗口不一致，或切换一个窗口污染另一个窗口，必须失败。
+7. 为了“干净”而隐藏 macOS 系统菜单栏、标题栏、React Flow attribution、异常提示或选择态工具条，必须失败。
+8. PRR-065 后继续引用 `caf1c20` 或任何此前 PRR-070 试跑 candidate/raw evidence，必须失败。
+
+### 实施顺序
+
+1. **规格先行**：新增 ADR 0012，记录零 WebView chrome、macOS 原生菜单、显式 onboarding、标准标题栏和 attribution 保留决定；同步产品视觉状态表与当前架构，删除“40px AppHeader 不破坏沉浸感”等过期事实。不得先改代码后补文档。
+2. 建立 typed `AppCommandId` 和单一 command dispatcher。现有 header callback、应用快捷键和原生菜单事件只能调用它，不能各自复制 new/open/save/export/organize/theme 业务逻辑。
+3. 扩展 Rust 原生 app menu 与稳定 menu item id。需要 renderer 状态的命令只定向发送给最近聚焦且 generation 有效、未 closing 的 WebView；`New Window` 与自定义 Quit 保留 host 生命周期所有权。
+4. 建立 renderer → host 的轻量菜单状态同步，仅同步 enable/check 所需的非敏感状态；主题和布局状态按窗口隔离。不得引入轮询、网络或持久化副本。
+5. 把应用级快捷键接到同一 dispatcher；明确 native accelerator 与 browser-dev keydown 的平台分工，保住输入控件/IME 隔离和 exactly-once。
+6. 从 `MindMapApp` 生产渲染树解除 `AppHeader`，让 `EditorCanvas` 直接占满内容区；窗口 title 的文档名/dirty 逻辑保留。没有文件删除授权，不删除或重命名 `app-header.tsx`，在交回风险中登记后续清理债务。
+7. 将 onboarding 改为 explicit-only：首次空白启动保持不可见，Help/`⌘⇧H` 触发 replay 后才显示；完成/跳过/本机偏好语义保持。
+8. 更新视觉与 a11y fixtures。视觉 golden 的变更只能来自顶栏消失和画布高度增加；节点、边、字体、主题 token、attribution 和导出 bytes 不得借机变化。
+9. 运行全部验证，提交一个新的本地 clean source commit；不得构建/冻结最终 PRR-070 候选，不得申请 G-FINAL 或开始 PRR-080。
+
+### 验收
+
+- 1080×864 暖白与黑板两张首次空白截图：原生标题栏下直接是画布，无 WebView 顶栏、菜单、按钮、状态文字或 onboarding；React Flow attribution 仍存在。
+- 浏览器/AX 树中不存在隐藏的 `主工具条` 或关闭菜单项；选择节点后 context toolbar 可见，取消选择后消失。
+- 原生菜单全部项目可由鼠标、键盘和 VoiceOver 发现；核心命令仅执行一次，目标始终是正确窗口。
+- 新建、打开、保存、另存为、导出、整理、fit、主题、设置、引导、dirty close 与多窗口定向测试全部通过。
+- 首次启动无 onboarding；Help/`⌘⇧H` 可以显式启动，完成与跳过偏好仍正确。
+- `document.title` 的文档名与 `●` dirty 标记通过；保存成功后 dirty 标记清除。
+- 无新增运行时依赖；`initial entry ≤ 500,000B`；license/network/boundary gate 不退化。
+- `pnpm format:check`、`pnpm typecheck`、`pnpm lint`、相关 Vitest/a11y/visual、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets --locked -- -D warnings`、`pnpm build` 全部返回 0。
+- 形成新的 clean source commit；`git status --short` 为空。交回报告明确声明旧 PRR-070 试跑候选与证据不可复用。
+
+### 交回物
+
+- `docs/quality/prr-065-implementation-report-2026-09-08.md`
+- ADR 0012、同步后的产品/架构文档
+- 逐文件变更表、命令/exit code/测试数量
+- 两主题首次空白视觉证据与 AX 结果
+- 原生菜单命令矩阵、focused-window/multi-window/exactly-once 结果
+- 新 clean source commit、`git status`、initial entry bytes
+- `NotRun`、残余风险与红线确认
+
+### STOP
+
+- 需要删除/重命名 `app-header.tsx`、历史截图、旧候选或任何目录但没有新的精确删除授权。
+- 需要隐藏 macOS 系统菜单栏、原生标题栏、React Flow attribution，或引入 private API/强制全屏。
+- 无法在 native accelerator 与 renderer keydown 之间保证 exactly-once。
+- 无法把 app-wide macOS 菜单安全定向到最近聚焦且 generation 有效的窗口。
+- 需要新增依赖、修改文档 schema/export bytes、提高预算、签名、公证、push、上传或公开发布。
+- 任一源码、测试或 runner 修改发生在 PRR-070 candidate 冻结之后；此时必须作废候选并回到 PRR-070 第一步。
+
+---
+
 ## PRR-070：新 unsigned 候选、原生矩阵与 G-FINAL
 
 类型：候选构建 / 原生验收  
@@ -489,6 +604,6 @@ Save As、重新打开或窗口重建后，旧 document handle 不能继续驱�
 
 1. 负责人先提供四组输入，并处理 PRR-000、PRR-030 授权项与 PRR-060 法律输入。
 2. 先独占执行 PRR-000，再按派发矩阵执行 PRR-010/020/040/050/030/060。
-3. 000～060 集成完成后形成 clean source commit。
-4. 串行执行 PRR-070 → G-FINAL → PRR-080，在 `READY_FOR_INDEPENDENT_REVIEW` 停止。
+3. 000～060 集成后执行 PRR-065；PRR-065 形成新的 clean source commit，旧 PRR-070 试跑证据全部作废。
+4. 从该 commit 串行执行 PRR-070 → G-FINAL → PRR-080，在 `READY_FOR_INDEPENDENT_REVIEW` 停止。
 5. 用户把冻结验收包交回当前审阅任务，由我执行 PRR-090；发布执行仍需另开任务和明确授权。

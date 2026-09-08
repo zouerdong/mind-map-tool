@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / OWNER_INPUTS_PROVIDED`（负责人四组输入已于 2026-09-08 提供，见 `docs/decisions/decision-register.json` G2 evidence `[from-user]`；PRR-000/030/060 已实现，产物级验证随 PRR-070）  
+状态：`IN_PROGRESS / PRR-065_READY`（负责人四组输入已于 2026-09-08 提供，见 `docs/decisions/decision-register.json` G2 evidence `[from-user]`；PRR-000/030/060 已实现；PRR-070 因新增零画布顶栏决定停止，须先完成 PRR-065）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -39,6 +39,8 @@ PRR-000 治理与证据基线
    ├─ PRR-050 active handle 生命周期
    └─ PRR-060 许可证与 notices
                 ↓
+PRR-065 零画布顶栏 + 原生命令承载
+                ↓
        clean source commit
                 ↓
 PRR-070 新候选 + 原生矩阵 + G-FINAL
@@ -48,17 +50,17 @@ PRR-080 全量门 + 冻结验收包
 PRR-090 独立终审 + 新交接包
 ```
 
-PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及生产 Tauri 配置，PRR-060 涉及法律文本，必须等待对应负责人输入。PRR-070、080、090 必须严格串行，且 PRR-090 不得交给参与 PRR-000～080 实现或证据生成的 Agent 自审。
+PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及生产 Tauri 配置，PRR-060 涉及法律文本，必须等待对应负责人输入。PRR-065 必须在新的 clean source commit 和 PRR-070 之前完成；PRR-070、080、090 必须严格串行，且 PRR-090 不得交给参与 PRR-000～080 实现或证据生成的 Agent 自审。
 
 ## 2.1 派发基线与工作区规则
 
-本轮审阅已在当前 working tree 中完成小修，但尚未形成新 commit。因此：
+截至 2026-09-08，执行 Agent 已把 PRR-000/030/060 与 PRR-070 试跑修复集成至 `main@89d7c76` 并停止；PRR-065 规划文档作为下一轮 working-tree 输入。因此：
 
-1. 执行 Agent 必须以“当前 working-tree snapshot”作为起点，不得只从 `main@541d38c` 新建一个不包含未提交审阅修复的 worktree。
-2. 如果任务系统只能从 commit/branch 创建 worktree，应先由负责人决定如何保存当前审阅 patch；不得由 Agent 用 reset/checkout 丢弃或覆盖现有修改。
+1. PRR-065 执行 Agent 必须以包含本任务卡的当前 working-tree snapshot 作为起点；不得退回 `541d38c` 或 `caf1c20`，也不得复用其候选/证据。
+2. 如果任务系统只能从 commit/branch 创建 worktree，应先保留当前规划 patch；不得用 reset/checkout 丢弃或覆盖。
 3. 每张卡只修改其“允许范围”；遇到其他卡已修改的文件先停止合并，报告冲突，不得用整文件覆盖。
 4. 执行 Agent 不得自行把规划状态、G2、G-FINAL、MM-110 或 handoff 改成通过。
-5. PRR-070 前必须形成 clean source commit；谁负责 commit、branch 合并与最终集成由负责人安排，本指南不自动授权 push/rebase。
+5. PRR-065 完成后必须形成新的 clean source commit，再从头执行 PRR-070；谁负责 commit、branch 合并与最终集成由负责人安排，本指南不自动授权 push/rebase。
 
 ## 2.2 负责人必须提供的四组输入
 
@@ -219,13 +221,14 @@ xcrun vtool -show-build <app-binary>
 
 ## 10. 最终验证顺序
 
-1. 从 clean source commit 运行 format、typecheck、lint、unit、integration、a11y、build、Rust fmt/test/clippy、boundaries、license、network、JS/Rust dependency advisory、golden、web performance、assets。advisory 工具与数据库版本必须记录；未安装工具不能写成 PASS。
-2. 通过强化的 bundle gate 构建新的 unsigned `.app`/`.dmg` 与 inventory。
-3. 对同一 hash 运行 native performance、install/LaunchServices、生命周期、快捷键、打开/保存/导出和 CSP 检查。
-4. 生成 native platform report JSON。
-5. 负责人实际查看/操作该候选并记录 G-FINAL。
-6. 最后生成 manifest；执行 `verify-evidence` 和全量 `pnpm quality -- --release-evidence ...`，冻结 PRR-080 验收包。
-7. 用户把冻结验收包交回本审阅任务，由未参与实现的验收者执行 PRR-090；只有 MM-110 `ACCEPT` 才生成新 handoff。
+1. 完成 PRR-065，确认生产 WebView 内没有常驻菜单/顶栏，核心命令已由 macOS 原生菜单与既有快捷键承载；形成新的 clean source commit。
+2. 从该 clean source commit 运行 format、typecheck、lint、unit、integration、a11y、build、Rust fmt/test/clippy、boundaries、license、network、JS/Rust dependency advisory、golden、web performance、assets。advisory 工具与数据库版本必须记录；未安装工具不能写成 PASS。
+3. 通过强化的 bundle gate 构建新的 unsigned `.app`/`.dmg` 与 inventory。
+4. 对同一 hash 运行 native performance、install/LaunchServices、生命周期、快捷键、打开/保存/导出和 CSP 检查。
+5. 生成 native platform report JSON。
+6. 负责人实际查看/操作该候选并记录 G-FINAL。
+7. 最后生成 manifest；执行 `verify-evidence` 和全量 `pnpm quality -- --release-evidence ...`，冻结 PRR-080 验收包。
+8. 用户把冻结验收包交回本审阅任务，由未参与实现的验收者执行 PRR-090；只有 MM-110 `ACCEPT` 才生成新 handoff。
 
 任何一步改变源码、runner 或候选 bytes，都回到第 1/2 步重新开始，不允许局部拼接旧证据。
 

@@ -16,13 +16,13 @@
 pub mod file;
 pub mod ipc;
 pub mod lifecycle;
+pub mod menu;
 pub mod perf;
 pub mod shortcuts;
 
 use std::sync::Arc;
 
-use tauri::menu::{MenuBuilder, MenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, RunEvent};
+use tauri::{Manager, RunEvent};
 
 use file::{FileLifecycleService, SystemClock};
 use ipc::TauriHostEffectSink;
@@ -31,42 +31,6 @@ use lifecycle::launch_coordinator::LaunchCoordinator;
 use lifecycle::runtime::LifecycleRuntime;
 use lifecycle::window_registry::WindowRegistry;
 use shortcuts::GlobalShortcutState;
-
-/// 构建应用菜单：macOS 标准 app 菜单（About/Services/Hide…）+ 自定义
-/// Quit（⌘Q）+「文件」子菜单（新建窗口：activation 语义，同 Dock/图标）+
-/// 基础编辑菜单（预定义项，保住 WKWebView 复制/粘贴/撤销）。
-/// 注意：菜单项不设 accelerator——画布内 ⌘N/⌘O 等由 renderer 键位表
-/// （shortcut-table.md）派发，避免系统级抢占改变既有键位语义。
-fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, "app-quit", "退出 Mind Map", true, Some("CmdOrCtrl+Q"))?;
-    let new_window = MenuItem::with_id(app, "app-new-window", "新建窗口", true, None::<&str>)?;
-    let app_menu = SubmenuBuilder::new(app, "Mind Map")
-        .about(None)
-        .separator()
-        .services()
-        .separator()
-        .hide()
-        .hide_others()
-        .show_all()
-        .separator()
-        .item(&quit)
-        .build()?;
-    let file_menu = SubmenuBuilder::new(app, "文件").item(&new_window).build()?;
-    let edit_menu = SubmenuBuilder::new(app, "编辑")
-        .undo()
-        .redo()
-        .separator()
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
-        .build()?;
-    let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &file_menu, &edit_menu])
-        .build()?;
-    app.set_menu(menu)?;
-    Ok(())
-}
 
 pub fn run() {
     let service = Arc::new(FileLifecycleService::new());
@@ -110,7 +74,8 @@ pub fn run() {
         .manage(service)
         .manage(runtime.clone())
         .manage(close_store.clone())
-        .manage(GlobalShortcutState::new());
+        .manage(GlobalShortcutState::new())
+        .manage(Arc::new(menu::MenuState::new()));
     // PRR-010 perf state：仅启用时注册。命令签名的 State<Arc<PerfProbe>>
     // 按 TypeId 解析——此前误把 Option<PerfProbe> 交给 manage，命令永远
     // 解析不到 state，invoke 失败被前端 catch 成"未启用"，renderer-ready
@@ -127,11 +92,10 @@ pub fn run() {
                     shortcuts::install(app.handle(), &config_dir);
                 }
                 // 应用菜单（MRT-003 X2）：macOS 默认菜单的 Quit 是 AppKit
-                // 预定义项——⌘Q 直接 terminate，绕过 CloseRequested/
-                // ExitRequested，dirty 文档会被无提示杀死。替换为自定义
-                // Quit 项：菜单事件逐窗 window.close()，走与红关闭按钮
-                // 完全相同的 fail-closed 关闭协议。
-                install_app_menu(app.handle())?;
+                // PRR-065 / ADR 0012：标准 macOS 应用菜单承载全部命令
+                // （Mind Map / 文件 / 编辑 predefined / 视图 / 帮助）；
+                // Quit 继续走逐窗 fail-closed 关闭协议。
+                menu::install_app_menu(app.handle())?;
                 // cold argv 统一入队 + 首次 drain（静态 main WebView 已由
                 // builder 创建；emit 未达 listener 由 ready 快照承接）。
                 let sink = TauriHostEffectSink::new(app.handle().clone());
@@ -144,20 +108,42 @@ pub fn run() {
             }
         })
         .on_menu_event(|app, event| {
-            match event.id().as_ref() {
-                "app-quit" => {
+            let id = event.id().as_ref().to_string();
+            match id.as_str() {
+                menu::MENU_APP_QUIT => {
                     for (_, window) in app.webview_windows() {
                         let _ = window.close(); // → CloseRequested → 三分支协议
                     }
                 }
                 // 菜单「新建窗口」：activation（同 Dock/图标语义；D1）。
-                "app-new-window" => {
+                menu::MENU_APP_NEW_WINDOW => {
                     let sink = TauriHostEffectSink::new(app.clone());
                     if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
                         runtime.ingest_activation(&sink);
                     }
                 }
-                _ => {}
+                // 关闭最近聚焦窗口（⇧⌘W）：原生 close → CloseRequested 协议。
+                menu::MENU_FILE_CLOSE_WINDOW => {
+                    let target = app
+                        .try_state::<GlobalShortcutState>()
+                        .and_then(|s| s.recent_focused_label())
+                        .or_else(|| app.get_webview_window("main").map(|_| "main".to_string()));
+                    match target
+                        .as_deref()
+                        .and_then(|label| app.get_webview_window(label))
+                    {
+                        Some(window) => {
+                            let _ = window.close();
+                        }
+                        None => eprintln!("[menu] 关闭窗口：无可关闭窗口，丢弃"),
+                    }
+                }
+                // renderer 命令：定向投递给最近聚焦且 generation 有效的窗口。
+                _ => {
+                    if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
+                        menu::forward_menu_command(app, &runtime, &id);
+                    }
+                }
             }
         })
         .on_window_event({
@@ -216,13 +202,19 @@ pub fn run() {
                         }
                     }
                     // D4：跟踪最近一次真实 Focused 的窗口 label（多窗热键
-                    // 分流目标；失焦不清除）。
+                    // 分流目标；失焦不清除）。PRR-065：app-wide 菜单 check
+                    // 状态同步跟随最近聚焦窗口的快照。
                     tauri::WindowEvent::Focused(focused) if *focused => {
                         if let Some(state) = window
                             .app_handle()
                             .try_state::<crate::shortcuts::GlobalShortcutState>()
                         {
                             state.on_focused(window.label(), *focused);
+                        }
+                        if let Some(menu_state) =
+                            window.app_handle().try_state::<Arc<menu::MenuState>>()
+                        {
+                            menu_state.on_window_focused(window.label());
                         }
                     }
                     _ => {}
@@ -253,6 +245,8 @@ pub fn run() {
             ipc::platform_resolve_shortcut_invocation,
             ipc::platform_pending_close_request,
             ipc::platform_resolve_close_request,
+            // 菜单状态同步（PRR-065）
+            ipc::platform_sync_menu_state,
             // perf 诊断（PRR-010；未启用时返回 None/错误，不影响生产）
             ipc::platform_get_perf_probe_config,
             ipc::platform_report_perf_event,

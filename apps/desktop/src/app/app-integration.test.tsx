@@ -107,31 +107,31 @@ describe("保存闭环（AC-04/06）", () => {
   it("新建 → 画布创建节点（dirty）→ 保存自动转 Save As → clean；再次编辑后 ordinary save 不再弹选址", async () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
-    expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
+    expect(document.title.startsWith("● ")).toBeTruthy();
 
     filePort.nextSaveDialog = "/docs/new-1.json";
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已保存 \/docs\/new-1\.json/)).toBeTruthy());
     expect(filePort.saveDialogCalls).toBe(1); // Save As 弹过一次
-    expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
+    expect(document.title.startsWith("● ")).toBeFalsy();
 
     // 再次编辑（创建第二个节点）→ ordinary save：对话框计数不变
     fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 120, clientY: 80 });
-    await waitFor(() => expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
-    fireEvent.click(screen.getByText("保存"));
-    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeFalsy());
     expect(filePort.saveDialogCalls).toBe(1); // ★ 不重复弹选址对话框
   });
 
   it("open → edit → ordinary save 不弹选址（AC-06 核心路径）", async () => {
     const { filePort } = setup();
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
     expect(filePort.openDialogCalls).toBe(1);
 
     await createNodeViaCanvas(); // 编辑
-    fireEvent.click(screen.getByText("保存"));
-    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeFalsy());
     expect(filePort.openDialogCalls).toBe(1);
     expect(filePort.saveDialogCalls).toBe(0); // ★ ordinary save 全程无选址对话框
   });
@@ -140,35 +140,35 @@ describe("保存闭环（AC-04/06）", () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
     filePort.nextSaveDialog = "/docs/saveas.json";
-    fireEvent.click(screen.getByText("另存为…"));
+    fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText(/已保存 \/docs\/saveas\.json/)).toBeTruthy());
 
     fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 10, clientY: 200 });
-    await waitFor(() => expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());
     filePort.nextSaveDialog = null; // 若误弹 → requestTargetAuthorization 返回 null → 保存取消（可检测）
-    fireEvent.click(screen.getByText("保存"));
-    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeFalsy());
     expect(filePort.saveDialogCalls).toBe(1); // ★ 只有 Save As 弹过
   });
 
   it("CR-001 回归：已有目标时连续两次保存不弹 Save As，恰好提交两次", async () => {
     const { filePort } = setup();
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
     await createNodeViaCanvas(); // dirty
 
-    fireEvent.click(screen.getByText("保存")); // 第一次：捕获快照并提交（异步未完成）
-    fireEvent.click(screen.getByText("保存")); // 第二次：提交进行中 → 应排队而非弹 Save As
-    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    fireEvent.keyDown(window, { key: "s", metaKey: true }); // 第一次：捕获快照并提交（异步未完成）
+    fireEvent.keyDown(window, { key: "s", metaKey: true }); // 第二次：提交进行中 → 应排队而非弹 Save As
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeFalsy());
     expect(filePort.saveDialogCalls).toBe(0); // ★ 第二次普通保存不得弹选址对话框
     await waitFor(() => expect(filePort.commitCalls).toBe(2)); // ★ 恰好两次提交，队列最终为 0
-    expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
+    expect(document.title.startsWith("● ")).toBeFalsy();
   }, 10_000);
 
   it('MRT-001A：保存 pending 时新建/打开被 gate——busy 提示、不弹 discard、不开对话框；完成后无"已新建"notice 且可重试', async () => {
     const filePort = new HoldingFilePort();
     setup(filePort);
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
     expect(filePort.openDialogCalls).toBe(1);
     await createNodeViaCanvas(); // dirty
@@ -178,31 +178,31 @@ describe("保存闭环（AC-04/06）", () => {
       release = resolve;
     });
     filePort.holdNextCommit(gate);
-    fireEvent.click(screen.getByText("保存")); // 提交挂起 → in-flight pending
+    fireEvent.keyDown(window, { key: "s", metaKey: true }); // 提交挂起 → in-flight pending
     await waitFor(() => expect(filePort.arrivedCalls).toBe(1));
 
     // ★ 新建被 gate：busy 非致命提示，不弹 discard 确认，文档未替换
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
     await waitFor(() =>
       expect(screen.getByTestId("app-notice").textContent).toContain("保存尚未完成"),
     );
     expect(screen.queryByTestId("dirty-confirm")).toBeNull();
-    expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy(); // dirty 保持
+    expect(document.title.startsWith("● ")).toBeTruthy(); // dirty 保持
 
     // ★ 打开同样被 gate：不弹文件对话框
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     expect(filePort.openDialogCalls).toBe(1); // 计数不变（无新对话框）
     expect(screen.queryByTestId("dirty-confirm")).toBeNull();
 
     // ★ 保存链自然终态：notice 是"已保存"，不出现"已新建/已打开"（场景 9）
     release();
-    await waitFor(() => expect(screen.getByText("已保存 · 浏览器 dev（fake 端口）")).toBeTruthy());
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeFalsy());
     expect(screen.getByTestId("app-notice").textContent).toContain("已保存 /docs/a.json");
     expect(screen.queryByText(/已新建空白文档/)).toBeNull();
     expect(screen.queryByText(/已打开/)).toBeNull();
 
     // ★ 终态后重试新建成功（clean → 不弹 discard）
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
     expect(screen.queryByTestId("dirty-confirm")).toBeNull();
     expect(filePort.commitCalls).toBe(1); // 全程恰好 1 次提交
@@ -212,18 +212,18 @@ describe("保存闭环（AC-04/06）", () => {
 describe("外部冲突（AC-08 应用层语义）", () => {
   it("外部修改后保存：不覆盖、dirty 保持、明确提示", async () => {
     const { filePort } = setup();
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已打开/)).toBeTruthy());
 
     await createNodeViaCanvas();
     // 模拟外部修改同一文件
     filePort.writeFile("/docs/a.json", encodeDocument(docWithNode("被外部改写")));
 
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
     await waitFor(() => expect(screen.getByText(/文件在应用外被修改或删除/)).toBeTruthy());
     // 未覆盖：文件内容仍是外部版本；应用侧 dirty 保持
     expect(new TextDecoder().decode(filePort.files.get("/docs/a.json")!)).toContain("被外部改写");
-    expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy();
+    expect(document.title.startsWith("● ")).toBeTruthy();
   });
 });
 
@@ -232,7 +232,7 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     const { filePort, renderer } = setup();
     await createNodeViaCanvas();
 
-    fireEvent.click(screen.getByRole("button", { name: "导出" }));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     const panel = await screen.findByTestId("export-panel");
 
     filePort.nextSaveDialog = "/out/map.svg";
@@ -241,7 +241,7 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     expect(filePort.files.get("/out/map.svg")).toBeTruthy();
     expect(renderer.rendered.at(-1)?.format).toBe("svg");
 
-    fireEvent.click(screen.getByRole("button", { name: "导出" }));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/map.png";
     fireEvent.click(
       (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-png"]')!,
@@ -249,7 +249,7 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.png/)).toBeTruthy());
     expect(renderer.rendered.at(-1)?.format).toBe("png");
 
-    fireEvent.click(screen.getByRole("button", { name: "导出" }));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/map.pdf";
     fireEvent.click(
       (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-pdf"]')!,
@@ -259,11 +259,11 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     void panel;
 
     // 空文档：新建（丢弃）→ 导出被拒绝且不请求授权
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
     fireEvent.click(await screen.findByTestId("confirm-discard"));
     await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
     const calls = filePort.saveDialogCalls;
-    fireEvent.click(screen.getByRole("button", { name: "导出" }));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     fireEvent.click(
       (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!,
     );
@@ -297,13 +297,13 @@ describe("dirty 确认与标题（PRD §5-6/AC-09）", () => {
     setup();
     await createNodeViaCanvas();
 
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
     expect(await screen.findByTestId("dirty-confirm")).toBeTruthy();
     fireEvent.click(screen.getByTestId("confirm-cancel"));
     await waitFor(() => expect(screen.queryByTestId("dirty-confirm")).toBeNull());
-    expect(screen.getByText("未保存 · 浏览器 dev（fake 端口）")).toBeTruthy(); // 修改保留
+    expect(document.title.startsWith("● ")).toBeTruthy(); // 修改保留
 
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
     fireEvent.click(await screen.findByTestId("confirm-discard"));
     await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
   });
@@ -311,7 +311,7 @@ describe("dirty 确认与标题（PRD §5-6/AC-09）", () => {
   it("窗口标题随 dirty/文件名变化", async () => {
     const { filePort } = setup();
     expect(document.title).toContain("未命名");
-    fireEvent.click(screen.getByText("打开…"));
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
     await waitFor(() => expect(document.title).toContain("a.json"));
     await createNodeViaCanvas();
     await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());

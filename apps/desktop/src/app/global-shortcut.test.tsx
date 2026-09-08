@@ -53,7 +53,9 @@ function setup(conflictWith: string | null = null) {
 describe("全局热键设置（AC-16 应用层）", () => {
   it("打开设置显示当前热键；修改成功后提示并关闭", async () => {
     const { shortcut } = setup();
-    fireEvent.click(screen.getByRole("button", { name: /热键…/ }));
+    (
+      window as typeof window & { __mmDispatchAppCommand: (id: string) => boolean }
+    ).__mmDispatchAppCommand("app.shortcuts");
     const input = (await screen.findByTestId("shortcut-input")) as HTMLInputElement;
     expect(input.value).toBe("Alt+Space"); // 定稿默认（键位专项讨论 2026-08-29）
 
@@ -68,7 +70,9 @@ describe("全局热键设置（AC-16 应用层）", () => {
 
   it("冲突：稳定错误提示，面板保留可重试，应用不崩", async () => {
     setup("CmdOrCtrl+Shift+B");
-    fireEvent.click(screen.getByRole("button", { name: /热键…/ }));
+    (
+      window as typeof window & { __mmDispatchAppCommand: (id: string) => boolean }
+    ).__mmDispatchAppCommand("app.shortcuts");
     const input = (await screen.findByTestId("shortcut-input")) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "CmdOrCtrl+Shift+B" } });
     fireEvent.click(screen.getByTestId("shortcut-apply"));

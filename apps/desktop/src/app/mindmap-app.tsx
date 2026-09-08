@@ -18,8 +18,14 @@ import {
   OnboardingFlow,
   type OnboardingObservation,
 } from "@mindmap/ui";
-import { AppHeader } from "./app-header.js";
 import { AppNotice } from "./app-notice.js";
+import {
+  createAppCommandListenerBridge,
+  type AppCommandHandlers,
+  dispatchAppCommand,
+  shouldDispatchShortcutViaKeydown,
+  shortcutActionToCommandId,
+} from "./app-commands.js";
 import {
   createTauriBootstrapPorts,
   WindowBootstrapAdapter,
@@ -119,6 +125,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
   // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
   const [quickCreateSignal, setQuickCreateSignal] = useState(0);
+  // PRR-065：onboarding 条件挂载——首启（not-started）不自动出示；
+  // in-progress 续跑保留；help.onboarding（帮助菜单/⌘⇧H）显式挂载+重放。
+  const [onboardingMounted, setOnboardingMounted] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmState, setConfirmState] = useState<PendingConfirm>(null);
   // 原生关闭三分支（MRT-003）：closeState 同步镜像到 ref，供 async 流程
@@ -237,6 +246,25 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     () => createOnboardingPreferences(ports.preferences),
     [ports.preferences],
   );
+
+  // PRR-065：onboarding 条件挂载（ADR 0012 §7）——not-started 首启不自动
+  // 出示（打开即全干净画布）；in-progress 中断续跑保留；读取失败按
+  // not-started 保守处理（不挂载，等待显式打开）。显式入口统一经
+  // help.onboarding 命令（帮助菜单 / ⌘⇧H）。
+  useEffect(() => {
+    let cancelled = false;
+    void onboardingPreferences
+      .load()
+      .then((status) => {
+        if (!cancelled && status !== "not-started") setOnboardingMounted(true);
+      })
+      .catch(() => {
+        /* 读取失败：保守不挂载；偏好警告由 OnboardingFlow 自身路径提示 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onboardingPreferences]);
 
   const confirmDiscard = useCallback(
     (message: string) =>
@@ -624,42 +652,101 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     [bump],
   );
 
+  // ---- 单一命令 dispatcher（PRR-065 / ADR 0012） ----
+  // 原生菜单事件（app-command bridge）、应用级快捷键（浏览器 dev keydown）
+  // 与既有 UI 回调全部经由 dispatchCommand；业务逻辑零复制。
+  // close modal 是文件生命周期的互斥决策面；禁止其背后的 New/Open/Save
+  // 命令制造新的文档或保存竞态。Cancel 后恢复正常（原快捷键守卫语义）。
+  const commandHandlers = useMemo<AppCommandHandlers>(
+    () => ({
+      "file.new": () => void onNew(),
+      "file.open": () => void onOpen(),
+      "file.save": () => void onSave(),
+      "file.save-as": () => void onSaveAs(),
+      "file.export-panel": () => setExportPanel((v) => !v),
+      "view.fit": () => setFitViewSignal((n) => n + 1),
+      "view.organize": () => onOrganize(),
+      "view.layout-horizontal": () => setOrganizeDirection("horizontal"),
+      "view.layout-vertical": () => setOrganizeDirection("vertical"),
+      "view.theme-warm": () => {
+        session.commit({ kind: "SetDocumentStyle", theme: "light" });
+        bump();
+      },
+      "view.theme-dark": () => {
+        session.commit({ kind: "SetDocumentStyle", theme: "dark" });
+        bump();
+      },
+      "app.shortcuts": () => void openShortcutPanel(),
+      "help.onboarding": () => {
+        setOnboardingMounted(true);
+        setReplaySignal((n) => n + 1);
+      },
+    }),
+    [onNew, onOpen, onSave, onSaveAs, onOrganize, openShortcutPanel, session, bump],
+  );
+  const dispatchCommand = useCallback(
+    (id: string): boolean => {
+      if (closeStateRef.current !== null) return false;
+      return dispatchAppCommand(id, commandHandlers);
+    },
+    [commandHandlers],
+  );
+
   // ---- 全局快捷键（输入/IME 隔离见 keyboard.ts） ----
+  // exactly-once 分工（ADR 0012 §5）：Tauri 生产环境应用级快捷键由 macOS
+  // 原生菜单 accelerator 拦截（唯一 menu event）；keydown 仅浏览器 dev 派发。
   useEffect(() => {
+    if (!shouldDispatchShortcutViaKeydown(isTauriRuntime())) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const shortcut = normalizeShortcut(e);
       if (!shortcut) return;
       e.preventDefault();
-      // close modal 是文件生命周期的互斥决策面；禁止其背后的 New/Open/Save
-      // 快捷键制造新的文档或保存竞态。Cancel 后恢复正常。
-      if (closeStateRef.current !== null) return;
-      switch (shortcut.action) {
-        case "new":
-          void onNew();
-          break;
-        case "open":
-          void onOpen();
-          break;
-        case "save":
-          void onSave();
-          break;
-        case "save-as":
-          void onSaveAs();
-          break;
-        case "export-panel":
-          setExportPanel((v) => !v);
-          break;
-        case "replay-onboarding":
-          setReplaySignal((n) => n + 1);
-          break;
-        case "organize":
-          onOrganize();
-          break;
-      }
+      dispatchCommand(shortcutActionToCommandId(shortcut.action));
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onNew, onOpen, onSave, onSaveAs, onOrganize]);
+  }, [dispatchCommand]);
+
+  // ---- 原生菜单命令桥接（Tauri 生产：host 定向 emit → dispatcher） ----
+  const dispatchCommandRef = useRef(dispatchCommand);
+  dispatchCommandRef.current = dispatchCommand;
+  useEffect(() => {
+    if (!isTauriRuntime()) return; // 浏览器 dev 无原生菜单
+    // webview 定向 listener：只收发给本 WebView 的事件（多窗口不串扰；
+    // tauri v2 中 emit_to(WebviewWindow) 的事件不触发普通全局 listen）。
+    // webviewWindow API 动态 import：不占 entry 预算（RLS-013）；测试 mock
+    // 环境无 getCurrentWebviewWindow 时回退普通 listen（行为等价）。
+    const listenWebview: (
+      event: string,
+      handler: (payload: { payload: unknown }) => void,
+    ) => Promise<() => void> = async (event, handler) => {
+      try {
+        const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const webview = getCurrentWebviewWindow();
+        if (webview) {
+          return webview.listen(event, (e) => handler({ payload: e.payload }));
+        }
+      } catch {
+        /* fallthrough：mock 环境无 webview window */
+      }
+      return listen(event, (e) => handler({ payload: e.payload }));
+    };
+    return createAppCommandListenerBridge((id) => dispatchCommandRef.current(id), listenWebview);
+  }, []);
+
+  // ---- 浏览器 dev / 测试命令通道（PRR-065） ----
+  // 生产（Tauri）命令经原生菜单；浏览器 dev 无菜单，暴露非可见的
+  // dispatch 通道供开发调试与 jsdom 集成测试驱动（view.fit / app.shortcuts
+  // 等无键盘绑定的命令）。不构成 WebView chrome。
+  useEffect(() => {
+    const w = window as typeof window & {
+      __mmDispatchAppCommand?: (id: string) => boolean;
+    };
+    w.__mmDispatchAppCommand = (id: string) => dispatchCommandRef.current(id);
+    return () => {
+      delete w.__mmDispatchAppCommand;
+    };
+  }, []);
 
   // ---- 全局热键 Pre-Focus 两阶段协议（PRC-030 / ADR 0011）：
   // 阶段 1：响应 host 的 pre-focus probe，此时 host 尚未聚焦窗口，读取真实 document.hasFocus()；
@@ -914,213 +1001,196 @@ export function MindMapApp({ ports }: MindMapAppProps) {
 
   const theme = session.current.document.document.theme;
 
+  // PRR-065：菜单 check 状态同步（非敏感：主题/布局方向）。挂载与变化时
+  // 上报 host；host 按窗口缓存并在聚焦切换时刷新 app-wide 菜单。失败
+  // 只影响勾选显示，不阻塞编辑。Promise.resolve 包装：测试 mock 的
+  // invoke 可能不返回 Promise，容错不阻塞主流程。
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    void Promise.resolve(
+      invoke("platform_sync_menu_state", { payload: { theme, organizeDirection } }),
+    ).catch(() => {});
+  }, [theme, organizeDirection]);
+
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <AppHeader
-        theme={theme}
-        docName={session.displayPath?.split(/[\\/]/).pop() ?? "未命名"}
-        isDirty={session.isDirty}
-        statusSuffix={ports.isBrowserDev ? " · 浏览器 dev（fake 端口）" : ""}
-        onNew={() => void onNew()}
-        onOpen={() => void onOpen()}
-        onSave={() => void onSave()}
-        onSaveAs={() => void onSaveAs()}
-        onExport={(f) => void onExport(f)}
-        onOpenExportPanel={() => setExportPanel((v) => !v)}
-        onOrganize={onOrganize}
+    // PRR-065 / ADR 0012：生产内容区零常驻 chrome——EditorCanvas 直接占满
+    // 原生标题栏以下全部区域；命令经原生菜单/快捷键进入 dispatchCommand。
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <EditorCanvas
+        session={session}
+        fonts={ports.fonts}
+        geometryBarrier={geometryBarrier}
+        activeEditorRef={activeEditorRef}
+        revision={revision}
+        quickCreateSignal={quickCreateSignal}
+        fitViewSignal={fitViewSignal}
+        organizeSignal={organizeSignal}
         organizeDirection={organizeDirection}
-        onToggleOrganizeDirection={() =>
-          setOrganizeDirection((d) => (d === "horizontal" ? "vertical" : "horizontal"))
-        }
-        onFitView={() => setFitViewSignal((n) => n + 1)}
-        onOpenShortcutPanel={() => void openShortcutPanel()}
-        onReplayOnboarding={() => setReplaySignal((n) => n + 1)}
-        onThemeCommand={(cmd) => {
-          session.commit(cmd);
-          bump();
-        }}
+        onOrganizeResult={handleOrganizeResult}
       />
 
-      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        <EditorCanvas
-          session={session}
-          fonts={ports.fonts}
-          geometryBarrier={geometryBarrier}
-          activeEditorRef={activeEditorRef}
-          revision={revision}
-          quickCreateSignal={quickCreateSignal}
-          fitViewSignal={fitViewSignal}
-          organizeSignal={organizeSignal}
-          organizeDirection={organizeDirection}
-          onOrganizeResult={handleOrganizeResult}
-        />
+      <AppNotice notice={notice} theme={theme} onDismiss={() => setNotice(null)} />
 
-        <AppNotice notice={notice} theme={theme} onDismiss={() => setNotice(null)} />
-
-        {/* bootstrap report-pending（W2R R3）：动作已完成但终态回报未送达
+      {/* bootstrap report-pending（W2R R3）：动作已完成但终态回报未送达
             host——显式一次重报；不自动 timer、不重跑 action。 */}
-        {pendingReports.length > 0 ? (
-          <div
-            role="alert"
-            data-testid="pending-reports"
-            style={{
-              position: "absolute",
-              top: 12,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 35,
-              maxWidth: "80%",
-              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
-              borderRadius: 10,
-              padding: "9px 14px",
-              background: "#6b4f00",
-              color: "#fff",
-              fontSize: 13,
-              display: "grid",
-              gap: 6,
-            }}
-          >
-            {pendingReports.map((report) => (
-              <div
-                key={report.deliveryId}
-                style={{ display: "flex", gap: 8, alignItems: "center" }}
-              >
-                <span data-testid={`pending-report-${report.deliveryId}`}>
-                  {`启动回报待重发（${report.deliveryId}）：${report.outcomeText}`}
-                </span>
-              </div>
-            ))}
-            <div>
-              <button
-                type="button"
-                data-testid="retry-bootstrap-report"
-                onClick={() => void onRetryPendingReports()}
-              >
-                重试启动回报
-              </button>
+      {pendingReports.length > 0 ? (
+        <div
+          role="alert"
+          data-testid="pending-reports"
+          style={{
+            position: "absolute",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 35,
+            maxWidth: "80%",
+            boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+            borderRadius: 10,
+            padding: "9px 14px",
+            background: "#6b4f00",
+            color: "#fff",
+            fontSize: 13,
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          {pendingReports.map((report) => (
+            <div key={report.deliveryId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span data-testid={`pending-report-${report.deliveryId}`}>
+                {`启动回报待重发（${report.deliveryId}）：${report.outcomeText}`}
+              </span>
             </div>
-          </div>
-        ) : null}
-
-        {/* host launch retryable 错误（MRT-004 Wave 2 §5D2）：最小功能性
-            错误 UI——reason + 重试/放弃；不自动重试、不自旋。 */}
-        {launchErrors.length > 0 ? (
-          <div
-            role="alert"
-            data-testid="launch-errors"
-            style={{
-              position: "absolute",
-              top: 12,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 35,
-              maxWidth: "80%",
-              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
-              borderRadius: 10,
-              padding: "9px 14px",
-              background: "#5a2119",
-              color: "#fff",
-              fontSize: 13,
-              display: "grid",
-              gap: 6,
-            }}
-          >
-            {launchErrors.map((error) => (
-              <div key={error.intentId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span data-testid={`launch-error-${error.intentId}`}>
-                  {`打开操作失败：${error.reason}`}
-                </span>
-                <button
-                  type="button"
-                  aria-label="重试打开"
-                  onClick={() => void onRetryLaunchError(error.intentId)}
-                >
-                  重试
-                </button>
-                <button
-                  type="button"
-                  aria-label="放弃打开"
-                  onClick={() => void onDismissLaunchError(error.intentId)}
-                >
-                  放弃
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {/* post-commit recovery（§4.3）：已写入目标文件、窗口状态恢复待
-            完成——不显示为保存失败；提供一次显式恢复。 */}
-        {pendingRecovery ? (
-          <div
-            role="status"
-            data-testid="pending-recovery"
-            style={{
-              position: "absolute",
-              top: 12,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 35,
-              maxWidth: "80%",
-              boxShadow: "0 8px 24px rgba(0,0,0,.2)",
-              borderRadius: 10,
-              padding: "9px 14px",
-              background: "#6b4f00",
-              color: "#fff",
-              fontSize: 13,
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
-            <span>{`已保存 ${pendingRecovery.displayPath}；${pendingRecovery.cause}。完成恢复前本窗口暂不能再次保存。`}</span>
+          ))}
+          <div>
             <button
               type="button"
-              data-testid="resolve-recovery"
-              onClick={() => void onResolveRecovery()}
+              data-testid="retry-bootstrap-report"
+              onClick={() => void onRetryPendingReports()}
             >
-              完成恢复
+              重试启动回报
             </button>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {exportPanel ? (
-          <div
-            role="dialog"
-            aria-label="导出"
-            data-testid="export-panel"
-            style={{
-              position: "absolute",
-              right: 12,
-              top: 12,
-              padding: 12,
-              border: `1px solid ${theme === "dark" ? "#35312A" : "#E3DFD5"}`,
-              background: theme === "dark" ? "#211E18" : "#FFFDF9",
-              color: theme === "dark" ? "#EFEAE0" : "#3B372F",
-              borderRadius: 8,
-              display: "grid",
-              gap: 8,
-              zIndex: 35,
-              boxShadow: "0 8px 24px rgba(0,0,0,.18)",
-            }}
-          >
-            <strong>导出当前脑图</strong>
-            {(["svg", "png", "pdf"] as const).map((f) => (
+      {/* host launch retryable 错误（MRT-004 Wave 2 §5D2）：最小功能性
+            错误 UI——reason + 重试/放弃；不自动重试、不自旋。 */}
+      {launchErrors.length > 0 ? (
+        <div
+          role="alert"
+          data-testid="launch-errors"
+          style={{
+            position: "absolute",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 35,
+            maxWidth: "80%",
+            boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+            borderRadius: 10,
+            padding: "9px 14px",
+            background: "#5a2119",
+            color: "#fff",
+            fontSize: 13,
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          {launchErrors.map((error) => (
+            <div key={error.intentId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span data-testid={`launch-error-${error.intentId}`}>
+                {`打开操作失败：${error.reason}`}
+              </span>
               <button
-                key={f}
                 type="button"
-                onClick={() => void onExport(f)}
-                data-testid={`export-${f}`}
+                aria-label="重试打开"
+                onClick={() => void onRetryLaunchError(error.intentId)}
               >
-                {f.toUpperCase()}
+                重试
               </button>
-            ))}
-            <button type="button" onClick={() => setExportPanel(false)}>
-              取消
+              <button
+                type="button"
+                aria-label="放弃打开"
+                onClick={() => void onDismissLaunchError(error.intentId)}
+              >
+                放弃
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* post-commit recovery（§4.3）：已写入目标文件、窗口状态恢复待
+            完成——不显示为保存失败；提供一次显式恢复。 */}
+      {pendingRecovery ? (
+        <div
+          role="status"
+          data-testid="pending-recovery"
+          style={{
+            position: "absolute",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 35,
+            maxWidth: "80%",
+            boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+            borderRadius: 10,
+            padding: "9px 14px",
+            background: "#6b4f00",
+            color: "#fff",
+            fontSize: 13,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
+          <span>{`已保存 ${pendingRecovery.displayPath}；${pendingRecovery.cause}。完成恢复前本窗口暂不能再次保存。`}</span>
+          <button
+            type="button"
+            data-testid="resolve-recovery"
+            onClick={() => void onResolveRecovery()}
+          >
+            完成恢复
+          </button>
+        </div>
+      ) : null}
+
+      {exportPanel ? (
+        <div
+          role="dialog"
+          aria-label="导出"
+          data-testid="export-panel"
+          style={{
+            position: "absolute",
+            right: 12,
+            top: 12,
+            padding: 12,
+            border: `1px solid ${theme === "dark" ? "#35312A" : "#E3DFD5"}`,
+            background: theme === "dark" ? "#211E18" : "#FFFDF9",
+            color: theme === "dark" ? "#EFEAE0" : "#3B372F",
+            borderRadius: 8,
+            display: "grid",
+            gap: 8,
+            zIndex: 35,
+            boxShadow: "0 8px 24px rgba(0,0,0,.18)",
+          }}
+        >
+          <strong>导出当前脑图</strong>
+          {(["svg", "png", "pdf"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => void onExport(f)}
+              data-testid={`export-${f}`}
+            >
+              {f.toUpperCase()}
             </button>
-          </div>
-        ) : null}
-      </div>
+          ))}
+          <button type="button" onClick={() => setExportPanel(false)}>
+            取消
+          </button>
+        </div>
+      ) : null}
 
       {shortcutPanel ? (
         <div
@@ -1308,13 +1378,17 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         </div>
       ) : null}
 
-      <OnboardingFlow
-        observeCommands={observeCommands}
-        preferences={onboardingPreferences}
-        theme={theme}
-        replaySignal={replaySignal}
-        onPreferenceWarning={onPreferenceWarning}
-      />
+      {/* PRR-065：条件挂载——not-started 首启不自动出示；help.onboarding
+          （帮助菜单 / ⌘⇧H）显式挂载并重放；in-progress 续跑保留。 */}
+      {onboardingMounted ? (
+        <OnboardingFlow
+          observeCommands={observeCommands}
+          preferences={onboardingPreferences}
+          theme={theme}
+          replaySignal={replaySignal}
+          onPreferenceWarning={onPreferenceWarning}
+        />
+      ) : null}
     </div>
   );
 }

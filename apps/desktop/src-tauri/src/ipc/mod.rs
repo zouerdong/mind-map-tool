@@ -583,6 +583,35 @@ pub struct GlobalShortcutInfo {
     pub accelerator: String,
 }
 
+// ---- 菜单状态同步（PRR-065 / ADR 0012；非敏感状态单向 renderer → host） ----
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuSyncPayload {
+    pub theme: String,
+    pub organize_direction: String,
+}
+
+/// renderer 上报本窗口主题/布局方向：快照按窗口缓存；仅当该窗口为最近
+/// 聚焦窗口时应用到 app-wide 菜单（多窗口隔离，聚焦切换时恢复对应快照）。
+/// 非法值 fail-closed 返回错误，不落任何状态。
+#[tauri::command]
+pub fn platform_sync_menu_state(
+    window: WebviewWindow,
+    state: State<'_, std::sync::Arc<crate::menu::MenuState>>,
+    payload: MenuSyncPayload,
+) -> Result<(), String> {
+    let sync = crate::menu::MenuWindowSync::parse(&payload.theme, &payload.organize_direction)
+        .ok_or_else(|| {
+            format!(
+                "非法菜单状态：theme={} direction={}",
+                payload.theme, payload.organize_direction
+            )
+        })?;
+    state.sync_from_window(window.app_handle(), window.label(), sync);
+    Ok(())
+}
+
 // ---- perf 诊断协议（PRR-010；仅 MINDMAP_PERF_SAMPLE=1 时存在） ----
 
 /// renderer 查询 perf 采样配置：绑定 caller 窗口并返回 host 权威的

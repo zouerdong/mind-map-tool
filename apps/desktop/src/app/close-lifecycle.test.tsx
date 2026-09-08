@@ -109,11 +109,12 @@ async function createNodeViaCanvas(x = 42, y = 24) {
 
 async function openExisting(filePort: CountingFilePort) {
   filePort.nextOpenDialog = "/docs/a.json";
-  fireEvent.click(screen.getByText("打开…"));
+  fireEvent.keyDown(window, { key: "o", metaKey: true });
   await waitFor(() => expect(screen.getByText(/已打开 \/docs\/a\.json/)).toBeTruthy());
 }
 
-const dirtyIndicator = () => screen.getByText(/未保存 · 浏览器 dev/);
+// PRR-065：dirty 状态由原生窗口标题（● 前缀）承载
+const dirtyIndicator = () => document.title.startsWith("● ");
 
 /**
  * 注入 host 关闭请求。emit 直调 handler 触发的 setState 发生在 act 之外，
@@ -289,7 +290,7 @@ describe("原生关闭三分支（MRT-003 / CR-003）", () => {
     await createNodeViaCanvas();
     let release!: () => void;
     filePort.holdNextCommit(new Promise<void>((r) => (release = r)));
-    fireEvent.click(screen.getByText("保存")); // 工具条保存 → in-flight 挂起
+    fireEvent.keyDown(window, { key: "s", metaKey: true }); // 工具条保存 → in-flight 挂起
     await waitFor(() => expect(filePort.arrivedCalls).toBe(1));
 
     await emitClose(closePort, "r-pending");
@@ -312,7 +313,7 @@ describe("原生关闭三分支（MRT-003 / CR-003）", () => {
     await openExisting(filePort);
     await createNodeViaCanvas();
     filePort.holdNextCommit(new Promise<void>(() => {})); // 永久挂起
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
     await waitFor(() => expect(filePort.arrivedCalls).toBe(1));
 
     await emitClose(closePort, "r-wait-cancel");

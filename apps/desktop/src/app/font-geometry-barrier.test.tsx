@@ -90,8 +90,7 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
     );
 
     // 打开文档
-    const openBtn = screen.getByRole("button", { name: "打开…" });
-    fireEvent.click(openBtn);
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
 
     await waitFor(() => {
       expect(screen.getByText("测试")).toBeDefined();
@@ -186,8 +185,7 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
     fireEvent.change(textarea, { target: { value: "权威节点测试文字" } });
 
     // 触发另存为 Save As（此时不主动 blur/Enter，测试 activeEditorRef.flush 自动提取）
-    const saveAsBtn = screen.getByRole("button", { name: "另存为…" });
-    fireEvent.click(saveAsBtn);
+    fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
 
     // 此时 save 会等待 barrier flush（即等待 metrics ready）
     // 尚未保存
@@ -243,8 +241,7 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
     });
 
     // 尝试保存，不应该写入错误几何
-    const saveBtn = screen.getByRole("button", { name: "另存为…" });
-    fireEvent.click(saveBtn);
+    fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
 
     expect(filePort.savedDocuments.length).toBe(0);
   });

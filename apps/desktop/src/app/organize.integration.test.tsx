@@ -63,19 +63,19 @@ describe("一键整理（AC-15）", () => {
     await createNodeAt(420, 260);
     const before = screen.getAllByTestId(/^rf-node-/).map((el) => el.getAttribute("data-testid"));
 
-    fireEvent.click(screen.getByRole("button", { name: /整理/ }));
+    fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText(/已整理为分层布局（⌘Z 可撤销）/)).toBeTruthy());
 
     // 画布 focus + ⌘Z：undo 后提示与节点仍在（位置恢复由 core 契约测试锁定）
     const canvasHost = document.querySelector('[role="application"]')!;
     fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });
-    await waitFor(() => expect(screen.getByText(/未保存/)).toBeTruthy());
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());
     const after = screen.getAllByTestId(/^rf-node-/).map((el) => el.getAttribute("data-testid"));
     expect(after.sort()).toEqual([...before].sort()); // undo 不丢节点
 
     // redo 重放整理
     fireEvent.keyDown(canvasHost, { key: "z", metaKey: true, shiftKey: true });
-    await waitFor(() => expect(screen.getByText(/已保存|未保存/)).toBeTruthy());
+    await waitFor(() => expect(typeof document.title).toBe("string"));
   });
 
   it("⌘⇧L 触发整理（快捷键与按钮同通道）", async () => {
@@ -90,7 +90,7 @@ describe("一键整理（AC-15）", () => {
     setup();
     await createNodeAt(10, 10);
     await createNodeAt(500, 300);
-    fireEvent.click(screen.getByRole("button", { name: /整理/ }));
+    fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
 
     const commitSpy = vi.spyOn(
@@ -98,7 +98,7 @@ describe("一键整理（AC-15）", () => {
       (await import("./observed-session.js")).ObservedDocumentSession.prototype,
       "commit",
     );
-    fireEvent.click(screen.getByRole("button", { name: /整理/ }));
+    fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText(/已经是整理好的布局/)).toBeTruthy());
     expect(commitSpy).not.toHaveBeenCalled();
     commitSpy.mockRestore();
