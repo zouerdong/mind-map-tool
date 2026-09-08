@@ -341,7 +341,8 @@ for (const atom of atoms) {
   lines.push(`代表性全文来源：\`${relPath(textPath)}\``);
   lines.push("");
   lines.push("```text");
-  const text = readFileSync(textPath, "utf8").trimEnd();
+  // 上游 LICENSE 可能是 CRLF；统一输出 LF，保证重跑与版本库内容字节一致。
+  const text = readFileSync(textPath, "utf8").replaceAll("\r\n", "\n").trimEnd();
   lines.push(text);
   lines.push("```");
   lines.push("");
