@@ -20,7 +20,9 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::Duration;
+use std::time::Instant;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -157,6 +159,46 @@ fn emit_perf_line(value: &serde_json::Value) {
     println!("{value}");
 }
 
+// ==================== PRR-067 启动分段（perf-only） ====================
+//
+// 归因协议：`spawn → host main → Tauri setup → renderer` 的分段事件只在
+// `MINDMAP_PERF_SAMPLE=1` 时输出；origin 是 `lib::run()` 入口（组合根第一
+// 行，距真正的 exec 只差一个薄 main 调用，差异为微秒级函数调用）。跨进程
+// monotonic 不可直接相减：host 事件只声明本进程 elapsed；sampler 侧用接收
+// 时刻形成端到端界限。普通生产启动不调用 mark/emit，零行为差异。
+
+/// `lib::run()` 入口 Instant（首次调用 mark 时固定；perf 模式专用）。
+static PROCESS_START: OnceLock<Instant> = OnceLock::new();
+
+/// 在组合根第一行标记进程起点（perf 模式下由 lib.rs 调用；重复调用无效果）。
+pub fn mark_process_start() {
+    let _ = PROCESS_START.set(Instant::now());
+}
+
+/// 构造启动分段事件（不打印；返回 JSON 供测试断言形状）。
+pub fn startup_milestone_line(run_id: &str, milestone: &str) -> serde_json::Value {
+    let host_elapsed_ms = PROCESS_START
+        .get()
+        .map(|start| start.elapsed().as_secs_f64() * 1000.0)
+        .unwrap_or(0.0);
+    let wall_clock_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    serde_json::json!({
+        "runId": run_id,
+        "milestone": milestone,
+        "pid": std::process::id(),
+        "hostElapsedMs": (host_elapsed_ms * 10.0).round() / 10.0,
+        "wallClockMs": wall_clock_ms,
+    })
+}
+
+/// 输出一条启动分段事件（仅 perf 模式调用；stdout 与其余 perf 事件同通道）。
+pub fn emit_startup_milestone(run_id: &str, milestone: &str) {
+    emit_perf_line(&startup_milestone_line(run_id, milestone));
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PerfProbeConfigDto {
@@ -214,10 +256,13 @@ pub fn report_perf_event(
             if !probe.try_claim_ready() {
                 return Err("renderer-ready already emitted for this run".to_string());
             }
+            // PRR-067：附带 renderer 早期分段（data 可空；向后兼容——
+            // 旧 renderer/测试不发送 data 时字段为 null，sampler 忽略）。
             emit_perf_line(&serde_json::json!({
                 "runId": payload.run_id,
                 "windowGeneration": payload.window_generation,
                 "milestone": "renderer-ready",
+                "data": payload.data.clone().unwrap_or(serde_json::Value::Null),
             }));
             match probe.scenario {
                 Scenario::Launch => app.exit(0),
@@ -368,5 +413,34 @@ mod tests {
     fn read_self_rss_kb_returns_positive_value() {
         let kb = read_self_rss_kb().expect("ps should report rss for the test process");
         assert!(kb > 0);
+    }
+
+    /// PRR-067：分段事件必须声明 runId/milestone/pid/hostElapsedMs/wallClockMs；
+    /// 未 mark_process_start 时 hostElapsedMs 为 0（不 panic、不伪造单调值）。
+    #[test]
+    fn startup_milestone_line_shape_and_unmarked_behavior() {
+        let line = startup_milestone_line("run-x", "main-entered");
+        assert_eq!(line["runId"], "run-x");
+        assert_eq!(line["milestone"], "main-entered");
+        assert!(line["pid"].as_u64().unwrap() > 0);
+        assert!(line["wallClockMs"].as_u64().unwrap() > 0);
+        // OnceLock 是进程级静态：本测试进程未标记（或被其他测试标记）都
+        // 必须输出有限数值；未标记时恰为 0。
+        let elapsed = line["hostElapsedMs"].as_f64().unwrap();
+        assert!(elapsed.is_finite() && elapsed >= 0.0);
+    }
+
+    /// PRR-067：mark 后 elapsed 单调不减（同进程两次采样）。
+    #[test]
+    fn startup_milestone_elapsed_monotonic_after_mark() {
+        mark_process_start();
+        let first = startup_milestone_line("run-y", "setup-started")["hostElapsedMs"]
+            .as_f64()
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(5));
+        let second = startup_milestone_line("run-y", "setup-complete")["hostElapsedMs"]
+            .as_f64()
+            .unwrap();
+        assert!(second >= first, "host elapsed 必须单调不减");
     }
 }

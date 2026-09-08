@@ -146,12 +146,18 @@ describe("perf probe (PRR-010)", () => {
     });
     await flushMicrotasks();
     expect(reportedEvents.length).toBe(1);
-    expect(reportedEvents[0]).toEqual({
-      runId: "run-launch",
-      windowGeneration: 3,
-      milestone: "renderer-ready",
-      data: null,
-    });
+    // PRR-067：renderer-ready 附带 renderer 早期分段（navigationStart 起算；
+    // jsdom 环境下 load 可能尚未发生，loadEventSinceNavigationMs 允许 null）。
+    const ready = reportedEvents[0]!;
+    expect(ready.runId).toBe("run-launch");
+    expect(ready.windowGeneration).toBe(3);
+    expect(ready.milestone).toBe("renderer-ready");
+    const early = (ready.data as { earlyTiming?: Record<string, unknown> } | null)?.earlyTiming;
+    expect(typeof early?.jsStartedSinceNavigationMs).toBe("number");
+    expect(
+      early?.loadEventSinceNavigationMs === null ||
+        typeof early?.loadEventSinceNavigationMs === "number",
+    ).toBe(true);
   });
 
   it("edit 场景：scenario-result 携带 4 类命令 raw samples", async () => {

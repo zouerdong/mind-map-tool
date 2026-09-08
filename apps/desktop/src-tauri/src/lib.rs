@@ -33,6 +33,16 @@ use lifecycle::window_registry::WindowRegistry;
 use shortcuts::GlobalShortcutState;
 
 pub fn run() {
+    // PRR-067 启动分段：组合根第一行固定进程 origin（OnceLock 首次生效；
+    // 普通生产启动仅多一次静态写入，无输出、无 IPC、无行为差异）。
+    perf::mark_process_start();
+    // PRR-010 perf 诊断模式：仅 MINDMAP_PERF_SAMPLE=1 时激活；生产路径
+    // 无此 state，全部 perf IPC 返回未启用。PRR-067：probe 构造提前到
+    // 组合根最前，main-entered 分段在其余初始化之前输出。
+    let perf_probe = perf::PerfProbe::from_env();
+    if let Some(probe) = perf_probe.as_ref() {
+        perf::emit_startup_milestone(&probe.run_id, "main-entered");
+    }
     let service = Arc::new(FileLifecycleService::new());
     // 唯一生产 launch 状态：registry 先登记默认 main（Booting generation），
     // 再交给 coordinator/runtime（§5C1）。
@@ -48,10 +58,6 @@ pub fn run() {
         Box::new(SystemClock),
     ));
     let close_store = Arc::new(CloseRequestStore::new());
-
-    // PRR-010 perf 诊断模式：仅 MINDMAP_PERF_SAMPLE=1 时激活；生产路径
-    // 无此 state，全部 perf IPC 返回未启用。
-    let perf_probe = perf::PerfProbe::from_env();
 
     // cold argv：进程参数即事实（在任何 drain 之前收集；setup 统一入队，
     // 第一个文件占用 main 由路由顺序保证——无 sleep/时序猜测）。
@@ -80,6 +86,8 @@ pub fn run() {
     // 按 TypeId 解析——此前误把 Option<PerfProbe> 交给 manage，命令永远
     // 解析不到 state，invoke 失败被前端 catch 成"未启用"，renderer-ready
     // 静默丢失（PRR-070 真实候选实测暴露；mock 协议测试覆盖不到此接线）。
+    // PRR-067：setup 分段需要 run_id，先于 move 进 manage 提取。
+    let perf_setup_run_id = perf_probe.as_ref().map(|probe| probe.run_id.clone());
     if let Some(probe) = perf_probe {
         builder = builder.manage(Arc::new(probe));
     }
@@ -87,6 +95,9 @@ pub fn run() {
         .setup({
             let runtime = runtime.clone();
             move |app| {
+                if let Some(run_id) = perf_setup_run_id.as_deref() {
+                    perf::emit_startup_milestone(run_id, "setup-started");
+                }
                 // 全局热键装配（注册失败仅日志，可经设置换绑；MM-088）。
                 if let Ok(config_dir) = app.path().app_config_dir() {
                     shortcuts::install(app.handle(), &config_dir);
@@ -104,6 +115,9 @@ pub fn run() {
                     "[lifecycle] setup 完成：cold argv={} 个参数",
                     cold.len() - 1
                 );
+                if let Some(run_id) = perf_setup_run_id.as_deref() {
+                    perf::emit_startup_milestone(run_id, "setup-complete");
+                }
                 Ok(())
             }
         })

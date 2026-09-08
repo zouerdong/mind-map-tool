@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, chmodSync } from "node:fs";
-import { resolve, join, dirname } from "node:path";
+import { resolve, join, dirname, relative } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
@@ -832,6 +832,323 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       } finally {
         rmSync(diagDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ==================== 4. PRR-067 attribution 诊断管线测试 ====================
+
+  /** 完整启动分段 mock：main-entered → setup → renderer-ready（带早期分段）。 */
+  const ATTR_FULL_TRACE_BIN = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"main-entered\\",\\"pid\\":4242,\\"hostElapsedMs\\":1.5,\\"wallClockMs\\":1769000000000}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-started\\",\\"pid\\":4242,\\"hostElapsedMs\\":2.5,\\"wallClockMs\\":1769000000001}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-complete\\",\\"pid\\":4242,\\"hostElapsedMs\\":8.0,\\"wallClockMs\\":1769000000005}"
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\",\\"data\\":{\\"earlyTiming\\":{\\"jsStartedSinceNavigationMs\\":120.5,\\"loadEventSinceNavigationMs\\":180.2}}}"
+exit 0
+`;
+
+  describe("run-performance --scope attribution（PRR-067 审阅修正版）", () => {
+    const FIXTURE_REPO_DIR = join(FIXTURE_DIR, "prr-067-attribution-repo");
+
+    afterEach(() => {
+      try {
+        rmSync(FIXTURE_REPO_DIR, { recursive: true, force: true });
+      } catch {}
+    });
+
+    /** 独立 clean git 仓库 + 诊断候选 + 合成 register（register 在被忽略的 .tmp 内）。 */
+    function buildAttributionFixture(binScript: string) {
+      const repoDir = createCleanGitRepo("prr-067-attribution-repo");
+      const appPath = join(repoDir, ".tmp/prr-067-runner-test/candidate/Mind Map.app");
+      createMockAppBundle(appPath, binScript);
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      return {
+        repoDir,
+        candidateRel: ".tmp/prr-067-runner-test/candidate/Mind Map.app",
+        evidenceRel: ".tmp/prr-067-runner-test/evidence",
+        regRel: relative(repoDir, regPath),
+        repoDirAbs: repoDir,
+      };
+    }
+
+    function runAttribution(fixture: ReturnType<typeof buildAttributionFixture>, extra: string[]) {
+      return runNode(PERF_RUNNER, [
+        "--scope",
+        "attribution",
+        "--root",
+        fixture.repoDir,
+        "--scope-from",
+        fixture.regRel,
+        "--candidate",
+        fixture.candidateRel,
+        "--evidence-dir",
+        fixture.evidenceRel,
+        ...extra,
+      ]);
+    }
+
+    function readReport(fixture: ReturnType<typeof buildAttributionFixture>, label: string) {
+      return JSON.parse(
+        readFileSync(
+          join(fixture.repoDir, fixture.evidenceRel, `cold-attribution-report-${label}.json`),
+          "utf8",
+        ),
+      );
+    }
+
+    it("worktree 不 clean 时拒绝（必须先形成 clean commit）", () => {
+      const fixture = buildAttributionFixture(ATTR_FULL_TRACE_BIN);
+      // fixture repo 的 .gitignore 只忽略 .tmp/；根下一个 untracked 文件即可致 dirty
+      writeFileSync(join(fixture.repoDir, "zz-dirty-marker.txt"), "dirty");
+      const res = runAttribution(fixture, ["--samples", "1"]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("clean worktree");
+    });
+
+    it("candidate 在边界外且非 G2 正式路径时拒绝；evidence 在边界外也拒绝", () => {
+      const fixture = buildAttributionFixture(ATTR_FULL_TRACE_BIN);
+      // candidate 合法（prr-067 内）但 evidence 边界外（fixture repo .tmp 下非 prr-067 前缀目录）
+      const resEvidence = runNode(PERF_RUNNER, [
+        "--scope",
+        "attribution",
+        "--root",
+        fixture.repoDir,
+        "--scope-from",
+        fixture.regRel,
+        "--candidate",
+        fixture.candidateRel,
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence",
+        "--samples",
+        "1",
+      ]);
+      expect(resEvidence.status).toBe(1);
+      expect(resEvidence.stderr).toContain("--evidence-dir 必须位于 .tmp/prr-067-*");
+      // candidate 既不在 prr-067 内也不是 G2 批准路径 → 拒绝
+      const foreignApp = join(fixture.repoDir, ".tmp/other-place/bundle/macos/Mind Map.app");
+      createMockAppBundle(foreignApp, ATTR_FULL_TRACE_BIN);
+      const resCandidate = runNode(PERF_RUNNER, [
+        "--scope",
+        "attribution",
+        "--root",
+        fixture.repoDir,
+        "--scope-from",
+        fixture.regRel,
+        "--candidate",
+        ".tmp/other-place/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        fixture.evidenceRel,
+        "--samples",
+        "1",
+      ]);
+      expect(resCandidate.status).toBe(1);
+      expect(resCandidate.stderr).toContain(
+        "必须位于 .tmp/prr-067-* 诊断边界或 G2 批准的正式 candidate 原路径",
+      );
+    });
+
+    it("--conditioning-first 只允许搭配 --home-mode shared", () => {
+      const fixture = buildAttributionFixture(ATTR_FULL_TRACE_BIN);
+      const res = runAttribution(fixture, [
+        "--samples",
+        "1",
+        "--home-mode",
+        "fresh",
+        "--conditioning-first",
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("--conditioning-first 只允许");
+    });
+
+    it("完整分段被采入报告且 exit 0；原始 stdout chunk 带 stream/sequence/receivedAt/text", () => {
+      const fixture = buildAttributionFixture(ATTR_FULL_TRACE_BIN);
+      const res = runAttribution(fixture, [
+        "--samples",
+        "3",
+        "--home-mode",
+        "fresh",
+        "--label",
+        "full",
+      ]);
+      expect(res.status).toBe(0);
+
+      const report = readReport(fixture, "full");
+      expect(report.measurementMode).toBe("attribution-diagnostic");
+      expect(report.segmentationEvidence).toBe(true);
+      expect(report.sourceWorktree).toBe("clean");
+      expect(report.sourceCommit).toMatch(/^[0-9a-f]{40}$/);
+      expect(report.runnerSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(report.candidateSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(report.samplingComplete).toBe(true);
+      expect(report.validSamples).toBe(3);
+      for (const run of report.runs) {
+        expect(run.markerFound).toBe(true);
+        const trace = run.startupTrace;
+        expect(trace.traceValid).toBe(true);
+        expect(trace.hostDurations.mainToSetupStartedMs).toBeCloseTo(1.0, 5);
+        expect(trace.hostDurations.setupDurationMs).toBeCloseTo(5.5, 5);
+        expect(trace.rendererEarlyTiming.jsStartedSinceNavigationMs).toBeCloseTo(120.5, 5);
+        // 审阅修正 6：有界原始输出——stdout chunk 必须含协议 JSON 原文与元数据
+        const raw = run.rawOutput;
+        expect(raw).toBeTruthy();
+        expect(raw.capBytesPerStream).toBeGreaterThan(0);
+        const stdoutChunks = raw.chunks.filter((chunk: any) => chunk.stream === "stdout");
+        expect(stdoutChunks.length).toBeGreaterThan(0);
+        let seen = 0;
+        for (const chunk of stdoutChunks) {
+          expect(Number.isInteger(chunk.sequence)).toBe(true);
+          expect(chunk.sequence).toBeGreaterThan(seen);
+          seen = chunk.sequence;
+          expect(typeof chunk.receivedAt).toBe("number");
+          expect(chunk.receivedAt).toBeGreaterThanOrEqual(0);
+        }
+        const joinedText = stdoutChunks.map((chunk: any) => chunk.text ?? "").join("");
+        expect(joinedText).toContain('"milestone":"main-entered"');
+        expect(joinedText).toContain('"milestone":"renderer-ready"');
+      }
+    });
+
+    it("红灯：缺 main-entered 时 exit 1 并提示 --legacy-timing-only（不伪造分段）", () => {
+      const partialBin = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-started\\",\\"pid\\":1,\\"hostElapsedMs\\":1.0,\\"wallClockMs\\":1}"
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+exit 0
+`;
+      const fixture = buildAttributionFixture(partialBin);
+      const res = runAttribution(fixture, ["--samples", "1", "--label", "missing"]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("startupTrace 无效");
+      expect(res.stderr).toContain("--legacy-timing-only");
+      const report = readReport(fixture, "missing");
+      expect(report.runs[0].startupTrace.traceValid).toBe(false);
+      expect(report.runs[0].startupTrace.traceIssues).toContain("missing:main-entered");
+      expect(report.traceFailureCount).toBe(1);
+    });
+
+    it("红灯：里程碑逆序时 exit 1（out-of-order）", () => {
+      const reversedBin = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"main-entered\\",\\"pid\\":1,\\"hostElapsedMs\\":1.0,\\"wallClockMs\\":1}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-started\\",\\"pid\\":1,\\"hostElapsedMs\\":2.0,\\"wallClockMs\\":2}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-complete\\",\\"pid\\":1,\\"hostElapsedMs\\":3.0,\\"wallClockMs\\":3}"
+exit 0
+`;
+      const fixture = buildAttributionFixture(reversedBin);
+      const res = runAttribution(fixture, ["--samples", "1", "--label", "reversed"]);
+      expect(res.status).toBe(1);
+      const report = readReport(fixture, "reversed");
+      expect(report.runs[0].startupTrace.traceValid).toBe(false);
+      expect(report.runs[0].startupTrace.traceIssues).toContain("out-of-order:renderer-ready");
+    });
+
+    it("红灯：负 hostElapsedMs 时 exit 1（negative-host-elapsed）", () => {
+      const negativeBin = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"main-entered\\",\\"pid\\":1,\\"hostElapsedMs\\":-5.0,\\"wallClockMs\\":1}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-started\\",\\"pid\\":1,\\"hostElapsedMs\\":2.0,\\"wallClockMs\\":2}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-complete\\",\\"pid\\":1,\\"hostElapsedMs\\":3.0,\\"wallClockMs\\":3}"
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+exit 0
+`;
+      const fixture = buildAttributionFixture(negativeBin);
+      const res = runAttribution(fixture, ["--samples", "1", "--label", "negative"]);
+      expect(res.status).toBe(1);
+      const report = readReport(fixture, "negative");
+      expect(report.runs[0].startupTrace.traceValid).toBe(false);
+      expect(report.runs[0].startupTrace.traceIssues).toContain(
+        "negative-host-elapsed:main-entered",
+      );
+    });
+
+    it("foreign runId 的分段事件不计入本样本 trace；本 runId 完整时仍 exit 0", () => {
+      const foreignBin = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"not-this-run\\",\\"milestone\\":\\"main-entered\\",\\"pid\\":1,\\"hostElapsedMs\\":1.0,\\"wallClockMs\\":1}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"main-entered\\",\\"pid\\":2,\\"hostElapsedMs\\":1.0,\\"wallClockMs\\":10}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-started\\",\\"pid\\":2,\\"hostElapsedMs\\":2.0,\\"wallClockMs\\":11}"
+emit "{\\"runId\\":\\"$RID\\",\\"milestone\\":\\"setup-complete\\",\\"pid\\":2,\\"hostElapsedMs\\":3.0,\\"wallClockMs\\":12}"
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+exit 0
+`;
+      const fixture = buildAttributionFixture(foreignBin);
+      const res = runAttribution(fixture, ["--samples", "1", "--label", "foreign"]);
+      expect(res.status).toBe(0);
+      const report = readReport(fixture, "foreign");
+      const events = report.runs[0].startupTrace.events;
+      expect(events).toHaveLength(4);
+      const hostEvents = events.filter((event: any) => event.pid !== undefined);
+      expect(hostEvents.map((event: any) => event.milestone)).toEqual([
+        "main-entered",
+        "setup-started",
+        "setup-complete",
+      ]);
+      expect(hostEvents.every((event: any) => event.pid === 2)).toBe(true);
+    });
+
+    it("红灯：样本失败时即停并 exit 1（samplingComplete=false，不跳样）", () => {
+      const brokenBin = `#!/bin/sh
+exit 3
+`;
+      const fixture = buildAttributionFixture(brokenBin);
+      const res = runAttribution(fixture, ["--samples", "3", "--label", "broken"]);
+      expect(res.status).toBe(1);
+      const report = readReport(fixture, "broken");
+      expect(report.samplingComplete).toBe(false);
+      expect(report.validSamples).toBe(0);
+      expect(report.runs).toHaveLength(1);
+    });
+
+    it("红灯：conditioning 失败时立即 exit 1，不产生 measured 样本", () => {
+      const brokenBin = `#!/bin/sh
+exit 3
+`;
+      const fixture = buildAttributionFixture(brokenBin);
+      const res = runAttribution(fixture, [
+        "--samples",
+        "2",
+        "--home-mode",
+        "shared",
+        "--conditioning-first",
+        "--label",
+        "cond-broken",
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("conditioning 启动失败");
+    });
+
+    it("审阅修正 5：--legacy-timing-only 允许无埋点候选，声明不得用作分段归因证据", () => {
+      const legacyBin = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+emit() { printf '%s\\n' "$1"; }
+emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+exit 0
+`;
+      const fixture = buildAttributionFixture(legacyBin);
+      const res = runAttribution(fixture, [
+        "--samples",
+        "2",
+        "--home-mode",
+        "fresh",
+        "--legacy-timing-only",
+        "--label",
+        "legacy",
+      ]);
+      expect(res.status).toBe(0);
+      const report = readReport(fixture, "legacy");
+      expect(report.measurementMode).toBe("attribution-diagnostic-legacy-timing-only");
+      expect(report.segmentationEvidence).toBe(false);
+      expect(report.legacyTimingOnlyDeclaration).toContain("must never be cited");
+      // legacy 模式下 trace 仍如实记录 invalid（missing 里程碑），但不影响 exit
+      expect(report.runs[0].startupTrace.traceValid).toBe(false);
+      expect(report.traceFailureCount).toBe(2);
+      expect(report.samplingComplete).toBe(true);
     });
   });
 });

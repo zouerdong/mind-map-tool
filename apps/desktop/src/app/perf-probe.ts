@@ -16,6 +16,7 @@ import type { ExportRendererLike } from "./export-commands.js";
 import { exportFlow } from "./export-commands.js";
 import { saveAsFlow, saveFlow } from "./file-commands.js";
 import { isTauriRuntime } from "./ports.js";
+import { collectPerfEarlyTiming } from "./perf-early.js";
 
 export type PerfScenario = "launch" | "rss" | "canvas" | "edit" | "save" | "png-export";
 
@@ -81,6 +82,20 @@ export async function reportPerfEvent(
       data: data === undefined ? null : data,
     },
   });
+}
+
+/** PRR-067：renderer-ready 伴随的早期分段（navigationStart 起算）。 */
+export function rendererReadyEarlyData(): Record<string, unknown> {
+  const early = collectPerfEarlyTiming();
+  return {
+    earlyTiming: {
+      jsStartedSinceNavigationMs: Math.round(early.jsStartedSinceNavigationMs * 10) / 10,
+      loadEventSinceNavigationMs:
+        early.loadEventSinceNavigationMs === null
+          ? null
+          : Math.round(early.loadEventSinceNavigationMs * 10) / 10,
+    },
+  };
 }
 
 // ---- 交互/帧工具 ----
@@ -453,7 +468,7 @@ export async function runPerfProbe(deps: PerfScenarioDeps): Promise<void> {
   if (!config) return;
   try {
     await whenCanvasInteractive();
-    await reportPerfEvent(config, "renderer-ready");
+    await reportPerfEvent(config, "renderer-ready", rendererReadyEarlyData());
     switch (config.scenario) {
       case "launch":
       case "rss":

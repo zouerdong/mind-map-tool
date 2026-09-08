@@ -33,13 +33,16 @@ import { RELEASE_BUDGETS as BUDGETS } from "./release-budgets.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
-const ROOT = resolve(HERE, "../..");
-
 const args = process.argv.slice(2);
 const flag = (name) => {
   const i = args.indexOf(`--${name}`);
   return i === -1 ? null : args[i + 1];
 };
+// --root 可把路径解析指向另一仓库根（与 bundle-gate/verify-decision 相同的
+// 复算/测试入口，供 attribution 的 clean-worktree 前置在测试中用独立
+// fixture 仓库验证）；生产调用不传该参数，默认本仓库根。RUNNER_PATH 始终
+// 是真实脚本自身——runnerSha256 与 --root 无关。
+const ROOT = flag("root") ? resolve(flag("root")) : resolve(HERE, "../..");
 
 const fixture = flag("fixture") ?? "dense-300-450";
 const scope = flag("scope") ?? "canvas";
@@ -56,7 +59,7 @@ if (!/^[a-z0-9-]+$/i.test(fixture)) {
   console.error("run-performance: FAIL — --fixture 只能使用字母、数字和连字符");
   process.exit(2);
 }
-if (!["canvas", "save", "export", "release"].includes(scope)) {
+if (!["canvas", "save", "export", "release", "attribution"].includes(scope)) {
   console.error(`run-performance: FAIL — 未知 --scope ${scope}`);
   process.exit(2);
 }
@@ -276,7 +279,10 @@ function getTreeSizeBytes(dirPath) {
   return total;
 }
 
-async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = {}) {
+async function runLaunchSample(
+  binPath,
+  { timeoutMs = 15000, homeDir = null, captureRaw = false, rawCapBytesPerStream = 262_144 } = {},
+) {
   return new Promise((resolveRun) => {
     const runId = randomUUID();
     const t0 = performance.now();
@@ -291,6 +297,18 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
     let postReadyTimer;
     let killWaitTimer;
     const buffers = { stdout: "", stderr: "" };
+    // PRR-067 启动分段：sampler 侧记录 spawn 前后与每条 perf 行的接收
+    // 时刻（sampler 本进程 monotonic）；host 事件自带 hostElapsedMs。
+    // 跨进程 monotonic 不相减，只各自分段 + 接收时刻形成端到端界限。
+    let tSpawnRequested = null;
+    let tSpawned = null;
+    const traceEvents = [];
+    // PRR-067 审阅修正 6：有界原始输出捕获——每 chunk 记录 stream、
+    // 全局 sequence、receivedAt（sampler monotonic，相对 t0）与原文文本；
+    // 超过每流上限后停止保存文本但继续计数（truncated 标记）。
+    const rawChunks = captureRaw ? [] : null;
+    const rawCounters = captureRaw ? { stdout: 0, stderr: 0, sequence: 0 } : null;
+    const rawSaved = captureRaw ? { stdout: 0, stderr: 0 } : null;
 
     const finish = (result) => {
       if (settled) return;
@@ -298,7 +316,23 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
       clearTimeout(timeoutTimer);
       clearTimeout(postReadyTimer);
       clearTimeout(killWaitTimer);
-      resolveRun(result);
+      resolveRun(captureRaw ? { ...result, rawOutput: rawOutputPayload() } : result);
+    };
+
+    const captureRawChunk = (stream, data) => {
+      if (!captureRaw) return;
+      const text = String(data);
+      rawCounters[stream] += text.length;
+      rawCounters.sequence += 1;
+      const saved = rawSaved[stream] < rawCapBytesPerStream;
+      if (saved) rawSaved[stream] += text.length;
+      rawChunks.push({
+        stream,
+        sequence: rawCounters.sequence,
+        receivedAt: Math.round((performance.now() - t0) * 10) / 10,
+        bytes: Buffer.byteLength(text),
+        ...(saved ? { text } : { truncated: true }),
+      });
     };
 
     const acceptLine = (line) => {
@@ -309,6 +343,22 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
         event = JSON.parse(trimmed);
       } catch {
         return;
+      }
+      if (typeof event?.milestone !== "string") return;
+      // PRR-067：凡带 runId 的 perf JSON 行都进 trace（含 host 分段与
+      // renderer-ready）；foreign runId 的事件不计入本样本 trace。
+      if (event.runId === runId) {
+        traceEvents.push({
+          milestone: event.milestone,
+          receivedAt: Math.round((performance.now() - t0) * 10) / 10,
+          ...(Number.isFinite(event.hostElapsedMs) ? { hostElapsedMs: event.hostElapsedMs } : {}),
+          ...(Number.isFinite(event.wallClockMs) ? { wallClockMs: event.wallClockMs } : {}),
+          ...(Number.isFinite(event.pid) ? { pid: event.pid } : {}),
+          ...(Number.isInteger(event.windowGeneration)
+            ? { windowGeneration: event.windowGeneration }
+            : {}),
+          ...(event.milestone === "renderer-ready" && event.data ? { data: event.data } : {}),
+        });
       }
       if (event?.milestone !== "renderer-ready") return;
       if (event.runId !== runId) {
@@ -341,6 +391,7 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
               code: -1,
               runId,
               readyEvent,
+              startupTrace: buildStartupTrace(tSpawnRequested, tSpawned, traceEvents),
               error: "renderer-ready 后候选未自行退出",
             }),
           3000,
@@ -349,11 +400,25 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
     };
 
     const onOutput = (stream, data) => {
+      captureRawChunk(stream, data);
       buffers[stream] += String(data);
       const lines = buffers[stream].split(/\r?\n/);
       buffers[stream] = lines.pop() ?? "";
       for (const line of lines) acceptLine(line);
     };
+
+    /** 附上原始输出摘要（captureRaw 启用时）。 */
+    const rawOutputPayload = () =>
+      captureRaw
+        ? {
+            capBytesPerStream: rawCapBytesPerStream,
+            savedBytes: { ...rawSaved },
+            totalChars: { stdout: rawCounters.stdout, stderr: rawCounters.stderr },
+            chunkCount: rawChunks.length,
+            truncatedChunks: rawChunks.filter((chunk) => chunk.truncated).length,
+            chunks: rawChunks,
+          }
+        : undefined;
 
     const env = {
       ...process.env,
@@ -365,10 +430,12 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
     if (homeDir) env.HOME = homeDir;
 
     try {
+      tSpawnRequested = Math.round((performance.now() - t0) * 10) / 10;
       child = spawn(binPath, [], {
         env,
         stdio: ["ignore", "pipe", "pipe"],
       });
+      tSpawned = Math.round((performance.now() - t0) * 10) / 10;
     } catch (e) {
       return resolveRun({
         elapsedMs: null,
@@ -377,6 +444,8 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
         code: 1,
         runId,
         readyEvent: null,
+        startupTrace: buildStartupTrace(tSpawnRequested, tSpawned, traceEvents),
+        ...(captureRaw ? { rawOutput: rawOutputPayload() } : {}),
         error: e.message,
       });
     }
@@ -395,6 +464,7 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
             code: -1,
             runId,
             readyEvent,
+            startupTrace: buildStartupTrace(tSpawnRequested, tSpawned, traceEvents),
             error: `等待 renderer-ready 超时且候选未退出 (${timeoutMs}ms)`,
           }),
         3000,
@@ -411,6 +481,7 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
         code: 1,
         runId,
         readyEvent,
+        startupTrace: buildStartupTrace(tSpawnRequested, tSpawned, traceEvents),
         error: error.message,
       });
     });
@@ -428,6 +499,7 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
         signal: signal ?? null,
         runId,
         readyEvent,
+        startupTrace: buildStartupTrace(tSpawnRequested, tSpawned, traceEvents),
         ...(valid
           ? {}
           : {
@@ -444,6 +516,81 @@ async function runLaunchSample(binPath, { timeoutMs = 15000, homeDir = null } = 
       });
     });
   });
+}
+
+// ==================== PRR-067 启动分段解析（fail-closed） ====================
+//
+// 从单个 launch 样本的 sampler/host 事件构造可复算的 startupTrace：
+// - 必备里程碑 main-entered → setup-started → setup-complete → renderer-ready
+//   （接收顺序）；缺任一、逆序、hostElapsedMs 负值都判 traceInvalid，
+//   不伪造、不补默认值。旧候选（无埋点）自然得到 traceInvalid + missing
+//   说明——这是事实而非错误。
+// - 差值只在同一 origin 内计算：sampler（spawnRequested→spawned 与各
+//   接收时刻）、host（main→setup 区间）。跨进程只给端到端界限差
+//   （receivedAt 差值），并在字段名里显式声明 boundaries 语义。
+
+const STARTUP_MILESTONES = ["main-entered", "setup-started", "setup-complete", "renderer-ready"];
+
+function buildStartupTrace(spawnRequestedAt, spawnedAt, events) {
+  const issues = [];
+  const present = events.map((event) => event.milestone);
+  for (const name of STARTUP_MILESTONES) {
+    if (!present.includes(name)) issues.push(`missing:${name}`);
+  }
+  // 顺序校验：必备里程碑的接收顺序必须与协议一致（允许穿插其他事件）。
+  const indices = STARTUP_MILESTONES.map((name) => present.indexOf(name)).filter((i) => i >= 0);
+  for (let i = 1; i < indices.length; i++) {
+    if (indices[i] <= indices[i - 1]) {
+      issues.push(`out-of-order:${STARTUP_MILESTONES[i]}`);
+    }
+  }
+  for (const event of events) {
+    if (Number.isFinite(event.hostElapsedMs) && event.hostElapsedMs < 0) {
+      issues.push(`negative-host-elapsed:${event.milestone}`);
+    }
+  }
+  const byMilestone = Object.create(null);
+  for (const event of events) {
+    if (!byMilestone[event.milestone]) byMilestone[event.milestone] = event;
+  }
+  const hostDurations = {};
+  const main = byMilestone["main-entered"];
+  const setupStarted = byMilestone["setup-started"];
+  const setupComplete = byMilestone["setup-complete"];
+  const ready = byMilestone["renderer-ready"];
+  if (main && setupStarted && Number.isFinite(main.hostElapsedMs)) {
+    hostDurations.mainToSetupStartedMs =
+      Math.round((setupStarted.hostElapsedMs - main.hostElapsedMs) * 10) / 10;
+    if (hostDurations.mainToSetupStartedMs < 0)
+      issues.push("negative-host-elapsed:mainToSetupStarted");
+  }
+  if (setupStarted && setupComplete) {
+    hostDurations.setupDurationMs =
+      Math.round((setupComplete.hostElapsedMs - setupStarted.hostElapsedMs) * 10) / 10;
+    if (hostDurations.setupDurationMs < 0) issues.push("negative-host-elapsed:setupDuration");
+  }
+  // 端到端界限（sampler 接收时刻差；跨进程，仅作界限不作分段归因）。
+  const boundaries = {};
+  if (spawnedAt !== null && main) {
+    boundaries.spawnedToMainEnteredReceivedMs = Math.round((main.receivedAt - spawnedAt) * 10) / 10;
+  }
+  if (spawnRequestedAt !== null && spawnedAt !== null) {
+    boundaries.spawnCallMs = Math.round((spawnedAt - spawnRequestedAt) * 10) / 10;
+  }
+  if (setupComplete && ready) {
+    boundaries.setupCompleteToReadyReceivedMs =
+      Math.round((ready.receivedAt - setupComplete.receivedAt) * 10) / 10;
+  }
+  return {
+    spawnRequestedAt,
+    spawnedAt,
+    events,
+    boundaries,
+    hostDurations,
+    rendererEarlyTiming: ready?.data?.earlyTiming ?? null,
+    traceValid: issues.length === 0,
+    traceIssues: issues,
+  };
 }
 
 // ==================== PRR-010 原生场景探针 ====================
@@ -596,6 +743,287 @@ function scenarioFailureReason(run, scenario) {
   );
   if (failed) return failed.reason ?? "unknown";
   return run.error ?? "场景未产出 scenario-result";
+}
+
+// ==================== PRR-067 ATTRIBUTION 诊断管线 ====================
+//
+// 冷启动归因专用（诊断证据，绝不进入发布 manifest）：candidate 与
+// evidence-dir 必须同属 `.tmp/prr-067-*`；measurementMode 固定为
+// attribution-diagnostic。不做预算判定、不改 release 语义；fail-closed
+// 只针对采样完整性（样本失败即停，不跳样、不挑样）。
+
+function isPrr067DiagnosticPath(absPath) {
+  const rel = relative(ROOT, absPath);
+  if (rel.startsWith("..") || isAbsolute(rel)) return false;
+  const segments = rel.split(sep);
+  return segments[0] === ".tmp" && (segments[1] ?? "").startsWith("prr-067-");
+}
+
+function safeExecText(command, args) {
+  try {
+    const r = execFileSync(command, args, { encoding: "utf8", timeout: 10_000 });
+    return r.trim();
+  } catch {
+    return null;
+  }
+}
+
+function captureSystemSnapshot() {
+  const loadavg = safeExecText("sysctl", ["-n", "vm.loadavg"]);
+  let totalCpuPercent = null;
+  const psOut = safeExecText("ps", ["-axo", "pcpu="]);
+  if (psOut !== null) {
+    const sum = psOut
+      .split("\n")
+      .map((line) => Number.parseFloat(line.trim()))
+      .filter((value) => Number.isFinite(value))
+      .reduce((a, b) => a + b, 0);
+    totalCpuPercent = Math.round(sum * 10) / 10;
+  }
+  const vmStat = safeExecText("vm_stat", []);
+  const pagesFree = vmStat ? ((vmStat.match(/Pages free\s+(\d+)/) ?? [])[1] ?? null) : null;
+  const thermal = safeExecText("pmset", ["-g", "therm"]);
+  return {
+    capturedAt: new Date().toISOString(),
+    loadavg,
+    totalCpuPercent,
+    pagesFree,
+    thermal,
+  };
+}
+
+if (scope === "attribution") {
+  if (!candidate || !evidenceDir) {
+    console.error(
+      "run-performance: FAIL — attribution scope 必须指定 --candidate <path> 与 --evidence-dir <path>",
+    );
+    process.exit(1);
+  }
+  const homeMode = flag("home-mode") ?? "fresh";
+  const conditioningFirst = args.includes("--conditioning-first");
+  const label = flag("label") ?? "attribution";
+  // PRR-067 审阅修正 5：legacy-timing-only——仅对无分段埋点的旧候选测时间
+  // 分布；该模式不校验 startupTrace，报告声明 segmentationEvidence=false，
+  // 不得用作分段归因证据。
+  const legacyTimingOnly = args.includes("--legacy-timing-only");
+  if (!["fresh", "shared"].includes(homeMode)) {
+    console.error("run-performance: FAIL — --home-mode 只支持 fresh|shared");
+    process.exit(1);
+  }
+  if (conditioningFirst && homeMode !== "shared") {
+    console.error("run-performance: FAIL — --conditioning-first 只允许与 --home-mode shared 搭配");
+    process.exit(1);
+  }
+  if (!Number.isInteger(samplesCount) || samplesCount < 1) {
+    console.error("run-performance: FAIL — --samples 必须为正整数");
+    process.exit(1);
+  }
+  const candidateAbs = resolve(ROOT, candidate);
+  const evidenceDirAbs = resolve(ROOT, evidenceDir);
+  // PRR-067 审阅修正 1：attribution 必须从 clean worktree 运行——报告的
+  // sourceCommit/runnerSha256 要对应可重建的真实快照；先形成 clean commit
+  //（诊断实现与测试），再构建诊断候选并采样。
+  let attributionGitHead;
+  let attributionStatus;
+  try {
+    attributionGitHead = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    }).trim();
+    attributionStatus = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    }).trim();
+  } catch (error) {
+    console.error(`run-performance: BLOCKED — 无法读取 git 状态: ${error.message}`);
+    process.exit(1);
+  }
+  if (attributionStatus.length > 0) {
+    console.error(
+      "run-performance: BLOCKED — attribution 必须从 clean worktree 运行（先把诊断实现与测试形成 clean commit）",
+    );
+    process.exit(1);
+  }
+  let validatedScope;
+  try {
+    validatedScope = loadAndValidateG2Scope({
+      scopeFrom,
+      host: "tauri",
+      action: "measure-performance",
+      repoRoot: ROOT,
+    });
+  } catch (err) {
+    console.error(`run-performance: BLOCKED — G2 scope 校验失败: ${err.message}`);
+    process.exit(1);
+  }
+  // candidate 边界：只允许 (a) .tmp/prr-067-* 内的诊断副本/诊断构建，或
+  // (b) G2 批准的正式 candidate 原路径（B0 组只读 spawn，不写不删）；
+  // evidence-dir 必须在 .tmp/prr-067-* 诊断边界内（诊断证据不进发布树）。
+  const relCandidate = relative(ROOT, candidateAbs);
+  const candidateInDiagnostic = isPrr067DiagnosticPath(candidateAbs);
+  const candidateIsG2Approved =
+    validatedScope.scope?.candidateOutputPaths?.includes(relCandidate) ?? false;
+  if (!candidateInDiagnostic && !candidateIsG2Approved) {
+    console.error(
+      "run-performance: FAIL — attribution 的 --candidate 必须位于 .tmp/prr-067-* 诊断边界或 G2 批准的正式 candidate 原路径（只读）",
+    );
+    process.exit(1);
+  }
+  if (!isPrr067DiagnosticPath(evidenceDirAbs)) {
+    console.error(
+      "run-performance: FAIL — attribution 的 --evidence-dir 必须位于 .tmp/prr-067-* 诊断边界",
+    );
+    process.exit(1);
+  }
+  const hits = checkSigningHints("tauri", ROOT);
+  if (hits.length) {
+    console.error(`run-performance: FAIL — 检测到签名凭据（${hits.join(", ")}）`);
+    process.exit(1);
+  }
+  if (!existsSync(candidateAbs) || lstatSync(candidateAbs).isSymbolicLink()) {
+    console.error(`run-performance: FAIL — 候选产物不存在或为符号链接: ${candidate}`);
+    process.exit(1);
+  }
+  const binPath = findCandidateExecutable(candidateAbs);
+  if (!binPath) {
+    console.error(`run-performance: FAIL — 无法在候选产物中找到可执行文件: ${candidate}`);
+    process.exit(1);
+  }
+  mkdirSync(evidenceDirAbs, { recursive: true });
+  const logsDir = join(evidenceDirAbs, "logs", label);
+  mkdirSync(logsDir, { recursive: true });
+
+  const candidateSha256 = computeArtifactSha256(candidateAbs);
+  const binarySha256 = computeFileSha256(binPath);
+  const xattrNames = safeExecText("xattr", [binPath]);
+  const systemBefore = captureSystemSnapshot();
+
+  const samples = [];
+  const runs = [];
+  let conditioningRun = null;
+  const homeRoot = join(evidenceDirAbs, "homes", label);
+  const samplingStartedAt = new Date().toISOString();
+
+  // 复用 runLaunchSample（同一 spawn/renderer-ready 协议），外层补三件
+  // 归因必需：逐样本保存结果（含有界原始 stdout/stderr chunk 与 trace）、
+  // HOME 生命周期由 homeMode 决定、失败即停（不跳样不挑样）。
+  const runOne = async (homeDir, index, kind) => {
+    mkdirSync(homeDir, { recursive: true });
+    const startedAt = new Date().toISOString();
+    const result = await runLaunchSample(binPath, { homeDir, captureRaw: true });
+    const logFile = join(logsDir, `${kind}-${String(index).padStart(3, "0")}.json`);
+    writeFileSync(
+      logFile,
+      JSON.stringify(
+        {
+          index,
+          kind,
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          homeDir: relative(ROOT, homeDir),
+          result,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    return result;
+  };
+
+  if (homeMode === "fresh") {
+    for (let i = 0; i < samplesCount; i++) {
+      const homeDir = join(homeRoot, `fresh-${i}`);
+      const res = await runOne(homeDir, i, "fresh");
+      runs.push(res);
+      if (!res.markerFound || !Number.isFinite(res.elapsedMs)) break; // 失败即停：不跳样
+      samples.push(res.elapsedMs);
+      rmSync(homeDir, { recursive: true, force: true });
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  } else {
+    const sharedHome = join(homeRoot, "shared");
+    if (conditioningFirst) {
+      conditioningRun = await runOne(sharedHome, 0, "conditioning");
+      if (!conditioningRun.markerFound) {
+        console.error("run-performance: FAIL — conditioning 启动失败，后续样本无意义");
+        process.exit(1);
+      }
+    }
+    for (let i = 0; i < samplesCount; i++) {
+      const res = await runOne(sharedHome, i + 1, "shared");
+      runs.push(res);
+      if (!res.markerFound || !Number.isFinite(res.elapsedMs)) break;
+      samples.push(res.elapsedMs);
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    rmSync(sharedHome, { recursive: true, force: true });
+  }
+  const samplingFinishedAt = new Date().toISOString();
+  const systemAfter = captureSystemSnapshot();
+  const stats = calcStats(samples);
+  const gitHead = attributionGitHead;
+  // PRR-067 审阅修正 4：非 legacy 模式下，任一有效样本的 startupTrace 缺失
+  // 必备里程碑、逆序、负 duration 或必要字段缺失 → 整轮 fail-closed。
+  const traceFailureSamples = runs.filter(
+    (run) => run.markerFound && run.startupTrace && !run.startupTrace.traceValid,
+  );
+  if (!legacyTimingOnly && traceFailureSamples.length > 0) {
+    const issues = traceFailureSamples.flatMap((run) =>
+      run.startupTrace.traceIssues.map((issue) => `${run.runId.slice(0, 8)}:${issue}`),
+    );
+    console.error(
+      `run-performance: FAIL — ${traceFailureSamples.length} 个样本的 startupTrace 无效：` +
+        `${issues.join(", ")}（分段证据不完整；旧候选请显式使用 --legacy-timing-only，该模式不得用作分段归因证据）`,
+    );
+  }
+
+  const report = {
+    schemaVersion: 2,
+    task: "PRR-067",
+    scope: "attribution",
+    platform: "macOS",
+    arch: process.arch,
+    measurementMode: legacyTimingOnly
+      ? "attribution-diagnostic-legacy-timing-only"
+      : "attribution-diagnostic",
+    segmentationEvidence: !legacyTimingOnly,
+    legacyTimingOnlyDeclaration: legacyTimingOnly
+      ? "timing-distribution only; startupTrace is NOT validated in this mode and must never be cited as segmentation/attribution evidence"
+      : null,
+    note: "diagnostic evidence only; must never enter release manifest or be re-labeled as release",
+    sourceCommit: gitHead,
+    sourceWorktree: "clean",
+    runnerPath: RUNNER_PATH,
+    runnerSha256: computeFileSha256(RUNNER_PATH),
+    command: [process.execPath, ...process.argv.slice(1)].join(" "),
+    candidate,
+    candidateSha256,
+    executable: relative(ROOT, binPath),
+    executableSha256: binarySha256,
+    executableXattrNames: xattrNames,
+    homeMode,
+    conditioningFirst,
+    conditioningRun,
+    requestedSamples: samplesCount,
+    validSamples: samples.length,
+    samples,
+    stats,
+    runs,
+    traceFailureCount: traceFailureSamples.length,
+    systemBefore,
+    systemAfter,
+    startedAt: samplingStartedAt,
+    finishedAt: samplingFinishedAt,
+    samplingComplete: samples.length === samplesCount,
+  };
+  const reportPath = join(evidenceDirAbs, `cold-attribution-report-${label}.json`);
+  writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
+  console.log(
+    `run-performance: attribution[${label}] valid=${samples.length}/${samplesCount} ` +
+      `p50=${stats.p50} max=${stats.max} → ${reportPath}`,
+  );
+  const pass = report.samplingComplete && (legacyTimingOnly || traceFailureSamples.length === 0);
+  process.exit(pass ? 0 : 1);
 }
 
 // ==================== RELEASE 测量管线 ====================

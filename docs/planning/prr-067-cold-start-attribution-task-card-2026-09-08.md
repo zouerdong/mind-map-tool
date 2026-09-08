@@ -3,9 +3,12 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`READY / PRR-070_BLOCKED`  
+状态：`WAITING_FOR_G_PERF_PROTOCOL`
+
+阶段 A 执行记录（2026-09-08，@ `4251894`）：A1 复算确认失败（首样本 1685.4ms 唯一离群）；A2 perf-only 分段埋点 + 红灯测试 + 零生产行为实证（无 env 启动 stdout 0 条 perf 行）；A3 完成 B0–B3 与 D1/D2 对照；A4 判定 `MEASUREMENT_BOUNDARY_CONFIRMED`（离群 ~98% 落在 spawn→main-entered 界限，应用分段稳定）。决策包位于 `.tmp/prr-067-g-perf-protocol-request/`；未改预算/样本数/percentile/ready 完成点/ADR/register。
+
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
-后继：PRR-067 独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
+后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
 
 ## 派发文本
 
