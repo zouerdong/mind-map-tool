@@ -29,3 +29,6 @@ tempfile = "3"
 [profile.release]
 strip = true
 lto = true
+# size 优化：v1 DMG 预算 25,000,000B（ADR 0006 decimal MB）临界；
+# Rust 壳层非帧循环热点（canvas/edit 在 WebView 侧），优先压缩二进制体积。
+opt-level = "s"
