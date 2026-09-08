@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-066_READY`。PRR-070 阶段 A 在 source `0c8a93b` 的性能步骤正确停止：production PNG 被 CSP 阻断、30秒 stable RSS 协议未实现、空白启动 eager-load 完整导出栈、warm p95 超预算，canvas 另有 raw 聚合口径错误。独立复算与小修见 [阶段 A 性能审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)，后继只派发 [PRR-066 性能整改卡](./prr-066-performance-remediation-task-card-2026-09-08.md)。PRR-066 经独立审阅并形成新 clean commit 前，PRR-070/080/090 与 G-FINAL 全部保持阻塞；旧候选及证据只读保留。
+当前整改批次状态为 `PRR-066 COMPLETE / READY_FOR_INDEPENDENT_REVIEW`。PRR-066 起于 PRR-070 阶段 A 在 source `0c8a93b` 的性能步骤正确停止（production PNG 被 CSP 阻断、30秒 stable RSS 协议未实现、空白启动 eager-load 完整导出栈、warm p95 超预算、canvas raw 聚合口径错误；独立复算见 [阶段 A 性能审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)），已于 clean commit `f5f8872` 关闭五项根因：CSP 仅新增 `wasm-unsafe-eval`、导出栈按首个几何意图/真正导出延迟加载、RSS 按 30 秒稳定窗测量、canvas frame p95 由三组完整 raw 帧样本复算、PNG/WASM 失败映射稳定 code+message。预发布性能预检（独立诊断 build 于 `.tmp/prr-066-f5f8872/`）`run-performance --scope release --samples 20` 全部预算 PASS（coldStart p95 324.9ms / warmStart p95 316.2ms / 30s RSS 98.8MB / canvas 18ms / edit 18ms / save 14ms / PNG 1561ms / installer 24,550,854B）。PRR-066 等待独立审阅；独立审阅通过前，PRR-070/080/090 与 G-FINAL 保持阻塞；PRR-070 从 f5f8872 之后的新 clean source commit 从步骤 1 完整重做；旧 `0c8a93b` 候选及证据只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 

@@ -1,10 +1,10 @@
 # PRR-066：候选性能与 PNG/CSP 根因整改
 
-日期：2026-09-08  
-类型：生产路径修复 / 性能证据协议修复  
-优先级：P0  
-状态：`READY_FOR_CODING`  
-依赖：PRR-070 阶段 A 在 `0c8a93b` 正确停止；[独立审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)完成  
+日期：2026-09-08
+类型：生产路径修复 / 性能证据协议修复
+优先级：P0
+状态：`PRR-066 COMPLETE / READY_FOR_INDEPENDENT_REVIEW`
+依赖：PRR-070 阶段 A 在 `0c8a93b` 正确停止；[独立审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)完成
 后继：独立审阅 PRR-066 → 新 clean source commit → PRR-070 从步骤1完整重做
 
 ## 派发文本
