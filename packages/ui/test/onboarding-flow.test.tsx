@@ -175,6 +175,27 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
     });
   });
 
+  it("presentRestoredState=false：恢复 not-started/in-progress 但启动不呈现", async () => {
+    for (const status of ["not-started", "in-progress"] as const) {
+      cleanup();
+      const store = new InMemoryPreferenceStore(
+        status === "not-started" ? {} : { onboardingStatus: status },
+      );
+      const prefs = createOnboardingPreferences(store);
+      const loadSpy = vi.spyOn(prefs, "load");
+      const channel = fakeChannel();
+      render(
+        <OnboardingFlow
+          observeCommands={channel.observeCommands}
+          preferences={prefs}
+          presentRestoredState={false}
+        />,
+      );
+      await waitFor(() => expect(loadSpy).toHaveBeenCalled());
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
+
   it("偏好读取失败不阻塞画布，并向宿主报告非致命提示", async () => {
     const onPreferenceWarning = vi.fn();
     const prefs = {

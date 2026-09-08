@@ -113,4 +113,33 @@ describe("createAppCommandListenerBridge（原生菜单事件桥接）", () => {
     await late;
     expect(dispose).toHaveBeenCalledOnce();
   });
+
+  it("listen 建立失败时可见上报；卸载后的迟到失败不再上报", async () => {
+    const onError = vi.fn();
+    const first = createAppCommandListenerBridge(
+      () => false,
+      () => Promise.reject(new Error("listen failed")),
+      onError,
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "listen failed" }));
+    first();
+
+    let rejectLate: (error: Error) => void = () => {};
+    const late = new Promise<() => void>((_resolve, reject) => {
+      rejectLate = reject;
+    });
+    const lateError = vi.fn();
+    const second = createAppCommandListenerBridge(
+      () => false,
+      () => late,
+      lateError,
+    );
+    second();
+    rejectLate(new Error("late"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(lateError).not.toHaveBeenCalled();
+  });
 });

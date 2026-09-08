@@ -18,7 +18,7 @@ accelerator，按键被 macOS 菜单拦截产生唯一 menu event，经 host 定
 | ------ | -------- | --------------------------------------------------- |
 | ⌘Q     | 退出     | host-owned：逐窗 fail-closed 关闭协议（MRT-003 X2） |
 | ⇧⌘N    | 新建窗口 | host-owned：activation 语义（同 Dock/图标；D1）     |
-| ⇧⌘W    | 关闭窗口 | host-owned：最近聚焦窗口原生 close → 三分支协议     |
+| ⌘W     | 关闭窗口 | host-owned：最近聚焦窗口原生 close → 三分支协议     |
 
 ## 系统级（全局热键，任意前台应用下生效）
 

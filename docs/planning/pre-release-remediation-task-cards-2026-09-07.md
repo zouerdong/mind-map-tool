@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-065_READY`
+状态：`IN_PROGRESS / PRR-070_READY`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -382,9 +382,9 @@ Save As、重新打开或窗口重建后，旧 document handle 不能继续驱�
 
 类型：产品视觉边界 / desktop command surface / 可访问性
 优先级：P0（PRR-070 新候选前必须完成）
-状态：`IMPLEMENTED / CLEAN_COMMIT_808959b`（2026-09-08 完成实现与全量源码门，报告见 `docs/quality/prr-065-implementation-report-2026-09-08.md`；PRR-070 须从本 commit 之后的新 clean source commit 重做）
+状态：`COMPLETE / INDEPENDENT_REVIEW_ACCEPTED`（实现点 `808959b`、状态点 `79f099c`；2026-09-08 独立审阅修正 onboarding 启动遮挡、accelerator 合同、CheckMenuItem 状态、监听失败处理、缓存清理与 CSP 窄豁免，并复跑全量源码门；PRR-070 只从包含审阅修复与本卡的当前 clean HEAD 重做）
 依赖：PRR-000～060 已集成；起点为 `main@89d7c76` 加本任务卡 planning patch
-后继：形成新的 clean source commit，然后从头执行 PRR-070
+后继：当前审阅修复与 PRR-070 卡形成 clean source commit 后，从头执行 PRR-070
 
 ### 负责人意图与本卡技术决议
 
@@ -402,7 +402,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 2. 保留 macOS 标准原生标题栏、交通灯和屏幕顶部的系统应用菜单栏；不进入无边框、强制全屏、`LSUIElement` 或 private API 路线。
 3. 文件、编辑、视图、整理、主题、设置和帮助命令进入 macOS 原生应用菜单；既有快捷键继续可用，并与原生菜单共用同一个 renderer command dispatcher。
 4. 节点/边格式工具条只在有选择时出现；错误、冲突、恢复、导出、设置和引导只在用户动作或异常发生后临时出现。
-5. 首次启动不自动显示 onboarding；既有引导逻辑继续保留，只能由原生“帮助 → 开始/重放引导”或 `⌘⇧H` 显式打开。
+5. 任何启动状态（包括 `not-started` / `in-progress`）都不自动显示 onboarding；既有引导逻辑继续保留，只能由原生“帮助 → 开始/重放引导”或 `⌘⇧H` 显式打开。
 6. 文档名与 dirty 状态继续使用现有原生窗口标题（`● <name> — Mind Map`），不在画布内复制。
 7. React Flow attribution 沿用既有 G1 决定，`hideAttribution: false`；本卡不得隐藏、移动或以 CSS 遮盖。
 8. 本卡不新增可见 command palette、右键菜单或新依赖；Windows 原生命令表仅保持可移植契约，Windows 视觉实现继续 deferred。
@@ -415,7 +415,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 | `文件` | 新建、打开、保存、另存为、导出、关闭窗口、新建窗口 | “新建当前文档”与“新建窗口”必须区分；不得绕过 dirty 确认和 handle/token 语义 |
 | `编辑` | 撤销、重做、剪切、复制、粘贴、全选 | textarea 编辑态使用原生文本语义；画布态使用 session/history；一次快捷键只执行一次 |
 | `视图` | 适应画布、整理、横向/纵向布局、暖白/黑板主题 | app-wide 菜单必须跟随最近聚焦窗口的文档主题和布局方向，不得把主题切换变成全局偏好 |
-| `帮助` | 开始/重放首次引导 | 首次启动不自动弹出；显式命令必须仍可完整启动引导 |
+| `帮助` | 开始/重放首次引导 | 任何启动状态都不自动弹出；显式命令对未开始状态显示 welcome，其余状态从第一步进入 |
 
 应用级快捷键以 `apps/desktop/src/app/shortcut-table.md` 与 `keyboard.ts` 为单一事实源：`⌘N/O/S/⇧S/E/⇧L/⇧H`。画布 `⌘Z/⇧Z/A/±/0/L`、节点编辑与 IME 隔离规则保持不变；原生 accelerator 与 WebView `keydown` 不得双重派发。
 
@@ -438,7 +438,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 ### 红灯（先写）
 
 1. 空白启动、打开已有文档和新窗口三种情况下，WebView 中出现 `主工具条`、`文件 ▾`、`整理`、`视图`、主题按钮或 40px 顶部占位，测试必须失败。
-2. 首次偏好为 `not-started` 时自动出现 onboarding，测试必须失败；显式“帮助 → 开始引导”不能打开也必须失败。
+2. 偏好为 `not-started` 或 `in-progress` 时在启动阶段自动出现 onboarding，测试必须失败；显式“帮助 → 开始引导”不能打开也必须失败。
 3. 任一原生菜单命令不可达、到达错误窗口、在窗口 closing/destroyed generation 上执行，必须失败。
 4. 一次 accelerator 同时触发 native event 与 renderer keydown，导致新建/保存/整理等执行两次，必须失败。
 5. dirty close、Save/Save As、open、export、快捷键、IME 或 textarea 原生编辑语义出现回归，必须失败。
@@ -454,7 +454,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 4. 建立 renderer → host 的轻量菜单状态同步，仅同步 enable/check 所需的非敏感状态；主题和布局状态按窗口隔离。不得引入轮询、网络或持久化副本。
 5. 把应用级快捷键接到同一 dispatcher；明确 native accelerator 与 browser-dev keydown 的平台分工，保住输入控件/IME 隔离和 exactly-once。
 6. 从 `MindMapApp` 生产渲染树解除 `AppHeader`，让 `EditorCanvas` 直接占满内容区；窗口 title 的文档名/dirty 逻辑保留。没有文件删除授权，不删除或重命名 `app-header.tsx`，在交回风险中登记后续清理债务。
-7. 将 onboarding 改为 explicit-only：首次空白启动保持不可见，Help/`⌘⇧H` 触发 replay 后才显示；完成/跳过/本机偏好语义保持。
+7. 将 onboarding 改为 explicit-only：任何启动状态都保持不可见，Help/`⌘⇧H` 才显式显示；未开始状态显示 welcome，其余状态从第一步进入；偏好损坏告警仍须被消费并可见上报。
 8. 更新视觉与 a11y fixtures。视觉 golden 的变更只能来自顶栏消失和画布高度增加；节点、边、字体、主题 token、attribution 和导出 bytes 不得借机变化。
 9. 运行全部验证，提交一个新的本地 clean source commit；不得构建/冻结最终 PRR-070 候选，不得申请 G-FINAL 或开始 PRR-080。
 
@@ -464,7 +464,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 - 浏览器/AX 树中不存在隐藏的 `主工具条` 或关闭菜单项；选择节点后 context toolbar 可见，取消选择后消失。
 - 原生菜单全部项目可由鼠标、键盘和 VoiceOver 发现；核心命令仅执行一次，目标始终是正确窗口。
 - 新建、打开、保存、另存为、导出、整理、fit、主题、设置、引导、dirty close 与多窗口定向测试全部通过。
-- 首次启动无 onboarding；Help/`⌘⇧H` 可以显式启动，完成与跳过偏好仍正确。
+- not-started / in-progress 启动均无 onboarding；Help/`⌘⇧H` 的 welcome/从第一步继续/重放分支正确，完成与跳过偏好仍正确。
 - `document.title` 的文档名与 `●` dirty 标记通过；保存成功后 dirty 标记清除。
 - 无新增运行时依赖；`initial entry ≤ 500,000B`；license/network/boundary gate 不退化。
 - `pnpm format:check`、`pnpm typecheck`、`pnpm lint`、相关 Vitest/a11y/visual、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets --locked -- -D warnings`、`pnpm build` 全部返回 0。
@@ -495,34 +495,75 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-065`（2026-09-08 负责人指令：新增零画布顶栏产品决定须先经 PRR-065 实施，PRR-070 从其后的新 clean source commit 完整重做；本轮在 caf1c20 上的试跑构建与性能矩阵不作为验收候选冻结）  
-依赖：PRR-000～060、PRR-065、clean source commit、精确 G2
+状态：`READY / TWO_STAGE_OWNER_GATE`（PRR-065 独立审阅已接受并完成小修；旧 `caf1c20` 及其前后所有试跑候选/证据只读作废）
+依赖：PRR-000～065 已集成；包含本任务卡的当前 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标
 
-从 clean source 构建唯一新候选，对同一 hash 完成所有原生证据，并取得负责人 G-FINAL。仍不签名、不公证、不发布。
+从一个 clean source commit 构建唯一的新 unsigned macOS Apple Silicon `.app`/`.dmg`，对同一 candidate hash 完成 bundle、DMG、安装、LaunchServices、生命周期、原生命令、VoiceOver、导出和真机性能矩阵。自动化只生成证据与负责人验收请求；G-FINAL 只能来自负责人查看/操作该候选后的 `[from-user]` 原文。仍不签名、不公证、不访问凭据、不上传、不 push、不公开发布。
+
+### 精确授权与写入范围
+
+- 已授权 candidate：`apps/desktop/src-tauri/target/release/bundle/macos/Mind Map.app`、`apps/desktop/src-tauri/target/release/bundle/dmg/Mind Map_0.1.0_aarch64.dmg`。
+- 新 evidence：`.tmp/release-candidate/<full-source-commit>/`；临时 profile/样本只进入 `.tmp/prr-070-*`。旧 `.tmp/release-candidate` 根层文件和其他 commit 子目录全部只读，不覆盖、不删除。
+- 临时安装仅使用 G2 登记的 `.tmp/release-candidate/installed/Mind Map.app`，由 `install-gate --execute` 按 receipt/hash 核验后清理；若发现外来预存目标，fail-closed 停止，不得强删。
+- 允许临时注册并恢复 LaunchServices 文件关联；不得修改系统信任、默认安全策略或签名设置。
+- 允许使用已有本地 Rust advisory 工具；若 `cargo-audit` 不存在，只可 `cargo install --root .tmp/prr-070-tools cargo-audit --locked`，不得全局安装。
+- PRR-070 不修改源码、测试、runner、生产配置、tracked 文档或 Gate。任何此类修改需求都要返回 PRR-065，形成新 clean commit 后从第 1 步重做。
+
+### 阶段 A：候选与完整原生矩阵
 
 ### 实施顺序
 
-1. 记录 source commit 和 clean worktree；运行完整源码门。
-2. bundle gate 构建 `.app/.dmg`，inventory 证明本轮刷新、hash/size/runner。
-3. 运行 PRR-010 性能；不得复用旧 raw data。
-4. 执行受控 install/launch/LaunchServices 验证。
-5. 在真实候选覆盖：冷启动、running/open、dirty、多窗口、最小化、关闭三分支、恢复、快捷键五状态、`.mindmap`/`.json`、SVG/2x PNG/PDF、CSP/权限/零网络。
-6. 输出 `macos-native-candidate-report.json`，每项含命令、时间、结果、artifact 与 candidate hash。
-7. 把候选交给项目负责人实际查看/操作；只在收到明确结论后记录 G-FINAL `[from-user]`。
-8. 最后生成 readiness manifest，不再覆盖任何输入 artifact。
+1. **冻结 source**：记录 `git rev-parse HEAD`、`git status --short`、OS build、arch、CPU/RAM、Node/pnpm/Rust/Tauri 版本；worktree 非空立即停止。证据目录名使用完整 source commit，不使用短 hash 猜测归属。
+2. **源码门**：逐项记录开始/结束时间和 exit code，至少运行 `pnpm format:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`pnpm test:integration`、`pnpm test:a11y`、`pnpm test:visual`、`pnpm test:export`、`pnpm build`、`pnpm net:scan`、`pnpm license:scan`、`pnpm boundaries`、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets --locked -- -D warnings`。复算 initial entry `≤ 500,000B`。此阶段不要运行缺 manifest 必然 fail-closed 的最终 `pnpm quality -- --release-evidence`，它属于 PRR-080。
+3. **依赖 advisory**：记录 JS advisory 命令/数据库时间与结果；运行已有 `cargo audit`，不存在时按本卡局部安装。不得把工具缺失、网络失败或旧数据库写成 PASS；无法完成则 `BLOCKED`。
+4. **唯一 bundle**：用 `scripts/quality/bundle-gate.mjs` 从该 clean HEAD 运行 unsigned Tauri build，把 inventory 写进本 source 的新 evidence 目录。inventory 必须证明 `.app` 与 `.dmg` 都由本轮刷新，记录 path/SHA-256/bytes/mtime/source/runner hash。构建前后 source HEAD 和 worktree 必须不变。
+5. **产物身份与 DMG 实测**：从 `.app/Contents/Info.plist` 与可执行文件复算 product/version/bundle id/arm64/`LSMinimumSystemVersion=11.0`、`.mindmap` document type、UTI/MIME、category、LICENSE/THIRD_PARTY_NOTICES 携带和 CSP/capability；验证 candidate 未签名。只读挂载 `.dmg`，核对能打开、包含的 `.app` hash/身份与 inventory 关系以及 `.dmg ≤ 25MB`，随后正常 detach；不得签名、调用公证或改变系统信任。
+6. **真机性能**：对同一 `.app` 用 `run-performance.mjs --scope release --platform macos --samples 20` 生成全新 raw/summary；冷/热启动各不少于 20 个有效样本，另含 renderer-ready、stable RSS、300/450 pan/zoom/drag、create/move/connect/undo、save、2x PNG。每项记录失败数、p50/p95/max、fixture hash、`measurementSource=native-candidate`、candidate/source/runner hash；不得复用、复制或改写旧 raw data。
+7. **受控安装与文件关联**：先 `install-gate --plan`，再对同一 candidate 执行 `--execute`；按 receipt/hash 证明复制、身份校验和只清理本轮安装。临时注册 LaunchServices 后验证 Finder/`open` 的冷启动与运行中 `.mindmap` 路由、已有 `.json` 兼容、默认 Save As `.mindmap`，结束时注销/恢复并记录前后状态。发现外来安装或无法可靠恢复时停止，不得覆盖或强删。
+8. **完整原生功能矩阵**：只操作真实 candidate，不以 jsdom、dev server、web harness 或 Rust 单测替代。每项必须记录操作方式（鼠标/accelerator/VoiceOver）、预期、实际、时间、截图/日志路径和 candidate hash：
+
+   | 组 | 必测事实 |
+   | --- | --- |
+   | 零 chrome / 两主题 | not-started 与 in-progress 两种启动均直接显示纯画布；无 WebView 顶栏、菜单、按钮、状态文字或 onboarding；暖白/黑板各一张 1080×864 图；React Flow attribution 保留；选择节点时上下文工具条出现、取消选择后消失；AX 树无隐藏“主工具条” |
+   | 原生菜单 / a11y | `Mind Map/文件/编辑/视图/帮助` 全项名称、顺序、enabled/check、快捷键提示正确；鼠标、键盘菜单导航、VoiceOver 逐项可发现；VoiceOver 权限不可用且需要修改系统权限时返回 `BLOCKED`，不得自行改系统设置 |
+   | accelerator / exactly-once | `⌘N/O/S/⇧⌘S/E/⇧⌘L/⇧⌘H/W/Q` 各执行恰好一次；导出必须是 `⌘E`，关闭窗口必须是 `⌘W`；菜单鼠标点击同样只执行一次；窗口 closing/destroyed 时命令 fail-closed |
+   | 编辑与 IME 隔离 | textarea 的撤销/重做/剪切/复制/粘贴/全选为原生文本语义；画布 `⌘Z/⇧⌘Z/A` 仍走 session/history；节点编辑态与中文 IME composition 期间不得误触发应用/画布命令。若原生 accelerator 绕过既有隔离，立即判 FAIL 并退回 PRR-065，不得在本卡现场改 source |
+   | 多窗口 | 至少两个窗口分别载入不同文档/主题/布局；菜单命令、`⌘W`、check state 始终跟随最近聚焦窗口；重复点击当前主题/布局仍恰有一个勾选；关闭一个窗口后其快照不残留、不污染另一窗口 |
+   | 文件与关闭 | New/Open/Save/Save As/dirty 标题 `●`、外部变更冲突、旧 handle/token 拒绝、关闭 Save/Discard/Cancel 三分支、保存中关闭、失败重试、逐窗 Quit 均保持 fail-closed |
+   | 启动/恢复/热键 | cold argv、running open、重复文件、多个文件、Reopen、最小化/失焦/已聚焦/编辑态/连线态五状态的 `⌥Space` 分流和 recovery/pending-report 均正确 |
+   | 导出 | 同一合成中文脑图导出语义 SVG、2x PNG、PDF；三者内容/字体/主题一致，SVG 无编辑控件/`foreignObject`，PNG 尺寸正确，PDF 至少两种 viewer 可打开 |
+
+9. **原生报告**：生成 `.tmp/release-candidate/<source>/macos-native-candidate-report.json`，`evidenceKind=native-candidate`、`platform=macos`、`overall=PASS`；包含 source commit、candidate/dmg hash、环境、逐项命令窗口、结果、artifact path/hash、NotRun（必须为空或只含 Windows deferred 决策）和红线确认。报告不能只引用 `.app` 路径，也不能把 web harness 标成 native。
+10. **一致性复算**：确认全部 artifact 都属于同一 source/candidate，runner hash 未漂移，报告时间晚于其输入；再次确认 worktree clean。任一 mismatch、失败、遗漏或 source/candidate 变化都作废本轮，停止并返回，不得拼接旧证据。
+11. **交回并等待**：输出绑定精确 source/candidate hash 的 `g-final-request.md/json`（仅请求，不含伪造批准），告诉负责人候选路径、hash、最小人工检查动作和结论格式；状态返回 `WAITING_FOR_OWNER_G_FINAL`。不得自行写 `APPROVED`，不得生成 readiness manifest，不得开始 PRR-080。
+
+负责人 G-FINAL 最小人工检查：从本卡候选启动，确认首次为全干净画布；用系统菜单完成新建/保存/导出、主题/布局切换和开始引导；打开第二窗口确认命令目标；查看一份 `.mindmap` 和三格式导出；确认是否接受该**精确 hash**作为 0.1.0 unsigned 发布候选。
+
+### 阶段 B：仅在负责人原文到位后
+
+1. 核对 `[from-user]` 原文明确包含批准人、结论、source commit、candidate path 与完整 SHA-256；任何缺项都继续等待，不补写、不推断。
+2. 在同一 evidence 目录生成独立 `g-final.json`：`approvalKind=g-final`、`status=APPROVED`、`approvedBy`、`approvedAt`、`userRecord`、`sourceCommit`、`candidateSha256`、artifact path/hash 均可复算。
+3. 只复核 hash/时间拓扑/worktree，不重跑会覆盖 artifact 的 runner。交回 `PRR-070 COMPLETE / G-FINAL_RECORDED` 后停止；PRR-080 必须由下一次明确派发开始。
 
 ### 验收
 
-- `.dmg`、全部原生预算、文件关联、安装生命周期、导出与视觉均 PASS。
-- native report 的 `evidenceKind=native-candidate`，source/candidate/platform 全匹配。
-- G-FINAL 真实主体、时间、artifact、candidate hash 齐全。
-- verifier 返回 0；工作树保持 clean。
+- source/worktree、`.app`/`.dmg`、全部原生预算、文件关联、安装生命周期、命令/a11y、导出与视觉均 PASS，且没有复用旧证据。
+- native report 的 `evidenceKind=native-candidate`，source/candidate/platform/runner/time 全匹配；Windows 只以 ADR 决策 deferred，不阻断 macOS v1。
+- 阶段 A 正确停在 `WAITING_FOR_OWNER_G_FINAL`；阶段 B 的 G-FINAL 有真实主体、时间、原文、独立 artifact 与精确 candidate hash。
+- `git status --short` 始终为空；本卡不生成 readiness manifest，也不宣称 `READY_TO_RELEASE`。
+
+### 交回物
+
+- 新 source 目录下的 bundle inventory、source-gate/advisory 日志、release performance raw/summary、install/LaunchServices 证据、DMG/Info.plist/codesign 探针、原生矩阵截图/日志与 `macos-native-candidate-report.json`。
+- 阶段 A：`g-final-request.md/json` + 固定格式任务报告，状态 `WAITING_FOR_OWNER_G_FINAL`。
+- 阶段 B：负责人原文绑定的 `g-final.json` + hash 清单，状态 `COMPLETE / G-FINAL_RECORDED`。
 
 ### STOP
 
-任一源码或 runner 在构建后变化；candidate hash 变化；需要删除旧证据或修改系统状态但未授权；负责人未做 G-FINAL。
+worktree 非 clean；任一源码/测试/runner/tracked 文档在候选构建前后变化；candidate hash 变化；任何 native/性能/DMG/文件关联/VoiceOver/IME/多窗口项失败或缺测；需要覆盖外来安装、删除旧证据、修改系统权限/信任、签名/公证/凭据/push/上传/发布；负责人尚未给出精确 G-FINAL。命中后必须保留现场并报告，不得现场绕过或把 `NotRun` 写成 PASS。
 
 ---
 

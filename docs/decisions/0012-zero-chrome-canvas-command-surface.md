@@ -32,14 +32,14 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
 2. **保留 macOS 标准原生标题栏、交通灯与系统应用菜单栏**；不进入 `LSUIElement`、无边框、强制全屏或 private API 路线。
 3. **命令归属 macOS 原生菜单**（稳定 menu item id）：
    - `Mind Map`：关于（predefined）、设置/全局热键、Services、Hide、Hide Others、Show All、Quit（自定义，继续走逐窗 fail-closed 关闭协议）
-   - `文件`：新建 `⌘N`、打开 `⌘O`、保存 `⌘S`、另存为 `⇧⌘S`、导出 `⇧⌘E`、新建窗口 `⇧⌘N`、关闭窗口 `⇧⌘W`
+   - `文件`：新建 `⌘N`、打开 `⌘O`、保存 `⌘S`、另存为 `⇧⌘S`、导出 `⌘E`、新建窗口 `⇧⌘N`、关闭窗口 `⌘W`
    - `编辑`：predefined 撤销/重做/剪切/复制/粘贴/全选（textarea 原生文本语义；画布态 undo/redo 继续由 WebView 键位层处理，不重复派发）
    - `视图`：适应画布、整理 `⇧⌘L`、横向布局 ✓ / 纵向布局 ✓（check）、暖白 ✓ / 黑板 ✓（check）
    - `帮助`：开始/重放引导 `⇧⌘H`
 4. **单一 typed command dispatcher**：renderer 定义 `AppCommandId`；原生菜单事件（host 定向 emit）、应用级快捷键（浏览器 dev keydown）与既有回调都只调用同一 dispatcher，业务逻辑零复制。
 5. **定向与 exactly-once**：带 accelerator 的菜单命令由 macOS 菜单拦截按键并产生唯一 menu event，定向发给最近聚焦且仍存在的 WebView；Tauri 生产环境下 WebView keydown 不再派发应用级快捷键（浏览器 dev 仍走 keydown）。`⌥Space` 全局热键与画布级键位不变。
 6. **菜单状态同步**：renderer 仅向 host 上报非敏感的 enable/check 状态（主题、布局方向）；host 按 per-window 缓存，窗口聚焦时刷新 app-wide 菜单 check state。不轮询、不联网、不持久化。
-7. **Onboarding explicit-only**：首次启动（偏好 `not-started`）不自动显示引导；仅"帮助 → 开始/重放引导"或 `⌘⇧H` 显式打开。`in-progress` 中断续跑、`completed/skipped` 不再弹出、完成/跳过本机偏好语义保持。
+7. **Onboarding explicit-only**：任何启动状态（包括偏好 `not-started` / `in-progress`）都不自动显示引导；仅“帮助 → 开始/重放引导”或 `⌘⇧H` 显式打开。`not-started` 显示含开始/跳过的 welcome，`in-progress` 从第一步继续，`completed/skipped` 从第一步重放；中断状态可在后台恢复但不遮挡画布，完成/跳过本机偏好语义保持。
 8. **保留**：dirty `●` 标记与文档名的原生窗口标题、选择态上下文工具条、错误/恢复/导出/设置临时面板、React Flow attribution（`hideAttribution: false`）。
 9. **不新增**：command palette、右键菜单、运行时依赖；Windows 原生命令表仅保持可移植契约（`AppCommandId` 与 dispatcher 契约平台无关），视觉实现继续 deferred。
 

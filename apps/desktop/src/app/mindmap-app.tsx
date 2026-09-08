@@ -125,9 +125,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
   // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
   const [quickCreateSignal, setQuickCreateSignal] = useState(0);
-  // PRR-065：onboarding 条件挂载——首启（not-started）不自动出示；
-  // in-progress 续跑保留；help.onboarding（帮助菜单/⌘⇧H）显式挂载+重放。
-  const [onboardingMounted, setOnboardingMounted] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmState, setConfirmState] = useState<PendingConfirm>(null);
   // 原生关闭三分支（MRT-003）：closeState 同步镜像到 ref，供 async 流程
@@ -246,25 +243,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     () => createOnboardingPreferences(ports.preferences),
     [ports.preferences],
   );
-
-  // PRR-065：onboarding 条件挂载（ADR 0012 §7）——not-started 首启不自动
-  // 出示（打开即全干净画布）；in-progress 中断续跑保留；读取失败按
-  // not-started 保守处理（不挂载，等待显式打开）。显式入口统一经
-  // help.onboarding 命令（帮助菜单 / ⌘⇧H）。
-  useEffect(() => {
-    let cancelled = false;
-    void onboardingPreferences
-      .load()
-      .then((status) => {
-        if (!cancelled && status !== "not-started") setOnboardingMounted(true);
-      })
-      .catch(() => {
-        /* 读取失败：保守不挂载；偏好警告由 OnboardingFlow 自身路径提示 */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [onboardingPreferences]);
 
   const confirmDiscard = useCallback(
     (message: string) =>
@@ -669,16 +647,17 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       "view.layout-horizontal": () => setOrganizeDirection("horizontal"),
       "view.layout-vertical": () => setOrganizeDirection("vertical"),
       "view.theme-warm": () => {
+        if (session.current.document.document.theme === "light") return;
         session.commit({ kind: "SetDocumentStyle", theme: "light" });
         bump();
       },
       "view.theme-dark": () => {
+        if (session.current.document.document.theme === "dark") return;
         session.commit({ kind: "SetDocumentStyle", theme: "dark" });
         bump();
       },
       "app.shortcuts": () => void openShortcutPanel(),
       "help.onboarding": () => {
-        setOnboardingMounted(true);
         setReplaySignal((n) => n + 1);
       },
     }),
@@ -731,7 +710,15 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       }
       return listen(event, (e) => handler({ payload: e.payload }));
     };
-    return createAppCommandListenerBridge((id) => dispatchCommandRef.current(id), listenWebview);
+    return createAppCommandListenerBridge(
+      (id) => dispatchCommandRef.current(id),
+      listenWebview,
+      (error) =>
+        setNotice({
+          tone: "error",
+          text: `原生命令菜单连接失败：${error instanceof Error ? error.message : String(error)}`,
+        }),
+    );
   }, []);
 
   // ---- 浏览器 dev / 测试命令通道（PRR-065） ----
@@ -739,6 +726,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // dispatch 通道供开发调试与 jsdom 集成测试驱动（view.fit / app.shortcuts
   // 等无键盘绑定的命令）。不构成 WebView chrome。
   useEffect(() => {
+    if (!ports.isBrowserDev) return;
     const w = window as typeof window & {
       __mmDispatchAppCommand?: (id: string) => boolean;
     };
@@ -746,7 +734,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     return () => {
       delete w.__mmDispatchAppCommand;
     };
-  }, []);
+  }, [ports.isBrowserDev]);
 
   // ---- 全局热键 Pre-Focus 两阶段协议（PRC-030 / ADR 0011）：
   // 阶段 1：响应 host 的 pre-focus probe，此时 host 尚未聚焦窗口，读取真实 document.hasFocus()；
@@ -1378,17 +1366,16 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         </div>
       ) : null}
 
-      {/* PRR-065：条件挂载——not-started 首启不自动出示；help.onboarding
-          （帮助菜单 / ⌘⇧H）显式挂载并重放；in-progress 续跑保留。 */}
-      {onboardingMounted ? (
-        <OnboardingFlow
-          observeCommands={observeCommands}
-          preferences={onboardingPreferences}
-          theme={theme}
-          replaySignal={replaySignal}
-          onPreferenceWarning={onPreferenceWarning}
-        />
-      ) : null}
+      {/* PRR-065：始终挂载以消费偏好损坏警告、恢复进度，但启动时永不
+          自动呈现；仅 help.onboarding（帮助菜单 / ⌘⇧H）显式 replay。 */}
+      <OnboardingFlow
+        observeCommands={observeCommands}
+        preferences={onboardingPreferences}
+        theme={theme}
+        replaySignal={replaySignal}
+        presentRestoredState={false}
+        onPreferenceWarning={onPreferenceWarning}
+      />
     </div>
   );
 }

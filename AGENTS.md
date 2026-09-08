@@ -2,9 +2,9 @@
 
 ## 项目阶段
 
-当前处于实现阶段（VRA-000 对账更正，2026-09-06）：G0 与 G1 已于 2026-08-26 由项目负责人批准，G2 仍 pending。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。MM-010～MM-090 已执行，当前整改与视觉对齐批次并行推进。
+当前处于发布前原生候选验收阶段（PRR-065 独立审阅完成，2026-09-08）：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～065 已完成，下一步只从当前 clean source commit 串行执行 PRR-070 原生候选矩阵。
 
-会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-06 参考对齐批次（VRA-000～VRA-090）的登记为准，见 `docs/planning/README.md` 与 [visual-alignment-development-guide-2026-09-06.md](./docs/planning/visual-alignment-development-guide-2026-09-06.md)。
+会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 
 ## 工程原则
 

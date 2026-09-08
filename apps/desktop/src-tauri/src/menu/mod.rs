@@ -42,6 +42,9 @@ pub const MENU_VIEW_THEME_DARK: &str = "view.theme-dark";
 pub const MENU_APP_SHORTCUTS: &str = "app.shortcuts";
 pub const MENU_HELP_ONBOARDING: &str = "help.onboarding";
 
+const ACCEL_FILE_EXPORT: &str = "CmdOrCtrl+E";
+const ACCEL_FILE_CLOSE_WINDOW: &str = "CmdOrCtrl+W";
+
 /// 全部 renderer 命令 id（分流与对齐测试用；顺序即菜单呈现序）。
 pub const RENDERER_COMMAND_IDS: &[&str] = &[
     MENU_FILE_NEW,
@@ -59,6 +62,16 @@ pub const RENDERER_COMMAND_IDS: &[&str] = &[
     MENU_HELP_ONBOARDING,
 ];
 
+/// macOS/muda 会在派发 CheckMenuItem 事件前先自动反转勾选态。主题与布局是
+/// 互斥的状态选择而非独立开关，因此 host 必须先恢复 renderer 最近上报的
+/// 权威快照，再等待命令执行后的新快照。
+pub const CHECK_COMMAND_IDS: &[&str] = &[
+    MENU_VIEW_LAYOUT_HORIZONTAL,
+    MENU_VIEW_LAYOUT_VERTICAL,
+    MENU_VIEW_THEME_WARM,
+    MENU_VIEW_THEME_DARK,
+];
+
 /// host-owned 命令 id（生命周期所有权保留在 host）。
 pub const HOST_OWNED_IDS: &[&str] = &[MENU_APP_QUIT, MENU_APP_NEW_WINDOW, MENU_FILE_CLOSE_WINDOW];
 
@@ -68,6 +81,10 @@ pub fn is_host_owned(id: &str) -> bool {
 
 pub fn is_renderer_command(id: &str) -> bool {
     RENDERER_COMMAND_IDS.contains(&id)
+}
+
+pub fn is_check_command(id: &str) -> bool {
+    CHECK_COMMAND_IDS.contains(&id)
 }
 
 // ---- 菜单 check 状态（纯逻辑，可单测） ----
@@ -177,6 +194,11 @@ impl MenuState {
         }
     }
 
+    /// 窗口销毁后清理菜单快照，避免长时多窗口会话积累失效 label。
+    pub fn on_window_destroyed(&self, label: &str) {
+        self.per_window.lock().unwrap().remove(label);
+    }
+
     fn apply_sync(&self, sync: &MenuWindowSync) {
         let (warm, dark, horiz, vert) = sync.check_state();
         if let Some(item) = self.theme_warm.lock().unwrap().as_ref() {
@@ -236,14 +258,14 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         MENU_FILE_EXPORT,
         "导出…",
         true,
-        Some("CmdOrCtrl+Shift+E"),
+        Some(ACCEL_FILE_EXPORT),
     )?;
     let file_close_window = MenuItem::with_id(
         app,
         MENU_FILE_CLOSE_WINDOW,
         "关闭窗口",
         true,
-        Some("CmdOrCtrl+Shift+W"),
+        Some(ACCEL_FILE_CLOSE_WINDOW),
     )?;
 
     // 编辑菜单：predefined 项走系统原生文本语义（textarea undo/copy 等），
@@ -439,6 +461,13 @@ mod tests {
         assert!(is_host_owned("app-quit"));
         assert!(is_host_owned("app-new-window"));
         assert!(is_host_owned("file-close-window"));
+        for id in CHECK_COMMAND_IDS {
+            assert!(
+                is_renderer_command(id),
+                "check 命令 {id} 必须属于 renderer 表"
+            );
+            assert!(is_check_command(id));
+        }
     }
 
     #[test]
@@ -446,6 +475,7 @@ mod tests {
         assert!(!is_host_owned("nonsense"));
         assert!(!is_renderer_command("nonsense"));
         assert!(!is_renderer_command(""));
+        assert!(!is_check_command("view.fit"));
     }
 
     #[test]
@@ -464,5 +494,11 @@ mod tests {
     fn predefined_edit_menu_covers_required_commands() {
         let ids = predefined_edit_ids();
         assert_eq!(ids, ["undo", "redo", "cut", "copy", "paste", "select_all"]);
+    }
+
+    #[test]
+    fn native_accelerators_match_shortcut_contract() {
+        assert_eq!(ACCEL_FILE_EXPORT, "CmdOrCtrl+E");
+        assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
     }
 }

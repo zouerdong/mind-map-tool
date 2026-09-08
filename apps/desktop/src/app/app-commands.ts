@@ -125,6 +125,7 @@ export type EventListenFn = (
 export function createAppCommandListenerBridge(
   dispatch: (id: string) => boolean,
   listenFn: EventListenFn,
+  onListenError?: (error: unknown) => void,
 ): EventUnlisten {
   let disposed = false;
   let unlisten: EventUnlisten | null = null;
@@ -132,10 +133,14 @@ export function createAppCommandListenerBridge(
     const payload = event.payload as AppCommandEventPayload | null;
     if (!payload || typeof payload.commandId !== "string") return;
     dispatch(payload.commandId);
-  }).then((dispose) => {
-    if (disposed) dispose();
-    else unlisten = dispose;
-  });
+  })
+    .then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    })
+    .catch((error: unknown) => {
+      if (!disposed) onListenError?.(error);
+    });
   return () => {
     disposed = true;
     unlisten?.();

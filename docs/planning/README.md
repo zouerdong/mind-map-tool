@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-065_IMPLEMENTED`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-010/020/040/050 的实现已在审阅小修后获得有条件接受；PRR-000（G2 真实批准已补齐并复算通过）、PRR-030 与 PRR-060 已实现。2026-09-08 负责人新增零画布顶栏产品决定：PRR-065 已实施完成（clean commit 808959b，ADR 0012 Accepted，报告见 `docs/quality/prr-065-implementation-report-2026-09-08.md`），旧 PRR-070 试跑候选作废；PRR-070 须从 808959b 之后的新 clean source commit 完整重做，不冻结候选、不申请 G-FINAL；PRR-080/090 未开始。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
+当前整改批次状态为 `IN_PROGRESS / PRR-070_READY`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-000～060 已实现；PRR-065 的零 WebView chrome 与原生命令承载已在 `808959b`/`79f099c` 后完成独立审阅并修正快捷键、启动引导、监听失败、菜单 check 状态和窗口销毁清理。旧 PRR-070 试跑候选全部作废；PRR-070 只可从包含审阅小修与当前任务卡的 clean HEAD 完整重做，并在候选证据齐备后等待负责人 G-FINAL；PRR-080/090 未开始。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
 
 ## 2026-09-07 发布前收口批次（历史）
 

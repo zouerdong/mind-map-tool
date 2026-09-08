@@ -84,6 +84,15 @@ describe("红灯 2：onboarding explicit-only", () => {
     expect(screen.queryByTestId("onboarding-overlay")).toBeNull();
   });
 
+  it("偏好 in-progress 也不在启动时自动遮挡画布", async () => {
+    const preferences = new FakePreferencesPort({ onboardingStatus: "in-progress" });
+    const loadSpy = vi.spyOn(preferences, "load");
+    setup(preferences);
+    await waitFor(() => expect(loadSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId("onboarding-overlay")).toBeNull();
+  });
+
   it("⌘⇧H 显式打开引导；跳过后偏好记录 skipped", async () => {
     const preferences = new FakePreferencesPort();
     setup(preferences);
@@ -97,9 +106,29 @@ describe("红灯 2：onboarding explicit-only", () => {
     });
     expect(await preferences.load()).toMatchObject({ onboardingStatus: "skipped" });
   });
+
+  it("completed 偏好下仍可由显式命令可靠重放", async () => {
+    const preferences = new FakePreferencesPort({ onboardingStatus: "completed" });
+    setup(preferences);
+    await waitFor(() => expect(screen.queryByTestId("onboarding-overlay")).toBeNull());
+    fireEvent.keyDown(window, { key: "h", metaKey: true, shiftKey: true });
+    await screen.findByText("第 1 步 · 创建第一个节点");
+  });
 });
 
 describe("红灯 5：无顶栏后既有语义保持", () => {
+  it("重复选择当前主题是 no-op，不产生虚假 dirty", async () => {
+    setup();
+    const dispatch = (
+      window as typeof window & { __mmDispatchAppCommand?: (id: string) => boolean }
+    ).__mmDispatchAppCommand;
+    expect(dispatch).toBeTypeOf("function");
+    expect(document.title.startsWith("● ")).toBe(false);
+    expect(dispatch?.("view.theme-warm")).toBe(true);
+    await Promise.resolve();
+    expect(document.title.startsWith("● ")).toBe(false);
+  });
+
   it("⌘S 保存 → document.title 的 dirty 标记清除（标题承载状态，非顶栏）", async () => {
     const { filePort } = setup();
     // ⌘O 打开 → 编辑（画布双击建点）→ dirty → ⌘S ordinary save（不弹选址）

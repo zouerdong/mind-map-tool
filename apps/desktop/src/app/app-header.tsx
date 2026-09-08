@@ -271,7 +271,7 @@ export function AppHeader({
             }}
           >
             <span>导出</span>
-            <span style={kbdStyle}>⇧⌘E</span>
+            <span style={kbdStyle}>⌘E</span>
           </button>
           <hr style={hrStyle} />
           <button

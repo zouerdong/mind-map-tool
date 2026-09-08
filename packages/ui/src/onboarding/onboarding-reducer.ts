@@ -4,7 +4,8 @@
 // - 步骤完成 = 观察到真实命令/动作（成功标准是完成动作，不是翻页）；
 // - 全部步骤完成 → completed 并记录本机偏好（onboardingCompleted 语义）；
 // - replay：任意状态从头开始（completedSteps 清空）；
-// - hide：本 session 隐藏（不阻塞用户、不改持久状态）；show：恢复显示。
+// - hide：本 session 隐藏（不阻塞用户、不改持久状态）；show：未完成时恢复
+//   当前入口，已完成/跳过时从第一步重放。
 
 import {
   INITIAL_ONBOARDING_STATE,
@@ -23,7 +24,12 @@ export type OnboardingAction =
   | { type: "hide" }
   | { type: "show" }
   /** 偏好载入（应用启动）：恢复持久状态；completed/skipped 不再自动弹出。 */
-  | { type: "restore"; status: OnboardingState["status"] };
+  | {
+      type: "restore";
+      status: OnboardingState["status"];
+      /** false = 恢复进度但不在启动时自动呈现（零 Chrome 桌面壳）。 */
+      present?: boolean;
+    };
 
 function stepAfter(id: OnboardingStepId): OnboardingStepId | null {
   const i = ONBOARDING_STEPS.findIndex((s) => s.id === id);
@@ -43,14 +49,25 @@ export function onboardingReducer(
 ): OnboardingState {
   switch (action.type) {
     case "restore": {
+      const present = action.present !== false;
       if (action.status === "in-progress") {
-        // 中断的引导：下次启动继续（从首个未完成步骤）。
+        // 中断的引导：恢复进度；是否在启动时呈现由宿主产品面决定。
         const next = ONBOARDING_STEPS[1]!;
-        return { ...state, status: "in-progress", ...beginStep(next.id) };
+        return {
+          ...state,
+          status: "in-progress",
+          ...beginStep(next.id),
+          visible: present,
+        };
       }
       if (action.status === "not-started") {
-        // 首次使用：自动出示 welcome 卡（开始 2 分钟引导 / 跳过）。
-        return { ...state, status: "not-started", ...beginStep("welcome") };
+        // 首次使用：准备 welcome 卡；是否在启动时呈现由宿主产品面决定。
+        return {
+          ...state,
+          status: "not-started",
+          ...beginStep("welcome"),
+          visible: present,
+        };
       }
       // completed/skipped：不再强制弹出（重放经 replay 信号）。
       return { ...INITIAL_ONBOARDING_STATE, status: action.status, visible: false };
@@ -72,6 +89,14 @@ export function onboardingReducer(
     case "hide":
       return { ...state, visible: false };
     case "show":
+      if (state.status === "completed" || state.status === "skipped") {
+        return {
+          ...INITIAL_ONBOARDING_STATE,
+          status: "in-progress",
+          completedSteps: [],
+          ...beginStep(ONBOARDING_STEPS[1]!.id),
+        };
+      }
       return { ...state, visible: true };
     case "observe": {
       if (state.status !== "in-progress" || state.currentStep === null) return state;

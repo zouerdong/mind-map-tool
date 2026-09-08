@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-065_READY`（负责人四组输入已于 2026-09-08 提供，见 `docs/decisions/decision-register.json` G2 evidence `[from-user]`；PRR-000/030/060 已实现；PRR-070 因新增零画布顶栏决定停止，须先完成 PRR-065）
+状态：`IN_PROGRESS / PRR-070_READY`（PRR-000～065 已完成并经独立审阅；负责人四组输入与 G2 已于 2026-09-08 到位；下一步从包含 PRR-065 审阅小修和本任务卡的 clean HEAD 完整重做原生候选矩阵）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -54,13 +54,13 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-08，执行 Agent 已把 PRR-000/030/060 与 PRR-070 试跑修复集成至 `main@89d7c76` 并停止；PRR-065 规划文档作为下一轮 working-tree 输入。因此：
+截至 2026-09-08，PRR-000～065 已集成并完成独立审阅；`808959b`/`79f099c` 是 PRR-065 的实现与状态历史点，独立审阅后另有小修。派发 PRR-070 时以**包含本指南和任务卡的当前 clean HEAD**为唯一 source，不再把历史 hash 当构建基线。因此：
 
-1. PRR-065 执行 Agent 必须以包含本任务卡的当前 working-tree snapshot 作为起点；不得退回 `541d38c` 或 `caf1c20`，也不得复用其候选/证据。
-2. 如果任务系统只能从 commit/branch 创建 worktree，应先保留当前规划 patch；不得用 reset/checkout 丢弃或覆盖。
-3. 每张卡只修改其“允许范围”；遇到其他卡已修改的文件先停止合并，报告冲突，不得用整文件覆盖。
-4. 执行 Agent 不得自行把规划状态、G2、G-FINAL、MM-110 或 handoff 改成通过。
-5. PRR-065 完成后必须形成新的 clean source commit，再从头执行 PRR-070；谁负责 commit、branch 合并与最终集成由负责人安排，本指南不自动授权 push/rebase。
+1. PRR-070 起点必须满足 `git status --short` 为空，并记录完整 `git rev-parse HEAD`；不得退回 `541d38c`、`caf1c20`、`808959b` 或 `79f099c`，也不得复用其候选/证据。
+2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。
+3. PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回 PRR-065 修复，修复后换新 source hash 从头重做。
+4. 执行 Agent 不得自行批准 G-FINAL、MM-110 或 handoff，也不得开始 PRR-080；自动化与 Agent 只能整理一份绑定候选 hash 的负责人验收请求。
+5. 不授权 push/rebase；签名、公证、凭据、系统信任修改、上传和公开发布仍明确禁止。
 
 ## 2.2 负责人必须提供的四组输入
 
@@ -225,9 +225,9 @@ xcrun vtool -show-build <app-binary>
 2. 从该 clean source commit 运行 format、typecheck、lint、unit、integration、a11y、build、Rust fmt/test/clippy、boundaries、license、network、JS/Rust dependency advisory、golden、web performance、assets。advisory 工具与数据库版本必须记录；未安装工具不能写成 PASS。
 3. 通过强化的 bundle gate 构建新的 unsigned `.app`/`.dmg` 与 inventory。
 4. 对同一 hash 运行 native performance、install/LaunchServices、生命周期、快捷键、打开/保存/导出和 CSP 检查。
-5. 生成 native platform report JSON。
-6. 负责人实际查看/操作该候选并记录 G-FINAL。
-7. 最后生成 manifest；执行 `verify-evidence` 和全量 `pnpm quality -- --release-evidence ...`，冻结 PRR-080 验收包。
+5. 生成 native platform report JSON 与 G-FINAL 请求；停止并等待负责人实际查看/操作该候选。
+6. 仅在收到负责人绑定同一 source/candidate hash 的明确 `[from-user]` 结论后，记录独立 G-FINAL JSON；PRR-070 完成并停止。
+7. 另行派发 PRR-080，最后生成 manifest，执行 `verify-evidence` 和全量 `pnpm quality -- --release-evidence ...`，冻结验收包。
 8. 用户把冻结验收包交回本审阅任务，由未参与实现的验收者执行 PRR-090；只有 MM-110 `ACCEPT` 才生成新 handoff。
 
 任何一步改变源码、runner 或候选 bytes，都回到第 1/2 步重新开始，不允许局部拼接旧证据。

@@ -92,9 +92,10 @@ if (existsSync(tauriConfPath)) {
       if (csp.includes("unsafe-eval")) {
         violations.push("tauri.conf.json: CSP 禁止包含 unsafe-eval");
       }
-      // PRR-065：Tauri 2 本机 IPC 端点 http://ipc.localhost 是官方要求的
-      // 回环地址（loopback），不构成远程 endpoint；排除任意 *.localhost 子域。
-      if (/https?:\/\/(?!([\w-]+\.)?localhost|127\.0\.0\.1)/.test(csp)) {
+      // PRR-065：Tauri 2 本机 IPC 端点 http://ipc.localhost 是明确允许的
+      // 回环地址；只豁免这一个宿主以及既有 localhost/127.0.0.1，避免把
+      // 任意 *.localhost 子域静默扩成通用网络门禁例外。
+      if (/https?:\/\/(?!(?:localhost|127\.0\.0\.1|ipc\.localhost)(?=[:/;\s'"]|$))/.test(csp)) {
         violations.push("tauri.conf.json: CSP 包含远程 http/https endpoint");
       }
     }

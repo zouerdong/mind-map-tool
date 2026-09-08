@@ -2,7 +2,7 @@
 
 状态：`ACTIVE`（2026-09-07 PRR-000 定义；消费方 `scripts/quality/verify-evidence.mjs`）
 
-本文件是发布 readiness manifest 的唯一 schema 来源。v1/v2 是 PRC 批次的历史形态：它们只能作为审计材料被读取，`verify-evidence` 对 v1/v2 一律拒绝发布 PASS（"历史 manifest 只可审计"）。任何新 manifest 必须使用 v3，并由 PRR-070 在全部输入 artifact 生成之后最后写入。
+本文件是发布 readiness manifest 的唯一 schema 来源。v1/v2 是 PRC 批次的历史形态：它们只能作为审计材料被读取，`verify-evidence` 对 v1/v2 一律拒绝发布 PASS（"历史 manifest 只可审计"）。任何新 manifest 必须使用 v3，并由 PRR-080 在 PRR-070 全部输入 artifact 与真实 G-FINAL 生成之后最后写入。
 
 ## 1. 顶层必需字段
 

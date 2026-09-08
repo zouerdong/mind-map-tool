@@ -122,7 +122,7 @@ pub fn run() {
                         runtime.ingest_activation(&sink);
                     }
                 }
-                // 关闭最近聚焦窗口（⇧⌘W）：原生 close → CloseRequested 协议。
+                // 关闭最近聚焦窗口（⌘W）：原生 close → CloseRequested 协议。
                 menu::MENU_FILE_CLOSE_WINDOW => {
                     let target = app
                         .try_state::<GlobalShortcutState>()
@@ -140,6 +140,21 @@ pub fn run() {
                 }
                 // renderer 命令：定向投递给最近聚焦且 generation 有效的窗口。
                 _ => {
+                    // muda 的 CheckMenuItem 会在发送事件前自动 toggle。主题/布局
+                    // 是互斥选择；先恢复最近聚焦窗口的权威快照，可避免重复点击
+                    // 当前项后菜单错误地变成“无选中”。renderer 执行不同选择后
+                    // 会通过 platform_sync_menu_state 上报并刷新为新状态。
+                    if menu::is_check_command(&id) {
+                        let label = app
+                            .try_state::<GlobalShortcutState>()
+                            .and_then(|s| s.recent_focused_label())
+                            .or_else(|| app.get_webview_window("main").map(|_| "main".to_string()));
+                        if let (Some(label), Some(menu_state)) =
+                            (label, app.try_state::<Arc<menu::MenuState>>())
+                        {
+                            menu_state.on_window_focused(&label);
+                        }
+                    }
                     if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
                         menu::forward_menu_command(app, &runtime, &id);
                     }
@@ -195,6 +210,9 @@ pub fn run() {
                         close_store.on_destroyed(&label);
                         if let Some(state) = app.try_state::<GlobalShortcutState>() {
                             state.on_window_destroyed(&label);
+                        }
+                        if let Some(menu_state) = app.try_state::<Arc<menu::MenuState>>() {
+                            menu_state.on_window_destroyed(&label);
                         }
                         if let Some(runtime) = app.try_state::<Arc<LifecycleRuntime>>() {
                             let sink = TauriHostEffectSink::new(app.clone());
