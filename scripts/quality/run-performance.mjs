@@ -50,6 +50,7 @@ const evidenceDir = flag("evidence-dir");
 const scopeFrom = flag("scope-from") ?? "docs/decisions/decision-register.json";
 const samplesCount = Number(flag("samples") ?? "20");
 const skipCanvas = args.includes("--skip-canvas");
+const diagnosticPreflightRequested = args.includes("--diagnostic-preflight");
 
 if (!/^[a-z0-9-]+$/i.test(fixture)) {
   console.error("run-performance: FAIL — --fixture 只能使用字母、数字和连字符");
@@ -643,7 +644,19 @@ if (scope === "release") {
     );
     process.exit(1);
   }
-  const diagnostic = candidateDiagnostic;
+  if (candidateDiagnostic && !diagnosticPreflightRequested) {
+    console.error(
+      "run-performance: FAIL — .tmp/prr-066-* 诊断边界必须显式传入 --diagnostic-preflight",
+    );
+    process.exit(1);
+  }
+  if (diagnosticPreflightRequested && (!candidateDiagnostic || !evidenceDiagnostic)) {
+    console.error(
+      "run-performance: FAIL — --diagnostic-preflight 只允许 candidate/evidence 同属 .tmp/prr-066-* 边界",
+    );
+    process.exit(1);
+  }
+  const diagnostic = diagnosticPreflightRequested;
 
   // 1. G2 scope 校验（诊断模式只绑定 host/action；正式模式绑定 candidate/
   //    evidence 边界）

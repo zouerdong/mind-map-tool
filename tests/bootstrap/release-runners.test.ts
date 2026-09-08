@@ -754,6 +754,7 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
           ".tmp/prr-066-runner-test/bundle/macos/Mind Map.app",
           "--evidence-dir",
           ".tmp/prr-066-runner-test/evidence",
+          "--diagnostic-preflight",
           "--samples",
           "20",
           "--skip-canvas",
@@ -774,6 +775,33 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
           readFileSync(join(diagDir, "evidence/release-performance-summary.json"), "utf8"),
         );
         expect(summary.measurementMode).toBe("diagnostic-preflight");
+      } finally {
+        rmSync(diagDir, { recursive: true, force: true });
+      }
+    });
+
+    it("PRR-066：诊断目录未显式声明 --diagnostic-preflight 时拒绝", () => {
+      const regPath = createSyntheticRegister("approved");
+      const diagDir = join(ROOT, ".tmp/prr-066-runner-test-no-flag");
+      rmSync(diagDir, { recursive: true, force: true });
+      const candidateApp = join(diagDir, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp);
+
+      try {
+        const res = runNode(PERF_RUNNER, [
+          "--scope",
+          "release",
+          "--scope-from",
+          regPath,
+          "--candidate",
+          ".tmp/prr-066-runner-test-no-flag/bundle/macos/Mind Map.app",
+          "--evidence-dir",
+          ".tmp/prr-066-runner-test-no-flag/evidence",
+          "--samples",
+          "20",
+        ]);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toContain("必须显式传入 --diagnostic-preflight");
       } finally {
         rmSync(diagDir, { recursive: true, force: true });
       }

@@ -85,7 +85,7 @@
 ### D. 预发布性能预检
 
 1. 从修复后的 clean commit 构建独立 diagnostic unsigned `.app/.dmg`，使用单独 `CARGO_TARGET_DIR` 与 `.tmp/prr-066-*`，不得覆盖旧 PRR-070 candidate。
-2. 先做单项 PNG 与 RSS 诊断，再运行一次完整 `run-performance --scope release --samples 20`。不关闭/修改系统服务，不人工删除任何有效离群，不复用旧 raw。
+2. 先做单项 PNG 与 RSS 诊断，再以显式 `--diagnostic-preflight` 运行一次完整 `run-performance --scope release --samples 20`。诊断模式只可用于 `.tmp/prr-066-*`，且最终 verifier 必须拒绝它成为发布证据；不关闭/修改系统服务，不人工删除任何有效离群，不复用旧 raw。
 3. 必须同时达到：warm p95 ≤800ms、30秒 stable RSS ≤120MB、canvas p95 ≤32ms、PNG p95 ≤3000ms，且 cold/edit/save/包体全部保持通过；raw/summary 完整一致。
 4. 如果 warm 仍有离群，给 host/renderer-ready 增加阶段性 monotonic marker（仅 perf env 生效），定位是 host setup、WebView navigation、React mount、canvas interactive 哪一段；有证据后修根因。不得把“后台干扰”作为无证据豁免。
 5. 如果 RSS 仍大于120MB，记录空白画布的主进程与 WebContent 分进程口径、资源加载状态和30秒样本，再返回 `BLOCKED_ON_RSS`；不要改预算。
@@ -146,4 +146,3 @@ NotRun: <明确列出>
 Risks: <残余风险>
 Redlines: <确认未继续 PRR-070/G-FINAL/PRR-080，未签名/公证/push/发布>
 ```
-

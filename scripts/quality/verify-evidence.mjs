@@ -291,6 +291,10 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
     if (command.id === "cmd-release-performance" && artifact) {
       if (artifact.overall !== "PASS")
         fail(`${label}.artifact release performance 必须为 PASS（实际 ${artifact.overall}）`);
+      if (artifact.measurementMode !== "release")
+        fail(
+          `${label}.artifact measurementMode 必须为 release（diagnostic-preflight 不能作为发布证据）`,
+        );
       if (artifact.sourceCommit !== source.commit)
         fail(`${label}.artifact sourceCommit 与 manifest 不一致`);
       if (artifact.candidate !== manifest.candidate?.path)
@@ -333,6 +337,10 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
         validateArtifactIntegrity(rawPath, artifact.rawSha256, `${label}.raw`, "rawSha256");
         if (raw?.measurementSource !== "native-candidate")
           fail(`${label}.raw measurementSource 必须为 native-candidate`);
+        if (raw?.measurementMode !== "release")
+          fail(
+            `${label}.raw measurementMode 必须为 release（diagnostic-preflight 不能作为发布证据）`,
+          );
         if (raw?.sourceCommit !== source.commit)
           fail(`${label}.raw sourceCommit 与 manifest 不一致`);
         if (raw?.candidateSha256 !== manifest.candidate?.sha256)

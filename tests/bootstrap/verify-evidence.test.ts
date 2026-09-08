@@ -224,6 +224,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
   const rawPath = resolve(FIXTURE_DIR, "release-performance-raw.json");
   const raw = {
     measurementSource: "native-candidate",
+    measurementMode: "release",
     sourceCommit: manifest.source.commit,
     candidateSha256: manifest.candidate.sha256,
     runnerSha256,
@@ -251,6 +252,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
   const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
   const summary = {
     overall: "PASS",
+    measurementMode: "release",
     sourceCommit: manifest.source.commit,
     candidate: manifest.candidate.path,
     candidateSha256: manifest.candidate.sha256,
@@ -572,5 +574,41 @@ describe("verify-evidence releaseScope verification", () => {
     const res = runVerifier(["--manifest", fixturePath]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("settleMs 缺失或不足 30000");
+  });
+
+  it("PRR-066: rejects diagnostic-preflight artifacts from final release evidence", () => {
+    const manifest = baseManifest();
+    const groups = {
+      pan: Array.from({ length: 20 }, () => 8),
+      drag: Array.from({ length: 20 }, () => 8),
+      zoom: Array.from({ length: 20 }, () => 8),
+    };
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: groups.pan,
+      nodeDragFrameSamples: groups.drag,
+      zoomFrameSamples: groups.zoom,
+    });
+    const rawPath = resolve(FIXTURE_DIR, "release-performance-raw.json");
+    const raw = JSON.parse(readFileSync(rawPath, "utf8"));
+    raw.measurementMode = "diagnostic-preflight";
+    writeFileSync(rawPath, JSON.stringify(raw, null, 2));
+    const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
+    const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+    summary.measurementMode = "diagnostic-preflight";
+    summary.rawSha256 = fileSha256(rawPath);
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    const command = manifest.commands.find((c: any) => c.id === "cmd-release-performance");
+    command.artifactSha256 = fileSha256(summaryPath);
+
+    const fixturePath = resolve(FIXTURE_DIR, "diagnostic-performance.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("measurementMode 必须为 release");
   });
 });
