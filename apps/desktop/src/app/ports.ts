@@ -188,9 +188,11 @@ export async function createAppPorts(): Promise<AppPorts> {
 }
 
 // Tauri：字体与 resvg wasm 经 vite ?url 资源（构建拷入 dist）按需 fetch。
-import notoRegularUrl from "../../../../assets/fonts/noto-sans-sc-regular.otf?url";
-import notoBoldUrl from "../../../../assets/fonts/noto-sans-sc-bold.otf?url";
-import lxgwUrl from "../../../../assets/fonts/lxgw-wenkai-regular.ttf?url";
+// PRR-020：分发字体为全字库 WOFF2（与原 TTF/OTF 字形/度量逐字一致），
+// 安装包体积从 41.6MB 降到 20.8MB；fontkit/resvg/@pdf-lib 均已实测消费。
+import notoRegularUrl from "../../../../assets/fonts/noto-sans-sc-regular.woff2?url";
+import notoBoldUrl from "../../../../assets/fonts/noto-sans-sc-bold.woff2?url";
+import lxgwUrl from "../../../../assets/fonts/lxgw-wenkai-regular.woff2?url";
 import resvgWasmUrl from "@resvg/resvg-wasm/index_bg.wasm?url";
 
 function createTauriExportRenderer(): ExportRendererLike {
@@ -206,20 +208,10 @@ class LazyTauriExportRenderer implements ExportRendererLike {
   private loading: Promise<NativeExportRenderer> | null = null;
   private resolvedFonts: FontResolver = DEV_FONTS;
   private metricsState: FontMetricsState = "pending";
-  private readonly metricsReadyPromise: Promise<FontResolver>;
-  private resolveMetricsReady!: (fonts: FontResolver) => void;
-  private rejectMetricsReady!: (error: unknown) => void;
   private readonly fontProxy: FontResolver = {
     regular: (fontId) => this.resolvedFonts.regular(fontId),
     bold: (fontId) => this.resolvedFonts.bold(fontId),
   };
-
-  constructor() {
-    this.metricsReadyPromise = new Promise<FontResolver>((resolve, reject) => {
-      this.resolveMetricsReady = resolve;
-      this.rejectMetricsReady = reject;
-    });
-  }
 
   fontMetricsState(): FontMetricsState {
     return this.metricsState;
@@ -227,8 +219,8 @@ class LazyTauriExportRenderer implements ExportRendererLike {
 
   whenMetricsReady(): Promise<FontResolver> {
     if (this.metricsState === "ready") return Promise.resolve(this.resolvedFonts);
-    if (this.metricsState === "failed") return Promise.reject(new Error("字体资源加载失败"));
-    return this.metricsReadyPromise;
+    // pending 与 failed 都通过 load() 汇合；failed 会因 loading 已清空而执行一次新重试。
+    return this.load().then(() => this.resolvedFonts);
   }
 
   private load(): Promise<NativeExportRenderer> {
@@ -239,13 +231,11 @@ class LazyTauriExportRenderer implements ExportRendererLike {
         this.renderer = renderer;
         this.resolvedFonts = renderer.fontResolver();
         this.metricsState = "ready";
-        this.resolveMetricsReady(this.resolvedFonts);
         return renderer;
       })
       .catch((error) => {
         this.loading = null;
         this.metricsState = "failed";
-        this.rejectMetricsReady(error);
         throw error;
       });
     return this.loading;

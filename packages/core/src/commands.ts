@@ -63,6 +63,17 @@ export type Command =
       shape?: NodeShape;
       framesVisible?: boolean;
     }
+  | {
+      /** [PRR-040] 字体切换的权威几何事务：目标字体 + 全部节点按目标字体
+       * 重新度量的 size，作为单条可撤销、全有或全无的用户命令提交。
+       * sizes 必须覆盖文档全部节点；旧尺寸只从当前 state 派生，不能由
+       * 调用方注入。previousFont 必须等于当前文档字体（陈旧命令
+       * fail-closed）。 */
+      kind: "SetDocumentFontAndResizeNodes";
+      font: FontToken;
+      previousFont: FontToken;
+      sizes: Array<{ id: string; size: Size }>;
+    }
   | { kind: "ReplaceDocument"; document: MindMapDocumentV1 }
   | { kind: "RestoreSelection"; nodes: MindNode[]; edges: MindEdge[] }; // 结构化逆
 
@@ -74,7 +85,9 @@ export type CommandError =
   | { code: "SELF_LOOP" }
   | { code: "DUPLICATE_EDGE_DIRECTION"; source: string; target: string }
   | { code: "BAD_KICKER"; reason: string } // [ADR 0010 v2]
-  | { code: "BAD_SIZE"; id: string }; // [ADR 0010 v2] measured 尺寸非法
+  | { code: "BAD_SIZE"; id: string } // [ADR 0010 v2] measured 尺寸非法
+  | { code: "FONT_MISMATCH"; expected: FontToken; actual: FontToken } // [PRR-040]
+  | { code: "INCOMPLETE_RESIZE_MAP"; reason: string }; // [PRR-040] 尺寸映射未覆盖全部节点
 
 export type Effect =
   | { kind: "nodes-created"; ids: string[] }
@@ -306,6 +319,58 @@ export function applyCommand(stateNode: StateNode, command: Command): ApplyResul
       if (command.shape !== undefined) d.shape = command.shape;
       if (command.framesVisible !== undefined) d.framesVisible = command.framesVisible;
       inverse = { kind: "SetDocumentStyle", ...prev };
+      effects.push({ kind: "document-style-changed" });
+      break;
+    }
+    case "SetDocumentFontAndResizeNodes": {
+      // [PRR-040] 先全量校验再写入：字体必须真的在切换、previousFont 必须
+      // 等于当前文档字体（陈旧命令 fail-closed）、尺寸映射必须与文档节点
+      // 集合完全一致（双向、无重复）、全部尺寸 finite 且在限额内。
+      // 任一校验失败返回错误，clone 丢弃 → 零写入。
+      if (command.font === command.previousFont)
+        return {
+          ok: false,
+          error: { code: "FONT_MISMATCH", expected: command.previousFont, actual: d.font },
+        };
+      if (command.previousFont !== d.font)
+        return {
+          ok: false,
+          error: { code: "FONT_MISMATCH", expected: command.previousFont, actual: d.font },
+        };
+      const sizeIds = new Set(command.sizes.map((entry) => entry.id));
+      const nodeIds = new Set(d.nodes.map((n) => n.id));
+      if (sizeIds.size !== command.sizes.length)
+        return { ok: false, error: { code: "INCOMPLETE_RESIZE_MAP", reason: "存在重复节点 id" } };
+      if (sizeIds.size !== nodeIds.size || [...nodeIds].some((id) => !sizeIds.has(id)))
+        return {
+          ok: false,
+          error: { code: "INCOMPLETE_RESIZE_MAP", reason: "尺寸映射未覆盖全部文档节点" },
+        };
+      for (const entry of command.sizes) {
+        const s = entry.size;
+        if (
+          !Number.isFinite(s.width) ||
+          !Number.isFinite(s.height) ||
+          s.width < LIMITS.minSize ||
+          s.height < LIMITS.minSize ||
+          s.width > LIMITS.maxSize ||
+          s.height > LIMITS.maxSize
+        )
+          return { ok: false, error: { code: "BAD_SIZE", id: entry.id } };
+      }
+      const previousSizes = d.nodes.map((node) => ({ id: node.id, size: { ...node.size } }));
+      // 校验全部通过：原子应用（font + 全部 node size 一次写入；position、
+      // edges、selection、viewport 均不动）。
+      d.font = command.font;
+      for (const entry of command.sizes) {
+        findNode(entry.id)!.size = { ...entry.size };
+      }
+      inverse = {
+        kind: "SetDocumentFontAndResizeNodes",
+        font: command.previousFont,
+        previousFont: command.font,
+        sizes: previousSizes,
+      };
       effects.push({ kind: "document-style-changed" });
       break;
     }

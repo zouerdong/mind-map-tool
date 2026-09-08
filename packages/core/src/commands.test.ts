@@ -184,3 +184,160 @@ describe("命令与逆命令", () => {
     }
   });
 });
+
+describe("SetDocumentFontAndResizeNodes（PRR-040 权威几何事务）", () => {
+  function fontSwitchCommand(overrides: Record<string, unknown> = {}): Command {
+    return {
+      kind: "SetDocumentFontAndResizeNodes",
+      font: "lxgw-wenkai",
+      previousFont: "noto-sans-sc",
+      sizes: [
+        { id: "a", size: { width: 110, height: 44 } },
+        { id: "b", size: { width: 120, height: 46 } },
+      ],
+      ...overrides,
+    } as Command;
+  }
+
+  it("原子切换：font 与全部 node size 一次写入，position/edges 不动", () => {
+    const s0 = stateWithTwoNodes();
+    s0.document.document.edges.push({ id: "e1", sourceNodeId: "a", targetNodeId: "b" });
+    const { stateNode } = unwrap(applyCommand(s0, fontSwitchCommand()));
+    expect(stateNode.document.document.font).toBe("lxgw-wenkai");
+    const a = stateNode.document.document.nodes.find((n) => n.id === "a")!;
+    const b = stateNode.document.document.nodes.find((n) => n.id === "b")!;
+    expect(a.size).toEqual({ width: 110, height: 44 });
+    expect(b.size).toEqual({ width: 120, height: 46 });
+    expect(a.position).toEqual({ x: 0, y: 0 });
+    expect(b.position).toEqual({ x: 200, y: 0 });
+    expect(stateNode.document.document.edges).toEqual([
+      { id: "e1", sourceNodeId: "a", targetNodeId: "b" },
+    ]);
+  });
+
+  it("inverse 一步恢复旧 font 与全部旧 size（round-trip）", () => {
+    const s0 = stateWithTwoNodes();
+    const { back } = roundTrip(s0, fontSwitchCommand());
+    expect(back.stateNode.document.document.font).toBe("noto-sans-sc");
+    for (const node of back.stateNode.document.document.nodes) {
+      expect(node.size).toEqual({ width: 100, height: 40 });
+    }
+  });
+
+  it("font 相同（无切换）必须失败且零写入", () => {
+    const s0 = stateWithTwoNodes();
+    const result = applyCommand(
+      s0,
+      fontSwitchCommand({ font: "noto-sans-sc", previousFont: "noto-sans-sc" }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("FONT_MISMATCH");
+    expect(s0.document.document.font).toBe("noto-sans-sc");
+  });
+
+  it("previousFont 与当前文档字体不一致（陈旧命令）必须失败且零写入", () => {
+    const s0 = stateWithTwoNodes();
+    const result = applyCommand(s0, fontSwitchCommand({ previousFont: "lxgw-wenkai" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("FONT_MISMATCH");
+    expect(s0.document.document.nodes.every((n) => n.size.width === 100)).toBe(true);
+  });
+
+  it("尺寸映射缺少任一节点必须失败且零写入（第 N 个节点缺失同样零部分提交）", () => {
+    const s0 = stateWithTwoNodes();
+    const result = applyCommand(
+      s0,
+      fontSwitchCommand({
+        sizes: [{ id: "a", size: { width: 110, height: 44 } }],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INCOMPLETE_RESIZE_MAP");
+    expect(s0.document.document.font).toBe("noto-sans-sc");
+    expect(s0.document.document.nodes.every((n) => n.size.width === 100)).toBe(true);
+  });
+
+  it("包含文档中不存在的节点 id 必须失败", () => {
+    const s0 = stateWithTwoNodes();
+    const result = applyCommand(
+      s0,
+      fontSwitchCommand({
+        sizes: [
+          { id: "a", size: { width: 110, height: 44 } },
+          { id: "b", size: { width: 120, height: 46 } },
+          { id: "ghost", size: { width: 90, height: 40 } },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INCOMPLETE_RESIZE_MAP");
+  });
+
+  it("任一 size 非有限/越限必须失败且零写入", () => {
+    const s0 = stateWithTwoNodes();
+    for (const bad of [
+      { width: 0, height: 44 },
+      { width: -5, height: 44 },
+      { width: Number.NaN, height: 44 },
+      { width: 1e9, height: 44 },
+    ]) {
+      const result = applyCommand(
+        s0,
+        fontSwitchCommand({
+          sizes: [
+            { id: "a", size: bad as { width: number; height: number } },
+            { id: "b", size: { width: 120, height: 46 } },
+          ],
+        }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("BAD_SIZE");
+      expect(s0.document.document.nodes.every((n) => n.size.width === 100)).toBe(true);
+    }
+  });
+
+  it("重复节点 id 必须失败", () => {
+    const s0 = stateWithTwoNodes();
+    const result = applyCommand(
+      s0,
+      fontSwitchCommand({
+        sizes: [
+          { id: "a", size: { width: 110, height: 44 } },
+          { id: "a", size: { width: 111, height: 44 } },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INCOMPLETE_RESIZE_MAP");
+  });
+
+  it("空文档：仅切换字体（空 size 映射合法）", () => {
+    const s0 = makeStateNode(emptyDocument());
+    const { stateNode } = unwrap(applyCommand(s0, fontSwitchCommand({ sizes: [] })));
+    expect(stateNode.document.document.font).toBe("lxgw-wenkai");
+  });
+
+  it("300 节点计算与提交满足 ≤50ms 高风险编辑预算", () => {
+    const doc = emptyDocument();
+    for (let i = 0; i < 300; i++) {
+      doc.document.nodes.push({
+        id: `n${i}`,
+        text: `节点${i}文本`,
+        position: { x: (i % 20) * 200, y: Math.floor(i / 20) * 120 },
+        size: { width: 100, height: 40 },
+      });
+    }
+    const s0 = makeStateNode(doc);
+    const command: Command = {
+      kind: "SetDocumentFontAndResizeNodes",
+      font: "lxgw-wenkai",
+      previousFont: "noto-sans-sc",
+      sizes: doc.document.nodes.map((n) => ({ id: n.id, size: { width: 110, height: 44 } })),
+    };
+    const t0 = performance.now();
+    const result = applyCommand(s0, command);
+    const elapsed = performance.now() - t0;
+    expect(result.ok).toBe(true);
+    expect(elapsed).toBeLessThan(50);
+  });
+});

@@ -26,6 +26,26 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    "icon": ["icons/icon.png"]
+    "icon": ["icons/icon.png"],
+    "category": "Productivity",
+    "copyright": "© 2026 ErDong Zou. All rights reserved.",
+    "licenseFile": "../../../LICENSE",
+    "resources": ["../../../LICENSE", "../../../THIRD_PARTY_NOTICES.md"],
+    "fileAssociations": [
+      {
+        "ext": ["mindmap"],
+        "name": "Mind Map Document",
+        "role": "Editor",
+        "mimeType": "application/x-mindmap+json",
+        "exportedType": {
+          "identifier": "com.mindmap.document",
+          "conformsTo": ["public.json"]
+        }
+      }
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "bundleVersion": "1"
+    }
   }
 }

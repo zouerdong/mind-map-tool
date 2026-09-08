@@ -23,10 +23,12 @@ async function loadFonts() {
   const dir = resolve(ROOT, "assets/fonts");
   return {
     "noto-sans-sc-regular": new Uint8Array(
-      await readFile(resolve(dir, "noto-sans-sc-regular.otf")),
+      await readFile(resolve(dir, "noto-sans-sc-regular.woff2")),
     ),
-    "noto-sans-sc-bold": new Uint8Array(await readFile(resolve(dir, "noto-sans-sc-bold.otf"))),
-    "lxgw-wenkai-regular": new Uint8Array(await readFile(resolve(dir, "lxgw-wenkai-regular.ttf"))),
+    "noto-sans-sc-bold": new Uint8Array(await readFile(resolve(dir, "noto-sans-sc-bold.woff2"))),
+    "lxgw-wenkai-regular": new Uint8Array(
+      await readFile(resolve(dir, "lxgw-wenkai-regular.woff2")),
+    ),
   };
 }
 

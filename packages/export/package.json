@@ -2,6 +2,7 @@
   "name": "@mindmap/export",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "确定性导出：共享布局、ExportScene、语义 SVG + web-ts-wasm renderer（MM-040 实现）",
   "main": "src/index.ts",

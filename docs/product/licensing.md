@@ -1,7 +1,7 @@
-# 许可与产品身份决策（PRC-050 / G2 批准）
+# 许可与产品身份记录（PRC-050 记录 / PRR 补正）
 
 状态：**G2 APPROVED (LOCAL PACKAGING SCOPE ONLY)**。
-本文记录项目负责人已批准的 v1 产品身份、许可证方向及 G2 候选构建范围。
+G2 已由项目负责人 ErDong Zou 于 2026-09-08 批准（原始 `[from-user]` 批准语句、精确范围与排除动作见 `docs/decisions/decision-register.json` 的 G2 evidence；`verify-decision --phase packaging` 复算通过）。PRC 批次曾因占位批准人与缺失原文被降级为 RECORDED，该缺口已由 PRR-000 关闭。
 
 ## 产品身份已批准清单
 
@@ -13,7 +13,7 @@
 | 目标系统与架构 | macOS 11.0+ (Apple Silicon: aarch64-apple-darwin) | Windows 顺延至后续专门版本（非 v1 blocker） |
 | 文件关联 | `.mindmap` | JSON 结构；MIME: `application/x-mindmap+json`；UTI: `com.mindmap.document` |
 | 应用图标 | `apps/desktop/src-tauri/icons/icon.png` | 512x512 PNG，随 Tauri bundle 生成 icns |
-| 软件许可 | Source-available 双重许可 (ADR 0007) | 终端用户自由免费使用；转售闭源包装需商业许可 |
+| 软件许可 | 专有软件 / All Rights Reserved（ADR 0007 Accepted 方案 4） | 根 `LICENSE`（© 2026 ErDong Zou）；正式公开发布前仍建议法律复核最终措辞 |
 | 候选格式 | Unsigned `.app` 与 `.dmg` | 严格禁止签名与公证 |
 
 ## 随应用分发的字体
@@ -27,9 +27,10 @@ Reserved Font Name、来源和许可证义务，不能仅沿用当前记录。
 
 ## 依赖审计
 
-工程筛查通过 `pnpm license:scan` 自动执行，全部 29 项直接 JS 依赖与 487 项 Cargo 依赖均属于 MIT / Apache-2.0 / MPL-2.0 / OFL-1.1 许可，无未解释 copyleft。
+工程筛查覆盖直接 JS、传递 JS 与全部 Cargo package（口径以 `pnpm license:scan` 输出为准）；当前枚举范围内没有未知或禁用的依赖许可。根 `LICENSE` 与 `THIRD_PARTY_NOTICES.md` 已按 ADR 0007 Accepted 方案 4 生成；scanner 会校验 notices 覆盖每个随包 package 与字体，缺条目或陈旧条目均 fail-closed。`THIRD_PARTY_NOTICES.md` 是生成文件，依赖或字体集合变化后必须重跑生成脚本。
 
 ```text
+node scripts/quality/generate-third-party-notices.mjs
 node scripts/quality/scan-dependency-licenses.mjs --output .tmp/quality/license-scan.json
 ```
 
@@ -50,6 +51,8 @@ node scripts/quality/scan-dependency-licenses.mjs --output .tmp/quality/license-
   - `uninstall`
   - `measure-performance`
   - `permission-probe`
+  - `launchservices-registration`
+  - `dependency-advisory-scan`
 - **deletionBoundaries**:
   - `.tmp/release-candidate`
   - `apps/desktop/src-tauri/target/release/bundle`
@@ -61,5 +64,6 @@ node scripts/quality/scan-dependency-licenses.mjs --output .tmp/quality/license-
   - `system trust changes`
   - `upload`
   - `publication`
+  - `git push`
 
 签名、公证、凭据访问、系统信任修改、上传和公开发布始终需要另行明确授权。

@@ -2,6 +2,7 @@
   "name": "@mindmap/platform",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "平台能力 port 与 macOS 适配（文件、对话框、生命周期、偏好；MM-060 实现）",
   "main": "src/index.ts",

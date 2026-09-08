@@ -1,9 +1,11 @@
 # 发布前收口任务卡（PRC-000～PRC-090）
 
 日期：2026-09-07  
-状态：`DRAFT / NOT_AUTHORIZED_FOR_EXECUTION`  
+状态：`HISTORICAL / EXECUTED / FINAL_REVIEW_REJECTED / SUPERSEDED_BY_PRR`
 指南：[pre-release-closure-development-guide-2026-09-07.md](./pre-release-closure-development-guide-2026-09-07.md)  
 审阅输入：[2026-09-07 发布前终审](../../.omx/reviews/2026-09-07-mrt-post-vra-final-review.md)
+
+> 2026-09-07 复核：这些任务已由执行 Agent 回报完成，但最终候选与证据未通过独立审阅。卡片保留用于审计，不得继续派发；整改工作见 [PRR-000～PRR-080](./pre-release-remediation-task-cards-2026-09-07.md)。
 
 ## 共同执行合同
 

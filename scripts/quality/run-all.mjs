@@ -3,7 +3,7 @@
 // fail-closed：阶段未到/证据缺失即非零退出，不产假绿。
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -78,28 +78,13 @@ const STAGES = {
     ),
   releasePerformance: () => {
     if (releaseEvidence && existsSync(resolve(ROOT, releaseEvidence))) {
-      try {
-        const manifest = JSON.parse(readFileSync(resolve(ROOT, releaseEvidence), "utf8"));
-        const candidatePath = manifest.candidate?.path;
-        const evidenceDir = dirname(releaseEvidence);
-        if (candidatePath) {
-          return run(
-            "node",
-            [
-              resolve(HERE, "run-performance.mjs"),
-              "--scope",
-              "release",
-              "--candidate",
-              candidatePath,
-              "--evidence-dir",
-              evidenceDir,
-              "--output",
-              ".tmp/quality/release-performance.json",
-            ],
-            ROOT,
-          );
-        }
-      } catch {}
+      // Candidate evidence is immutable input. Re-running the sampler here would overwrite
+      // evidence after its manifest timestamp/hash was fixed and could manufacture a false green.
+      return run(
+        "node",
+        [resolve(HERE, "verify-evidence.mjs"), "--manifest", releaseEvidence],
+        ROOT,
+      );
     }
     return run(
       "node",

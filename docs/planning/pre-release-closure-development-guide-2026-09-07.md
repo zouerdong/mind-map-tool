@@ -1,12 +1,14 @@
 # 发布前收口开发指南（PRC 批次）
 
 日期：2026-09-07  
-状态：`DRAFT / READY_FOR_OWNER_REVIEW`  
+状态：`HISTORICAL / EXECUTED / FINAL_REVIEW_REJECTED / SUPERSEDED_BY_PRR`
 适用范围：Mind Map Tool v1、macOS Apple Silicon、公开发布前的工程收口  
 输入：[发布前终审](../../.omx/reviews/2026-09-07-mrt-post-vra-final-review.md)、[v1 产品规格](../product/v1-product-spec.md)、[发布检查表](../quality/release-checklist.md)、已落地代码与测试  
 配套任务卡：[pre-release-closure-task-cards-2026-09-07.md](./pre-release-closure-task-cards-2026-09-07.md)
 
 > 本文把“代码基本完成”与“可公开发布”拆开处理。本文及任务卡的形成已获用户要求；它们不构成修改 CI/发布配置、删除文件、签名、公证、上传或公开发布的授权。
+>
+> 2026-09-07 复核：PRC 执行虽已回报完成，但候选、性能、许可、G2/G-FINAL 与证据链未通过独立审阅。后续以[全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)和 [PRR 整改指南](./pre-release-remediation-development-guide-2026-09-07.md)为准；本文不再作为派发入口。
 
 ## 1. 结论与最短路径
 

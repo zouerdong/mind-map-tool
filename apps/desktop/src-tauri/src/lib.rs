@@ -16,6 +16,7 @@
 pub mod file;
 pub mod ipc;
 pub mod lifecycle;
+pub mod perf;
 pub mod shortcuts;
 
 use std::sync::Arc;
@@ -84,6 +85,10 @@ pub fn run() {
     ));
     let close_store = Arc::new(CloseRequestStore::new());
 
+    // PRR-010 perf 诊断模式：仅 MINDMAP_PERF_SAMPLE=1 时激活；生产路径
+    // 无此 state，全部 perf IPC 返回未启用。
+    let perf_probe = perf::PerfProbe::from_env();
+
     // cold argv：进程参数即事实（在任何 drain 之前收集；setup 统一入队，
     // 第一个文件占用 main 由路由顺序保证——无 sleep/时序猜测）。
     let cold: Vec<String> = std::env::args().collect();
@@ -106,6 +111,7 @@ pub fn run() {
         .manage(runtime.clone())
         .manage(close_store.clone())
         .manage(GlobalShortcutState::new())
+        .manage(perf_probe)
         .setup({
             let runtime = runtime.clone();
             move |app| {
@@ -240,6 +246,9 @@ pub fn run() {
             ipc::platform_resolve_shortcut_invocation,
             ipc::platform_pending_close_request,
             ipc::platform_resolve_close_request,
+            // perf 诊断（PRR-010；未启用时返回 None/错误，不影响生产）
+            ipc::platform_get_perf_probe_config,
+            ipc::platform_report_perf_event,
         ])
         .build(tauri::generate_context!())
         .expect("error while running mindmap desktop")
@@ -275,7 +284,12 @@ pub fn run() {
                 // 任一受管窗口未取得关闭许可 → 阻止退出并为未决窗口建立/复用
                 // close request（定向 emit；已有请求不重发）。全部许可后放行；
                 // 最后一个窗口 Destroyed 后再次 ExitRequested 自然放行。
+                // 例外（PRR-010）：perf 采样进程由探针自身驱动退出（干净
+                // exit code），不进入 dirty 保护——采样会话不是用户文档。
                 RunEvent::ExitRequested { api, .. } => {
+                    if app.try_state::<Arc<perf::PerfProbe>>().is_some() {
+                        return;
+                    }
                     let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
                     match close_store.on_exit_requested(&labels) {
                         ExitGate::Allow => {}

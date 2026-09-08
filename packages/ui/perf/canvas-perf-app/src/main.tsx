@@ -17,9 +17,9 @@ import { EditorCanvas } from "@mindmap/ui";
 async function boot() {
   const [fixtureRes, notoRegular, notoBold, lxgw] = await Promise.all([
     fetch("/dense-300-450.json"),
-    fetch("/fonts/noto-sans-sc-regular.otf"),
-    fetch("/fonts/noto-sans-sc-bold.otf"),
-    fetch("/fonts/lxgw-wenkai-regular.ttf"),
+    fetch("/fonts/noto-sans-sc-regular.woff2"),
+    fetch("/fonts/noto-sans-sc-bold.woff2"),
+    fetch("/fonts/lxgw-wenkai-regular.woff2"),
   ]);
   const doc = (await fixtureRes.json()) as MindMapDocumentV1;
   const toBytes = async (r: Response) => new Uint8Array(await r.arrayBuffer());

@@ -127,10 +127,26 @@ impl FileLifecycleService {
     }
 
     /// openDocument：读目标 + 签发 handle + token（对话框结果由 ipc 层传入）。
+    /// （generation 1 兼容入口；生产/多代测试用 `open_file_at_generation`。）
     pub fn open_file(&self, window_label: &str, raw_path: &Path) -> ServiceResult<OpenOutcome> {
+        self.open_file_at_generation(window_label, raw_path, 1)
+    }
+
+    /// PRR-050：open 的 handle 绑定指定窗口代（runtime/测试传真实 generation）。
+    pub fn open_file_at_generation(
+        &self,
+        window_label: &str,
+        raw_path: &Path,
+        window_generation: u64,
+    ) -> ServiceResult<OpenOutcome> {
         let provider = platform_provider();
-        self.open_file_with_identity(provider.as_ref(), window_label, raw_path)
-            .map(|outcome| outcome.renderer)
+        self.open_file_with_identity_at_generation(
+            provider.as_ref(),
+            window_label,
+            raw_path,
+            window_generation,
+        )
+        .map(|outcome| outcome.renderer)
     }
 
     /// 对话框确认选址后签发一次性授权（记录 TOCTOU 复核基准）。
@@ -168,6 +184,7 @@ impl FileLifecycleService {
     ) -> ServiceResult<Receipt> {
         self.commit_ordinary_core(
             window_label,
+            None,
             document_target_handle,
             expected_version_token,
             content_json,
@@ -176,9 +193,22 @@ impl FileLifecycleService {
     }
 
     /// Save As：redeem 一次性授权 → TOCTOU 复核 → 原子替换 → 签发新 handle。
+    /// （generation 1 兼容入口；生产路径走 `commit_save_as_at_generation`。）
     pub fn commit_save_as(
         &self,
         window_label: &str,
+        authorization_ref: &str,
+        content_json: &str,
+    ) -> ServiceResult<Receipt> {
+        self.commit_save_as_at_generation(window_label, 1, authorization_ref, content_json)
+    }
+
+    /// Save As（PRR-050）：新 handle 以当前窗口 generation 签发，
+    /// 且与旧 active handle 的撤销发生在同一临界区（replace-and-revoke）。
+    pub fn commit_save_as_at_generation(
+        &self,
+        window_label: &str,
+        window_generation: u64,
         authorization_ref: &str,
         content_json: &str,
     ) -> ServiceResult<Receipt> {
@@ -190,9 +220,9 @@ impl FileLifecycleService {
         )?;
         verify_target_unchanged(&auth)?;
         commit::atomic_replace(&auth.canonical_path, content_json.as_bytes())?;
-        let handle = self
-            .handles
-            .issue(window_label, auth.canonical_path.clone());
+        let handle =
+            self.handles
+                .issue(window_label, auth.canonical_path.clone(), window_generation);
         Ok(Receipt {
             document_target_handle: handle,
             version_token: sha256_hex(content_json.as_bytes()),
@@ -232,13 +262,30 @@ impl FileLifecycleService {
 
     /// 只校验 opaque document handle 的窗口归属与撤销状态，不触碰文件；
     /// runtime 用它保持“窗口已销毁 + 旧 handle”仍返回稳定 capability 错误。
+    /// （generation 不校验的兼容入口；生产路径传当前代。）
     pub fn validate_document_handle(
         &self,
         window_label: &str,
         document_target_handle: &str,
     ) -> ServiceResult<()> {
         self.handles
-            .validate(document_target_handle, window_label)
+            .validate(document_target_handle, window_label, None)
+            .map(|_| ())
+    }
+
+    /// PRR-050：active 归属 + 窗口当前代双重校验（runtime 生产路径）。
+    pub fn validate_document_handle_at_generation(
+        &self,
+        window_label: &str,
+        document_target_handle: &str,
+        current_generation: u64,
+    ) -> ServiceResult<()> {
+        self.handles
+            .validate(
+                document_target_handle,
+                window_label,
+                Some(current_generation),
+            )
             .map(|_| ())
     }
 
@@ -247,16 +294,35 @@ impl FileLifecycleService {
         self.handles.count_for_window(window_label)
     }
 
+    /// 只读诊断：该窗口当前 active handle（PRR-050 replace-and-revoke 的
+    /// 直接观察通道；稳定窗口为 None 或唯一 handle）。
+    pub fn active_document_handle(&self, window_label: &str) -> Option<String> {
+        self.handles.active_handle_for_window(window_label)
+    }
+
     // ---- MRT-004B1/B1A:host-domain 提交边界(B1.5 + B1A-F2) ----
 
     /// open 的 host-only 绑定 outcome(B1A.3):renderer 只拿 `OpenOutcome`
     /// 投影(handle/token/displayPath);`identity` 由 host 从同一次打开的
     /// 无损 canonical 目标解析,不出 host、不经 displayPath 反推。
+    /// （generation 1 兼容入口；生产路径走 `open_file_with_identity_at_generation`。）
     pub fn open_file_with_identity(
         &self,
         provider: &dyn FileIdentityProvider,
         window_label: &str,
         raw_path: &Path,
+    ) -> ServiceResult<OpenHostOutcome> {
+        self.open_file_with_identity_at_generation(provider, window_label, raw_path, 1)
+    }
+
+    /// PRR-050：open 签发的 handle 绑定当前窗口 generation，并在同一
+    /// 临界区撤销该窗口旧 active handle。
+    pub fn open_file_with_identity_at_generation(
+        &self,
+        provider: &dyn FileIdentityProvider,
+        window_label: &str,
+        raw_path: &Path,
+        window_generation: u64,
     ) -> ServiceResult<OpenHostOutcome> {
         let canon = canonical_path(raw_path)?;
         // PRC-020: 单次 open 取得底层 descriptor
@@ -287,7 +353,9 @@ impl FileLifecycleService {
         }
 
         // provider 与打开目标的绑定验证通过后再签发能力，失败路径不留下孤立 handle
-        let handle = self.handles.issue(window_label, canon.clone());
+        let handle = self
+            .handles
+            .issue(window_label, canon.clone(), window_generation);
         Ok(OpenHostOutcome {
             renderer: OpenOutcome {
                 content_json,
@@ -330,8 +398,29 @@ impl FileLifecycleService {
         expected_version_token: &str,
         content_json: &str,
     ) -> Result<OrdinaryCommitResult, ServiceError> {
+        self.commit_ordinary_with_identity_at_generation(
+            provider,
+            window_label,
+            None,
+            document_target_handle,
+            expected_version_token,
+            content_json,
+        )
+    }
+
+    /// PRR-050：ordinary 提交带当前窗口 generation（active 归属 + 代校验）。
+    pub fn commit_ordinary_with_identity_at_generation(
+        &self,
+        provider: &dyn FileIdentityProvider,
+        window_label: &str,
+        current_generation: Option<u64>,
+        document_target_handle: &str,
+        expected_version_token: &str,
+        content_json: &str,
+    ) -> Result<OrdinaryCommitResult, ServiceError> {
         let (canon, receipt) = self.commit_ordinary_core(
             window_label,
+            current_generation,
             document_target_handle,
             expected_version_token,
             content_json,
@@ -369,13 +458,14 @@ impl FileLifecycleService {
     fn commit_ordinary_core(
         &self,
         window_label: &str,
+        current_generation: Option<u64>,
         document_target_handle: &str,
         expected_version_token: &str,
         content_json: &str,
     ) -> ServiceResult<(PathBuf, Receipt)> {
-        let canon = self
-            .handles
-            .validate(document_target_handle, window_label)?;
+        let canon =
+            self.handles
+                .validate(document_target_handle, window_label, current_generation)?;
         // 先复核内容(文件被外部删除/修改 → 稳定冲突码,绝不覆盖)。
         match file_sha256(&canon)? {
             Some(h) if h == expected_version_token => {}
@@ -423,6 +513,17 @@ impl FileLifecycleService {
         plan: &AuthorizationPlan,
         content_json: &str,
     ) -> ServiceResult<Receipt> {
+        self.commit_save_as_planned_at_generation(window_label, 1, plan, content_json)
+    }
+
+    /// PRR-050：planned Save As 的 handle 以当前窗口 generation 签发。
+    pub fn commit_save_as_planned_at_generation(
+        &self,
+        window_label: &str,
+        window_generation: u64,
+        plan: &AuthorizationPlan,
+        content_json: &str,
+    ) -> ServiceResult<Receipt> {
         if plan.window_label() != window_label {
             return Err(ServiceError::invalid_target_authorization(
                 "plan 不属于当前窗口",
@@ -431,9 +532,9 @@ impl FileLifecycleService {
         let auth = self.authorizations.redeem_plan(plan, self.clock.now_ms())?;
         verify_target_unchanged(&auth)?;
         commit::atomic_replace(&auth.canonical_path, content_json.as_bytes())?;
-        let handle = self
-            .handles
-            .issue(window_label, auth.canonical_path.clone());
+        let handle =
+            self.handles
+                .issue(window_label, auth.canonical_path.clone(), window_generation);
         Ok(Receipt {
             document_target_handle: handle,
             version_token: sha256_hex(content_json.as_bytes()),
@@ -597,7 +698,13 @@ pub fn orchestrate_save_as_with_generation(
         .map_err(PreCommitError::Prepare)
         .map_err(SaveAsError::PreCommit)?;
     // 4. commit(锁外;redeem=消耗授权 + TOCTOU + 原子替换)
-    let receipt = match service.commit_save_as_planned(window_label, &plan, content_json) {
+    // PRR-050：新 handle 以调用方绑定的窗口代签发（replace-and-revoke）。
+    let receipt = match service.commit_save_as_planned_at_generation(
+        window_label,
+        expected_generation.unwrap_or(1),
+        &plan,
+        content_json,
+    ) {
         Ok(r) => r,
         Err(e) => {
             // pre-commit 失败:显式 abort;abort 自身失败 → 组合错误,不吞错

@@ -2,6 +2,7 @@
   "name": "@mindmap/core",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "平台无关脑图领域层：schema、命令、历史、DocumentSession（MM-030 实现）",
   "main": "src/index.ts",

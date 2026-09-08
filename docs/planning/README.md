@@ -2,9 +2,20 @@
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
-## 2026-09-07 发布前收口批次
+## 2026-09-07 发布前终审整改批次
 
-本批次把 2026-09-07 发布前终审中仍未关闭的真实发布条件整理为 PRC-000～PRC-090。当前状态为 `DRAFT / READY_FOR_OWNER_REVIEW`：用户已要求产出指南与任务卡，但尚未因此授权修改 CI/发布判定、生产 Tauri 配置、删除文件、候选安装、签名、公证、上传或公开发布。
+PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复算结论为 `REJECT / NOT_READY_TO_RELEASE`。旧候选、旧 MM-110 `ACCEPT` 与旧 `READY_TO_RELEASE` 交接包只保留审计用途，不得作为签名、公证或公开发布输入。
+
+- [全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)：候选、实现、runner 和证据链的独立结论及已完成的小修。
+- [PRR-000～050 实现审阅](../quality/prr-000-050-implementation-review-2026-09-07.md)：执行 Agent 本轮代码 diff 的独立复核、审阅修复和剩余 Gate。
+- [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
+- [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
+
+当前整改批次状态为 `IN_PROGRESS / OWNER_INPUTS_PROVIDED`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-010/020/040/050 的实现已在审阅小修后获得有条件接受；PRR-000（G2 真实批准已补齐并复算通过）、PRR-030 与 PRR-060 已实现（产物级 plist/LaunchServices/携带文件验证随 PRR-070 执行）；PRR-070～090 未完成。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
+
+## 2026-09-07 发布前收口批次（历史）
+
+本批次把此前终审中仍未关闭的条件整理为 PRC-000～PRC-090。执行已经回报完成，但最终证据被后续独立审阅推翻；批次状态为 `EXECUTED / FINAL_REVIEW_REJECTED / SUPERSEDED_BY_PRR`。
 
 - [发布前收口开发指南](./pre-release-closure-development-guide-2026-09-07.md)：v1 权威范围、完成层级、Gate、技术路线与最终验收口径。
 - [发布前收口任务卡](./pre-release-closure-task-cards-2026-09-07.md)：PRC-000～PRC-090 的允许范围、红灯用例、命令、STOP 条件与交接物。
@@ -12,7 +23,7 @@
 
 本批次明确按已批准 PRD/ADR 执行：v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，只保留移植准备与 `deferred/not-run` 记录，不作为本次 v1 原生发布阻塞。由于修订现有 quality/CI 判定仍属于发布门变更，必须先取得任务卡定义的 `G-PRC-SCOPE`。
 
-文件使用 `pre-release-closure-<purpose>-2026-09-07.md`。正文通过 `G-PRC-PLAN` 前不得派发写入型任务；通过后若正文发生实质变化，需要重新审阅并记录新批准版本，旧版保留追溯。
+文件使用 `pre-release-closure-<purpose>-2026-09-07.md`。这些文件现在是历史执行输入；后续不得继续从中派发，也不得通过补写旧证据恢复其发布结论。
 
 ## 2026-09-06 参考对齐批次
 

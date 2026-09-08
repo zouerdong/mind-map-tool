@@ -1,0 +1,56 @@
+Mind Map Tool — Proprietary Software License
+
+Copyright (c) 2026 ErDong Zou. All rights reserved.
+
+1. Proprietary Rights
+
+This software, its source code, documentation, artwork, and bundled
+assets (collectively, the "Software") are the proprietary property of
+the copyright holder. All rights are reserved. Nothing in this license
+grants any right to use, copy, modify, merge, publish, distribute,
+sublicense, sell, or create derivative works of the Software beyond
+the express written permission of the copyright holder.
+
+2. No License by Source Availability
+
+The availability of the Software's source code for inspection does not
+constitute an open-source license and does not grant any rights under
+any open-source definition (including the OSI Open Source Definition).
+Until a separate written license is granted, all use of the Software is
+subject to this license and the copyright holder's written permission.
+
+3. Third-Party Components
+
+The Software incorporates third-party components and fonts that are
+licensed under their own terms. Those components remain the property of
+their respective rights holders and are governed by the notices in
+THIRD_PARTY_NOTICES.md, which accompanies every distribution of the
+Software. Nothing in this license limits, voids, or re-licenses the
+rights granted by those third-party licenses to their components.
+
+4. Commercial and Personal Use
+
+Personal and internal evaluation use of officially distributed copies
+of the Software is permitted by the copyright holder. Reselling,
+repackaging, charging for, or building commercial products on the
+Software itself requires a separate written commercial license from
+the copyright holder.
+
+5. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+6. Contact
+
+For licensing and commercial inquiries, contact the copyright holder:
+ErDong Zou.
+
+This license takes effect for version 0.1.0 of the Software and
+remains in force unless superseded by a written agreement signed by
+the copyright holder.

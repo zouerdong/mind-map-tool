@@ -2,6 +2,7 @@
   "name": "@mindmap/desktop",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "桌面应用组合根（Tauri 2 + React）",
   "scripts": {
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@xyflow/react": "12.11.5",
     "jsdom": "^26.0.0",
+    "terser": "^5.51.2",
     "vite": "^6.0.7"
   }
 }

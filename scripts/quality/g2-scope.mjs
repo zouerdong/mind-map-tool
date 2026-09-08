@@ -2,8 +2,15 @@
 // 集中校验 G2 approval、host、allowedActions、candidate/install/evidence/deletion 边界，
 // 拒绝空数组、相对逃逸、symlink 越界、宽泛 glob、未授权 action 和签名凭据。
 
-import { readFileSync, lstatSync, realpathSync, existsSync, readdirSync } from "node:fs";
-import { resolve, normalize, relative, isAbsolute, join } from "node:path";
+import {
+  readFileSync,
+  lstatSync,
+  realpathSync,
+  existsSync,
+  readdirSync,
+  readlinkSync,
+} from "node:fs";
+import { resolve, normalize, relative, isAbsolute, join, dirname, sep } from "node:path";
 import { createHash } from "node:crypto";
 
 export const FORBIDDEN_EXCLUDED_ACTIONS = [
@@ -74,29 +81,42 @@ export function validateSafePath(p, repoRoot, fieldName = "path") {
     throw new Error(`${fieldName} 包含通配符，必须为精确路径: ${p}`);
   }
   // 拒绝相对逃逸
-  if (p.includes("..") || normalize(p).startsWith("..")) {
+  if (p.split(/[\\/]+/).includes("..")) {
     throw new Error(`${fieldName} 包含路径穿越 (..): ${p}`);
   }
+  const normalized = normalize(p);
 
   const absPath = isAbsolute(p) ? normalized : resolve(repoRoot, p);
-  const relToRoot = relative(repoRoot, absPath);
-  if (relToRoot.startsWith("..") || isAbsolute(relToRoot)) {
+  const rootAbs = resolve(repoRoot);
+  const relToRoot = relative(rootAbs, absPath);
+  if (absPath === rootAbs) {
+    throw new Error(`${fieldName} 不能指向仓库根目录`);
+  }
+  if (!isSameOrDescendant(rootAbs, absPath)) {
     throw new Error(`${fieldName} 越界 repo root: ${p}`);
   }
 
-  // 符号链接检查
-  if (existsSync(absPath)) {
-    const st = lstatSync(absPath);
-    if (st.isSymbolicLink()) {
-      const real = realpathSync(absPath);
-      const relReal = relative(repoRoot, real);
-      if (relReal.startsWith("..") || isAbsolute(relReal)) {
-        throw new Error(`${fieldName} 为越界符号链接: ${p} -> ${real}`);
-      }
+  // 检查目标或最近的已存在父目录，避免通过中间 symlink 越出 repo。
+  const rootReal = realpathSync(rootAbs);
+  let existingAncestor = absPath;
+  while (!existsSync(existingAncestor)) {
+    const parent = dirname(existingAncestor);
+    if (parent === existingAncestor) break;
+    existingAncestor = parent;
+  }
+  if (existsSync(existingAncestor)) {
+    const realAncestor = realpathSync(existingAncestor);
+    if (!isSameOrDescendant(rootReal, realAncestor)) {
+      throw new Error(`${fieldName} 通过符号链接越界: ${p} -> ${realAncestor}`);
     }
   }
 
   return relToRoot;
+}
+
+export function isSameOrDescendant(parentPath, childPath) {
+  const rel = relative(resolve(parentPath), resolve(childPath));
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
 export function loadAndValidateG2Scope({
@@ -110,7 +130,8 @@ export function loadAndValidateG2Scope({
   repoRoot,
 }) {
   const root = repoRoot ?? resolve(process.cwd());
-  const regPath = isAbsolute(scopeFrom) ? scopeFrom : resolve(root, scopeFrom);
+  const safeScopeFrom = validateSafePath(scopeFrom, root, "scopeFrom");
+  const regPath = resolve(root, safeScopeFrom);
 
   if (!existsSync(regPath)) {
     throw new Error(`decision register 不存在: ${scopeFrom}`);
@@ -129,6 +150,19 @@ export function loadAndValidateG2Scope({
   }
   if (g2.status !== "approved") {
     throw new Error(`G2 门状态必须为 approved（当前 ${g2.status ?? "missing"}）`);
+  }
+  const approvedBy = typeof g2.approvedBy === "string" ? g2.approvedBy.trim() : "";
+  if (!approvedBy || /^(project[- ]?owner|owner|tbd|unknown)$/i.test(approvedBy)) {
+    throw new Error("G2.approvedBy 必须记录真实批准人，不能使用 project-owner/TBD 占位符");
+  }
+  if (!Number.isFinite(Date.parse(g2.approvedAt))) {
+    throw new Error("G2.approvedAt 必须是合法日期");
+  }
+  if (
+    !Array.isArray(g2.evidence) ||
+    !g2.evidence.some((entry) => typeof entry === "string" && entry.startsWith("[from-user]"))
+  ) {
+    throw new Error("G2.evidence 必须包含 [from-user] 批准记录，不能仅有执行者自述");
   }
 
   const scope = g2.approvedScope;
@@ -185,20 +219,25 @@ export function loadAndValidateG2Scope({
   // 校验 candidateRoot
   if (candidateRoot) {
     const safeCandidateRoot = validateSafePath(candidateRoot, root, "candidateRoot");
-    const isUnderRoot = safeCandidateOutputPaths.some(
-      (cop) => cop.startsWith(safeCandidateRoot) || safeCandidateRoot.startsWith(cop),
-    );
-    if (!isUnderRoot) {
-      throw new Error(`candidateRoot "${candidateRoot}" 与批准 candidateOutputPaths 不匹配`);
+    let approvedRoot = dirname(resolve(root, safeCandidateOutputPaths[0]));
+    while (
+      !safeCandidateOutputPaths.every((cop) => isSameOrDescendant(approvedRoot, resolve(root, cop)))
+    ) {
+      const parent = dirname(approvedRoot);
+      if (parent === approvedRoot) break;
+      approvedRoot = parent;
+    }
+    if (resolve(root, safeCandidateRoot) !== approvedRoot) {
+      throw new Error(
+        `candidateRoot "${candidateRoot}" 必须等于批准产物的唯一共同目录 ${relative(root, approvedRoot)}`,
+      );
     }
   }
 
   // 校验 candidate
   if (candidate) {
     const safeCandidate = validateSafePath(candidate, root, "candidate");
-    const isApprovedCandidate = safeCandidateOutputPaths.some(
-      (cop) => cop === safeCandidate || safeCandidate.startsWith(cop),
-    );
+    const isApprovedCandidate = safeCandidateOutputPaths.includes(safeCandidate);
     if (!isApprovedCandidate) {
       throw new Error(`candidate "${candidate}" 不在批准 candidateOutputPaths 中`);
     }
@@ -209,9 +248,15 @@ export function loadAndValidateG2Scope({
     const safeEvidenceDir = validateSafePath(evidenceDir, root, "evidenceDir");
     const isApprovedEvidenceDir =
       safeEvidenceOutputPaths.some(
-        (eop) => eop === safeEvidenceDir || safeEvidenceDir.startsWith(eop),
+        (eop) =>
+          eop === safeEvidenceDir ||
+          isSameOrDescendant(resolve(root, eop), resolve(root, safeEvidenceDir)),
       ) ||
-      safeDeletionBoundaries.some((db) => db === safeEvidenceDir || safeEvidenceDir.startsWith(db));
+      safeDeletionBoundaries.some(
+        (db) =>
+          db === safeEvidenceDir ||
+          isSameOrDescendant(resolve(root, db), resolve(root, safeEvidenceDir)),
+      );
     if (!isApprovedEvidenceDir) {
       throw new Error(`evidenceDir "${evidenceDir}" 不在批准 evidenceOutputPaths 中`);
     }
@@ -225,7 +270,7 @@ export function loadAndValidateG2Scope({
       throw new Error(`target "${target}" 不在批准 installationTargets 中`);
     }
     const isWithinDeletion = safeDeletionBoundaries.some(
-      (db) => safeTarget === db || safeTarget.startsWith(db + "/"),
+      (db) => safeTarget === db || isSameOrDescendant(resolve(root, db), resolve(root, safeTarget)),
     );
     if (!isWithinDeletion) {
       throw new Error(`target "${target}" 必须位于 deletionBoundaries 范围之内以保证安全卸载`);
@@ -266,9 +311,18 @@ export function computeArtifactSha256(artifactPath) {
       const full = join(dir, ent.name);
       if (ent.isDirectory()) {
         walk(full);
-      } else if (ent.isFile() || ent.isSymbolicLink()) {
+      } else if (ent.isFile()) {
         const rel = relative(artifactPath, full);
         const hash = computeFileSha256(full);
+        files.push(`${rel}:${hash}`);
+      } else if (ent.isSymbolicLink()) {
+        const rel = relative(artifactPath, full);
+        const real = realpathSync(full);
+        if (!isSameOrDescendant(artifactPath, real)) {
+          throw new Error(`artifact 内含越界符号链接: ${rel} -> ${real}`);
+        }
+        const target = readlinkSync(full);
+        const hash = createHash("sha256").update(`symlink:${target}`).digest("hex");
         files.push(`${rel}:${hash}`);
       }
     }

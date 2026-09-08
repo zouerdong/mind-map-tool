@@ -5,17 +5,28 @@
 // 用法：
 //   node install-gate.mjs --host tauri --scope-from <register> --candidate <path> --evidence-dir <path> [--plan|--execute]
 
-import { existsSync, readFileSync, writeFileSync, rmSync, cpSync, mkdirSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  cpSync,
+  mkdirSync,
+  lstatSync,
+} from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   loadAndValidateG2Scope,
   checkSigningHints,
+  computeFileSha256,
   computeArtifactSha256,
-  validateSafePath,
+  isSameOrDescendant,
 } from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const RUNNER_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolve(HERE, "../..");
 
 const args = process.argv.slice(2);
@@ -77,7 +88,7 @@ const targetAbs = resolve(ROOT, targetRel);
 // 校验 target 是否在 deletionBoundaries 内
 const isWithinDeletionBoundary = scope.deletionBoundaries.some((db) => {
   const dbAbs = resolve(ROOT, db);
-  return targetAbs.startsWith(dbAbs);
+  return isSameOrDescendant(dbAbs, targetAbs);
 });
 
 if (!isWithinDeletionBoundary) {
@@ -90,6 +101,10 @@ if (!isWithinDeletionBoundary) {
 const candidateAbs = resolve(ROOT, candidate);
 let candidateSha256 = "(pending build)";
 if (existsSync(candidateAbs)) {
+  if (lstatSync(candidateAbs).isSymbolicLink()) {
+    console.error(`install-gate: FAIL — 候选产物不能是符号链接: ${candidate}`);
+    process.exit(1);
+  }
   candidateSha256 = computeArtifactSha256(candidateAbs);
 } else if (!isPlan) {
   console.error(`install-gate: FAIL — 候选产物不存在: ${candidate}`);
@@ -158,7 +173,12 @@ if (existsSync(targetAbs)) {
   if (existsSync(receiptPath)) {
     try {
       const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
-      if (receipt.candidateSha256 === candidateSha256) {
+      const existingTargetSha256 = computeArtifactSha256(targetAbs);
+      if (
+        receipt.candidateSha256 === candidateSha256 &&
+        existingTargetSha256 === candidateSha256 &&
+        receipt.target === targetRel
+      ) {
         isAlien = false;
       }
     } catch {}
@@ -176,6 +196,7 @@ mkdirSync(targetParent, { recursive: true });
 
 // 复制应用到目标
 console.log(`install-gate: 复制候选到沙箱目标 -> ${targetRel}`);
+const installStartedAt = new Date().toISOString();
 cpSync(candidateAbs, targetAbs, { recursive: true });
 
 const receipt = {
@@ -188,17 +209,36 @@ const receipt = {
 };
 writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + "\n");
 
-// 身份探针：核实 bundle ID 与结构
+function plistString(plistText, key) {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = plistText.match(
+    new RegExp(`<key>\\s*${escapedKey}\\s*</key>\\s*<string>([^<]*)</string>`),
+  );
+  return match?.[1]?.trim() ?? null;
+}
+
+// 身份探针：核实 bundle ID、版本与结构
 console.log("install-gate: 执行安装身份探针...");
 const plistPath = join(targetAbs, "Contents/Info.plist");
-if (existsSync(plistPath)) {
-  const plistText = readFileSync(plistPath, "utf8");
-  if (scope.bundleIdentifier && !plistText.includes(scope.bundleIdentifier)) {
-    console.error(
-      `install-gate: FAIL — Info.plist 中未找到预期 bundle identifier: ${scope.bundleIdentifier}`,
-    );
-    process.exit(1);
-  }
+if (!existsSync(plistPath)) {
+  console.error("install-gate: FAIL — 安装目标缺少 Contents/Info.plist，停止清理并保留现场");
+  process.exit(1);
+}
+const plistText = readFileSync(plistPath, "utf8");
+const installedBundleId = plistString(plistText, "CFBundleIdentifier");
+const installedVersion =
+  plistString(plistText, "CFBundleShortVersionString") ?? plistString(plistText, "CFBundleVersion");
+if (installedBundleId !== scope.bundleIdentifier) {
+  console.error(
+    `install-gate: FAIL — bundle identifier 不匹配（expected=${scope.bundleIdentifier}, actual=${installedBundleId ?? "missing"}），停止清理并保留现场`,
+  );
+  process.exit(1);
+}
+if (installedVersion !== scope.version) {
+  console.error(
+    `install-gate: FAIL — bundle version 不匹配（expected=${scope.version}, actual=${installedVersion ?? "missing"}），停止清理并保留现场`,
+  );
+  process.exit(1);
 }
 
 // 卸载与清理：只移除本次 execution 创建且 hash/identity 相符的目标
@@ -225,14 +265,25 @@ mkdirSync(evidenceDirAbs, { recursive: true });
 const evidenceOutPath = join(evidenceDirAbs, "install-gate-evidence.json");
 
 const evidence = {
+  schemaVersion: 2,
+  task: "PRC-055",
   status: "PASS",
   mode: "execute",
   host,
   candidate,
   candidateSha256,
+  sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(),
+  runnerSha256: computeFileSha256(RUNNER_PATH),
+  os: process.platform,
+  arch: process.arch,
+  command: [process.execPath, ...process.argv.slice(1)].join(" "),
   target: targetRel,
+  installedBundleId,
+  installedVersion,
   installedAndUninstalled: true,
   executedAt: new Date().toISOString(),
+  startedAt: installStartedAt,
+  finishedAt: new Date().toISOString(),
 };
 writeFileSync(evidenceOutPath, JSON.stringify(evidence, null, 2) + "\n");
 console.log(`install-gate: PASS — 安装与干净卸载验证完成，证据写入 ${evidenceOutPath}`);

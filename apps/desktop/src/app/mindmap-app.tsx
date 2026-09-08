@@ -211,6 +211,28 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, [bump, geometryBarrier, ports.renderer]);
 
   const deps = useMemo(() => ({ filePort: ports.filePort }), [ports.filePort]);
+
+  // PRR-010 perf 诊断探针：mount 后启动；未启用（无 MINDMAP_PERF_SAMPLE
+  // env 的普通用户/浏览器 dev 路径）时 no-op。场景文档加载复用与 open
+  // 相同的 load + fitView 信号路径。动态 import：诊断代码不占首屏 entry
+  // 预算（RLS-013/PRR-020）。
+  useEffect(() => {
+    void import("./perf-probe.js").then((mod) =>
+      mod.runPerfProbe({
+        session,
+        filePort: ports.filePort,
+        renderer: ports.renderer,
+        loadDocument: (doc) => {
+          session.load(doc);
+          bump();
+          setFitViewSignal((n) => n + 1);
+        },
+        notifySaved: () => session.notifySaved(),
+        notifyExported: () => session.notifyExported(),
+      }),
+    );
+    // 单次启动：探针自身幂等（StrictMode 复用模块级单例），依赖只取首帧引用。
+  }, []);
   const onboardingPreferences = useMemo(
     () => createOnboardingPreferences(ports.preferences),
     [ports.preferences],
@@ -374,7 +396,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       });
       return;
     }
-    reportSaveResult(await saveAsFlow(session, deps, `未命名.json`));
+    reportSaveResult(await saveAsFlow(session, deps, "未命名.mindmap"));
     bump();
   }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 

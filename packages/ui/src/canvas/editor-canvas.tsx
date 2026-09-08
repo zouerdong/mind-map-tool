@@ -501,7 +501,7 @@ export function EditorCanvas({
     (event: React.MouseEvent) => {
       const point = panePointFromEvent(event.nativeEvent, viewport);
       if (!point) return;
-      if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+      if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
         const id = (nextNodeId ?? (() => defaultId("n")))();
         void geometryBarrier.enqueue({ kind: "create-node", id, position: point, text: "" });
         setPendingNodes((prev) => new Map(prev).set(id, { id, position: point, text: "" }));
@@ -641,7 +641,7 @@ export function EditorCanvas({
       y: Math.round(center.y * 1000) / 1000,
     };
 
-    if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+    if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
       void geometryBarrier.enqueue({ kind: "create-node", id, position: pos, text: "" });
       setPendingNodes((prev) => new Map(prev).set(id, { id, position: pos, text: "" }));
       setFocusNodeId(id);
@@ -691,7 +691,7 @@ export function EditorCanvas({
       }
       const current = session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
       if (text === current) return;
-      if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+      if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
         void geometryBarrier.enqueue({ kind: "edit-text", id, text });
         setTextOverrides((prev) => new Map(prev).set(id, text));
       } else {
@@ -815,7 +815,7 @@ export function EditorCanvas({
             primaryNodeId={uiSelection.primary}
             onCommand={(command) => {
               if (command.kind === "SetNodeKicker") {
-                if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+                if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
                   void geometryBarrier.enqueue({
                     kind: "set-kicker",
                     id: command.id,
@@ -835,7 +835,7 @@ export function EditorCanvas({
                   });
                 }
               } else if (command.kind === "EditNodeText") {
-                if (geometryBarrier && geometryBarrier.getMetricsState() === "pending") {
+                if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
                   void geometryBarrier.enqueue({
                     kind: "edit-text",
                     id: command.id,
@@ -849,6 +849,17 @@ export function EditorCanvas({
                     ...command,
                     size: { width: box.width, height: box.height },
                   });
+                }
+              } else if (command.kind === "SetDocumentStyle" && command.font !== undefined) {
+                // [PRR-040] 字体切换永远经 GeometryBarrier：ready 时 barrier
+                // 用目标字体立即度量全部节点并原子提交（单 undo step 同时
+                // 恢复旧字体与旧 size）；pending/failed 时保留意图，禁止
+                // 旧字体几何随 SetDocumentStyle 直接入库。无 barrier 的
+                // 测试/harness 环境维持旧语义。
+                if (geometryBarrier) {
+                  void geometryBarrier.enqueue({ kind: "set-document-font", font: command.font });
+                } else {
+                  session.commit(command);
                 }
               } else {
                 session.commit(command); // 版本号驱动重投影（useCanvasSession）

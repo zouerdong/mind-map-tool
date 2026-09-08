@@ -177,13 +177,17 @@ impl GlobalShortcutState {
         if inv.generation != generation {
             return Err(IpcError::new("STALE_WINDOW_GENERATION", "窗口代次已过期"));
         }
-        if let Some(curr_gen) = current_window_generation {
-            if curr_gen != generation {
-                return Err(IpcError::new(
-                    "STALE_WINDOW_GENERATION",
-                    "窗口已重建换代，旧代响应无效",
-                ));
-            }
+        let Some(curr_gen) = current_window_generation else {
+            return Err(IpcError::new(
+                "STALE_WINDOW_GENERATION",
+                "窗口当前没有可验证的代次，快捷键调用按唤醒-only 处理",
+            ));
+        };
+        if curr_gen != generation {
+            return Err(IpcError::new(
+                "STALE_WINDOW_GENERATION",
+                "窗口已重建换代，旧代响应无效",
+            ));
         }
         if inv.created_at.elapsed() > std::time::Duration::from_millis(500) {
             return Err(IpcError::new("INVOCATION_EXPIRED", "快捷键调用已过期"));
@@ -276,13 +280,16 @@ fn dispatch(app: &AppHandle) {
     let generation = if let Some(runtime) =
         app.try_state::<std::sync::Arc<crate::lifecycle::runtime::LifecycleRuntime>>()
     {
-        runtime
-            .coordinator
-            .window_record(&label)
-            .map(|r| r.generation)
-            .unwrap_or(1)
+        let Some(record) = runtime.coordinator.window_record(&label) else {
+            let _ = win.show();
+            let _ = win.set_focus();
+            return;
+        };
+        record.generation
     } else {
-        1
+        let _ = win.show();
+        let _ = win.set_focus();
+        return;
     };
 
     let seq = state
@@ -316,6 +323,7 @@ fn dispatch(app: &AppHandle) {
     };
     if let Err(e) = win.emit("shortcut://pre-focus-probe", probe) {
         eprintln!("[shortcuts] 发送 pre-focus-probe 失败：{e}");
+        state.invocations.lock().unwrap().remove(&invocation_id);
         let _ = win.show();
         let _ = win.set_focus();
         return;
@@ -764,6 +772,37 @@ mod tests {
         // 窗口在期间已被销毁并以新代次重建（coordinator 代次已为 2）
         let res2 = state.resolve_invocation("inv-test-4", "main", 1, true, Some(2));
         assert_eq!(res2.unwrap_err().code, "STALE_WINDOW_GENERATION");
+    }
+
+    #[test]
+    fn pre_focus_resolve_without_host_generation_is_fail_closed() {
+        let state = GlobalShortcutState::new();
+        let (tx, _rx) = std::sync::mpsc::sync_channel::<bool>(1);
+        state.invocations.lock().unwrap().insert(
+            "inv-no-generation".to_string(),
+            PendingInvocation {
+                invocation_id: "inv-no-generation".to_string(),
+                window_label: "main".to_string(),
+                generation: 1,
+                created_at: std::time::Instant::now(),
+                responder: tx,
+                consumed: false,
+            },
+        );
+
+        let error = state
+            .resolve_invocation("inv-no-generation", "main", 1, true, None)
+            .unwrap_err();
+        assert_eq!(error.code, "STALE_WINDOW_GENERATION");
+        assert!(
+            !state
+                .invocations
+                .lock()
+                .unwrap()
+                .get("inv-no-generation")
+                .unwrap()
+                .consumed
+        );
     }
 
     #[test]

@@ -326,7 +326,7 @@ function failPendingWaiters(session: DocumentSession, failure: SaveFlowResult): 
 export function suggestedName(session: DocumentSession): string {
   const display = session.displayPath;
   const base = display?.split(/[\\/]/).pop() ?? "未命名";
-  return base.endsWith(".json") || base.includes(".") ? base : `${base}.json`;
+  return base.includes(".") ? base : `${base}.mindmap`;
 }
 
 /** 供测试/工具条触发的类型收敛 helper。 */

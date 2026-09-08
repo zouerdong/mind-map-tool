@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 
 const ROOT = resolve(__dirname, "../..");
 const VERIFIER = resolve(ROOT, "scripts/quality/verify-evidence.mjs");
@@ -28,14 +29,105 @@ function getGitHead() {
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
 }
 
+function fileSha256(path: string) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
 function baseManifest() {
+  mkdirSync(FIXTURE_DIR, { recursive: true });
+  const sourceCommit = getGitHead();
+  const candidateSha256 = fileSha256(resolve(ROOT, "package.json"));
+  const nativeReportPath = resolve(FIXTURE_DIR, "native-candidate-report.json");
+  const approvedAt = "2026-09-07T00:00:00.000Z";
+  const approvedBy = "Test Owner";
+  const userRecord = "[from-user] synthetic visual approval";
+  const g2UserRecord = "[from-user] synthetic packaging approval";
+  writeFileSync(
+    nativeReportPath,
+    JSON.stringify(
+      {
+        evidenceKind: "native-candidate",
+        sourceCommit,
+        candidateSha256,
+        platform: "macos",
+        overall: "PASS",
+        generatedAt: approvedAt,
+      },
+      null,
+      2,
+    ),
+  );
+  const gFinalPath = resolve(FIXTURE_DIR, "g-final.json");
+  writeFileSync(
+    gFinalPath,
+    JSON.stringify(
+      {
+        approvalKind: "g-final",
+        status: "APPROVED",
+        approvedBy,
+        approvedAt,
+        userRecord,
+        candidateSha256,
+        sourceCommit,
+      },
+      null,
+      2,
+    ),
+  );
+  const g2RegisterPath = resolve(FIXTURE_DIR, "g2-register.json");
+  writeFileSync(
+    g2RegisterPath,
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        gates: {
+          G2: {
+            status: "approved",
+            approvedBy,
+            approvedAt,
+            evidence: [g2UserRecord],
+            approvedScope: {
+              selectedHost: "tauri",
+              candidateOutputPaths: ["package.json"],
+              evidenceOutputPaths: [".tmp/quality-test-fixtures"],
+              installationTargets: [".tmp/quality-test-fixtures/installed/Mind Map.app"],
+              allowedActions: [
+                "build",
+                "launch",
+                "install",
+                "uninstall",
+                "measure-performance",
+                "permission-probe",
+              ],
+              deletionBoundaries: [".tmp/quality-test-fixtures"],
+              explicitlyExcluded: [
+                "test-signing",
+                "signing",
+                "notarization",
+                "credential access",
+                "system trust changes",
+                "upload",
+                "publication",
+              ],
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  const nativeReportSha256 = fileSha256(nativeReportPath);
+  const gFinalSha256 = fileSha256(gFinalPath);
+  const g2RegisterSha256 = fileSha256(g2RegisterPath);
+
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     caseId: "TEST-EVIDENCE-001",
     task: "PRC-010-TEST",
     generatedAt: new Date().toISOString(),
     source: {
-      commit: getGitHead(),
+      commit: sourceCommit,
       worktree: "clean",
     },
     environment: {
@@ -50,9 +142,38 @@ function baseManifest() {
         id: "cmd-test",
         command: "echo test",
         exitCode: 0,
+        startedAt: "2026-09-06T00:00:00.000Z",
+        finishedAt: "2026-09-06T00:00:01.000Z",
         artifact: "package.json",
+        artifactSha256: candidateSha256,
       },
     ],
+    candidate: {
+      path: "package.json",
+      sha256: candidateSha256,
+      installerDmg: "package.json",
+      dmgSha256: candidateSha256,
+      unsignedConfirmed: true,
+    },
+    approvals: {
+      g2: {
+        status: "APPROVED",
+        approvedBy,
+        approvedAt,
+        userRecord: g2UserRecord,
+        artifact: ".tmp/quality-test-fixtures/g2-register.json",
+        artifactSha256: g2RegisterSha256,
+      },
+      gFinal: {
+        status: "APPROVED",
+        approvedBy,
+        approvedAt,
+        userRecord,
+        candidateSha256,
+        artifact: ".tmp/quality-test-fixtures/g-final.json",
+        artifactSha256: gFinalSha256,
+      },
+    },
     releaseScope: {
       productVersion: "v1",
       requiredPlatforms: ["macos"],
@@ -72,7 +193,8 @@ function baseManifest() {
         command: "echo test",
         status: "verified",
         exitCode: 0,
-        artifact: "package.json",
+        artifact: ".tmp/quality-test-fixtures/native-candidate-report.json",
+        artifactSha256: nativeReportSha256,
       },
       windows: {
         platform: "windows",
@@ -82,6 +204,91 @@ function baseManifest() {
     },
     overall: "READY",
   };
+}
+
+function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, unknown>) {
+  const startedAt = "2026-09-06T00:00:00.000Z";
+  const finishedAt = "2026-09-06T00:00:01.000Z";
+  const runnerSha256 = fileSha256(resolve(ROOT, "scripts/quality/run-performance.mjs"));
+  const samples = Array.from({ length: 20 }, (_, index) => index + 1);
+  const runs = samples.map((_, index) => ({
+    runId: `run-${index}`,
+    markerFound: true,
+    exited: true,
+    readyEvent: {
+      runId: `run-${index}`,
+      milestone: "renderer-ready",
+      windowGeneration: 1,
+    },
+  }));
+  const rawPath = resolve(FIXTURE_DIR, "release-performance-raw.json");
+  const raw = {
+    measurementSource: "native-candidate",
+    sourceCommit: manifest.source.commit,
+    candidateSha256: manifest.candidate.sha256,
+    runnerSha256,
+    generatedAt: finishedAt,
+    startedAt,
+    finishedAt,
+    coldSamples: samples,
+    warmSamples: samples,
+    rssSamples: samples.slice(0, 5),
+    editSamples: samples,
+    saveSamples: samples,
+    pngExportSamples: samples,
+    coldRuns: runs,
+    warmRuns: runs,
+    samplingProtocol: { coldDefinition: "isolated", warmDefinition: "shared" },
+    rssResult: {
+      measurementSource: "native-candidate",
+      readyEvent: { milestone: "renderer-ready" },
+    },
+    canvasResult,
+    incompleteReasons: [],
+  };
+  writeFileSync(rawPath, JSON.stringify(raw, null, 2));
+  const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
+  const summary = {
+    overall: "PASS",
+    sourceCommit: manifest.source.commit,
+    candidate: manifest.candidate.path,
+    candidateSha256: manifest.candidate.sha256,
+    runnerSha256,
+    generatedAt: finishedAt,
+    startedAt,
+    finishedAt,
+    rawSha256: fileSha256(rawPath),
+    budgets: {
+      coldStartP95Ms: 1500,
+      warmStartP95Ms: 800,
+      rssStableMb: 120,
+      canvasFrameP95Ms: 32,
+      editCommandP95Ms: 50,
+      saveP95Ms: 200,
+      pngExportP95Ms: 3000,
+      installerBytes: 25_000_000,
+    },
+    results: {
+      coldStartP95Ms: 20,
+      warmStartP95Ms: 20,
+      rssStableMb: 3,
+      canvasFrameP95Ms: 1,
+      editCommandP95Ms: 20,
+      saveP95Ms: 20,
+      pngExportP95Ms: 20,
+      installerBytes: readFileSync(resolve(ROOT, "package.json")).byteLength,
+    },
+  };
+  writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  manifest.commands.push({
+    id: "cmd-release-performance",
+    command: "node scripts/quality/run-performance.mjs",
+    exitCode: 0,
+    startedAt,
+    finishedAt,
+    artifact: ".tmp/quality-test-fixtures/release-performance-summary.json",
+    artifactSha256: fileSha256(summaryPath),
+  });
 }
 
 describe("verify-evidence releaseScope verification", () => {
@@ -106,6 +313,17 @@ describe("verify-evidence releaseScope verification", () => {
     } else {
       expect(res.stdout).toContain("PASS");
     }
+  });
+
+  it("fails closed when releaseScope is omitted from a legacy-shaped manifest", () => {
+    const manifest = baseManifest();
+    delete (manifest as any).releaseScope;
+    const fixturePath = resolve(FIXTURE_DIR, "missing-release-scope.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("历史 manifest 只可审计");
   });
 
   it("fails if macOS required report is missing", () => {
@@ -159,5 +377,162 @@ describe("verify-evidence releaseScope verification", () => {
     const res = runVerifier(["--manifest", fixturePath]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("platformReports.windows.artifact 不存在");
+  });
+
+  it("fails if the recorded candidate hash does not match the artifact", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    manifest.candidate.sha256 = "0".repeat(64);
+    const fixturePath = resolve(FIXTURE_DIR, "candidate-hash-mismatch.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("candidate.sha256 与当前产物不一致");
+  });
+
+  it("fails if a platform report's embedded platform does not match its key", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    manifest.platformReports.macos.platform = "windows";
+    const fixturePath = resolve(FIXTURE_DIR, "platform-key-mismatch.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("platformReports.macos.platform 与键名不一致");
+  });
+
+  it("fails if a native report is modified after its hash was recorded", () => {
+    const manifest = baseManifest();
+    writeFileSync(
+      resolve(FIXTURE_DIR, "native-candidate-report.json"),
+      JSON.stringify({ evidenceKind: "native-candidate", overall: "FAIL" }, null, 2),
+    );
+    const fixturePath = resolve(FIXTURE_DIR, "tampered-native-report.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("platformReports.macos.artifactSha256 与当前 artifact 不一致");
+  });
+
+  it("fails when the exact G2 decision record is absent", () => {
+    const manifest = baseManifest();
+    delete (manifest.approvals as any).g2;
+    const fixturePath = resolve(FIXTURE_DIR, "missing-g2.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("approvals.g2 缺失");
+  });
+
+  it("fails when G-FINAL is absent instead of treating visual automation as owner approval", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    delete (manifest as any).approvals;
+    const fixturePath = resolve(FIXTURE_DIR, "missing-g-final.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("approvals.gFinal 缺失");
+  });
+
+  it("fails when G-FINAL uses a placeholder approver identity", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    manifest.approvals.gFinal.approvedBy = "project-owner";
+    const fixturePath = resolve(FIXTURE_DIR, "placeholder-g-final.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("approvals.gFinal.approvedBy 必须记录真实批准人");
+  });
+
+  it("fails when a v1/v2 legacy schema claims release readiness (audit-only)", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    manifest.schemaVersion = 2;
+    const fixturePath = resolve(FIXTURE_DIR, "legacy-schema.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("v1/v2 历史 manifest 只可审计");
+  });
+
+  it("fails when an evidence artifact is generated after the manifest (time inversion)", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    const futureReportPath = resolve(FIXTURE_DIR, "future-native-report.json");
+    writeFileSync(
+      futureReportPath,
+      JSON.stringify(
+        {
+          evidenceKind: "native-candidate",
+          sourceCommit: manifest.source.commit,
+          candidateSha256: manifest.candidate.sha256,
+          platform: "macos",
+          overall: "PASS",
+          generatedAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+    manifest.platformReports.macos.artifact =
+      ".tmp/quality-test-fixtures/future-native-report.json";
+    manifest.platformReports.macos.artifactSha256 = fileSha256(futureReportPath);
+    const fixturePath = resolve(FIXTURE_DIR, "time-inversion.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("晚于 manifest.generatedAt");
+  });
+
+  it("fails when a command lacks its own execution window (schema v3)", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    delete (manifest.commands[0] as any).startedAt;
+    delete (manifest.commands[0] as any).finishedAt;
+    const fixturePath = resolve(FIXTURE_DIR, "missing-command-window.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("commands[0].startedAt 缺失");
+  });
+
+  it("fails when a command artifact lacks a recorded SHA-256 binding (schema v3)", () => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+    const manifest = baseManifest();
+    delete (manifest.commands[0] as any).artifactSha256;
+    const fixturePath = resolve(FIXTURE_DIR, "missing-command-hash.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("commands[0].artifactSha256 缺失或无效");
+  });
+
+  it("fails when native canvas evidence has no independently recomputable raw frame samples", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 1,
+    });
+    const fixturePath = resolve(FIXTURE_DIR, "missing-canvas-raw-samples.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("canvas frame samples");
   });
 });

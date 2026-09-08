@@ -26,6 +26,7 @@ const SCAN_DIRS = [
 const ALLOWLIST = [
   {
     file: "apps/desktop/src/app/ports.ts",
+    label: "fetch(",
     pattern: /fetch\s*\(/,
     reason:
       "MM-080：加载 vite ?url 打包的同源 dist 资产（字体 OTF/TTF 与 resvg wasm，相对路径资源 URL），非网络端点（AC-13）",
@@ -64,7 +65,9 @@ for (const dir of SCAN_DIRS) {
     for (const { re, label } of PATTERNS) {
       const m = text.match(re);
       const rel = file.replace(ROOT + "/", "");
-      const exempted = ALLOWLIST.some((a) => a.file === rel && a.pattern.test(text));
+      const exempted = ALLOWLIST.some(
+        (a) => a.file === rel && a.label === label && a.pattern.test(text),
+      );
       if (m && !exempted) {
         violations.push(`${rel}: ${label}`);
       }

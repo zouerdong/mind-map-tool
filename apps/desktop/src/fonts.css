@@ -1,0 +1,28 @@
+/*
+ * UI 字体必须与共享 FontResolver / 导出链使用同一份受控资产。
+ * 不声明 @font-face 时，CSS 中的 Noto Sans SC / LXGW WenKai 会在未安装
+ * 这些字体的用户机器上静默回退，导致画布字形与持久化几何不一致。
+ */
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("../../../assets/fonts/noto-sans-sc-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("../../../assets/fonts/noto-sans-sc-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("../../../assets/fonts/lxgw-wenkai-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}

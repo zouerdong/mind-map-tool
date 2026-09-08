@@ -14,6 +14,7 @@ import {
   openPathFlow,
   saveAsFlow,
   saveFlow,
+  suggestedName,
   whenSavesSettled,
 } from "./file-commands.js";
 
@@ -107,6 +108,10 @@ function edit(session: DocumentSession, id: string): void {
 }
 
 describe("保存队列状态机（CR-001 回归）", () => {
+  it("新文档默认建议正式 .mindmap 扩展名", () => {
+    expect(suggestedName(new DocumentSession(emptyDocument()))).toBe("未命名.mindmap");
+  });
+
   it("关闭等待会持续追踪调用后才加入的保存请求，直到整条保存链归零", async () => {
     const fake = new FakeFilePort();
     const session = await openedSession(fake);

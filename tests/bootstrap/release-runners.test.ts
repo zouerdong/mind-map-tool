@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdirSync, rmSync, existsSync, chmodSync, readdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, chmodSync } from "node:fs";
+import { resolve, join, dirname } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
@@ -30,9 +30,11 @@ function runNode(script: string, args: string[], env: Record<string, string> = {
 function createSyntheticRegister(
   g2Status: "approved" | "pending" | "blocked" = "approved",
   overrides: any = {},
+  dir: string = FIXTURE_DIR,
 ) {
+  mkdirSync(dir, { recursive: true });
   const regPath = join(
-    FIXTURE_DIR,
+    dir,
     `register-${g2Status}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
   );
   const relFixtureDir = ".tmp/release-runner-fixtures";
@@ -46,6 +48,7 @@ function createSyntheticRegister(
         owner: "test-owner",
         approvedBy: "test-owner",
         approvedAt: "2026-09-07",
+        evidence: ["[from-user] synthetic test approval"],
         approvedScope: {
           productName: "Mind Map",
           bundleIdentifier: "com.mindmap.desktop",
@@ -88,7 +91,7 @@ function createSyntheticRegister(
   return regPath;
 }
 
-function createMockAppBundle(appPath: string) {
+function createMockAppBundle(appPath: string, binScript?: string) {
   mkdirSync(join(appPath, "Contents/MacOS"), { recursive: true });
   mkdirSync(join(appPath, "Contents/Resources"), { recursive: true });
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
@@ -105,14 +108,57 @@ function createMockAppBundle(appPath: string) {
 </plist>`;
   writeFileSync(join(appPath, "Contents/Info.plist"), plist);
 
-  const binScript = `#!/bin/sh
+  const script =
+    binScript ??
+    `#!/bin/sh
 echo "[lifecycle] setup 完成：cold argv=0 个参数"
 exit 0
 `;
   const binPath = join(appPath, "Contents/MacOS/mind-map");
-  writeFileSync(binPath, binScript);
+  writeFileSync(binPath, script);
   chmodSync(binPath, 0o755);
 }
+
+/**
+ * 构造一个独立的 clean git 仓库（.gitignore 忽略 .tmp/ 产物），供 bundle-gate
+ * 通过 --root 复算 clean-worktree 前置；真实仓库工作树不要求 clean。
+ */
+function createCleanGitRepo(name: string): string {
+  const repoDir = join(FIXTURE_DIR, name);
+  rmSync(repoDir, { recursive: true, force: true });
+  mkdirSync(join(repoDir, ".tmp/release-runner-fixtures"), { recursive: true });
+  writeFileSync(join(repoDir, ".gitignore"), ".tmp/\n");
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "fixture",
+    GIT_AUTHOR_EMAIL: "fixture@example.invalid",
+    GIT_COMMITTER_NAME: "fixture",
+    GIT_COMMITTER_EMAIL: "fixture@example.invalid",
+  };
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repoDir });
+  execFileSync("git", ["add", ".gitignore"], { cwd: repoDir });
+  execFileSync("git", ["commit", "-q", "-m", "fixture init", "--allow-empty"], {
+    cwd: repoDir,
+    env: gitEnv,
+  });
+  return repoDir;
+}
+
+/** PRR-010 协议 mock：按 env 输出带 runId/generation 的 perf JSON 行。 */
+const PERF_PROTOCOL_BIN = `#!/bin/sh
+RID="$MINDMAP_PERF_RUN_ID"
+SC="\${MINDMAP_PERF_SCENARIO:-launch}"
+emit() { printf '%s\\n' "$1"; }
+if [ "$SC" = "rss" ]; then
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":51200}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-sample\\",\\"rssKb\\":52224}"
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"rss-complete\\"}"
+else
+  emit "{\\"runId\\":\\"$RID\\",\\"windowGeneration\\":1,\\"milestone\\":\\"renderer-ready\\"}"
+fi
+exit 0
+`;
 
 describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
   beforeEach(() => {
@@ -146,6 +192,29 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res.status).toBe(1);
       expect(res.stderr).toContain("G2 scope 校验未通过");
       expect(existsSync(sentinel)).toBe(false);
+    });
+
+    it("G2 使用批准人占位符时直接 fail-closed", () => {
+      const regPath = createSyntheticRegister("approved");
+      const register = JSON.parse(readFileSync(regPath, "utf8"));
+      register.gates.G2.approvedBy = "project-owner";
+      writeFileSync(regPath, JSON.stringify(register, null, 2));
+
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--",
+        process.execPath,
+        "-e",
+        "process.exit(0)",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("必须记录真实批准人");
     });
 
     it("host 与 G2 selectedHost 不匹配时失败", () => {
@@ -186,6 +255,25 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res.stderr).toContain("路径穿越");
     });
 
+    it("candidate-root 只是批准目录的字符串前缀时仍拒绝", () => {
+      const regPath = createSyntheticRegister("approved");
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle-escape",
+        "--",
+        process.execPath,
+        "-e",
+        "process.exit(0)",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("唯一共同目录");
+    });
+
     it("环境变量命中签名/凭据提示时 fail-closed，且绝不泄漏凭据值", () => {
       const regPath = createSyntheticRegister("approved");
       const secretValue = "SUPER_SECRET_KEY_NEVER_LOG";
@@ -214,13 +302,61 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
     });
 
     it("approved 契约下假执行能够成功构建并输出 inventory/hash", () => {
-      const regPath = createSyntheticRegister("approved");
-      const bundleDir = join(FIXTURE_DIR, "bundle/macos");
+      const repoDir = createCleanGitRepo("bundle-ok-repo");
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      const bundleDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos");
+      const dmgDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/dmg");
       const mockApp = join(bundleDir, "Mind Map.app");
+      const mockDmg = join(dmgDir, "Mind Map_0.1.0_aarch64.dmg");
 
       const res = runNode(BUNDLE_GATE, [
         "--host",
         "tauri",
+        "--root",
+        repoDir,
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--inventory",
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+        "--",
+        process.execPath,
+        "-e",
+        `const fs = require('fs');
+         fs.mkdirSync('${bundleDir}', { recursive: true });
+         fs.mkdirSync('${dmgDir}', { recursive: true });
+         fs.mkdirSync('${mockApp}/Contents/MacOS', { recursive: true });
+         fs.writeFileSync('${mockApp}/Contents/MacOS/mind-map', '#!/bin/sh\\nexit 0\\n');
+         fs.writeFileSync('${mockApp}/Contents/Info.plist', '<plist></plist>');
+         fs.writeFileSync('${mockDmg}', 'synthetic dmg');`,
+      ]);
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("PASS — 成功构建并盘点");
+      expect(res.stdout).toContain("Mind Map.app");
+      expect(
+        existsSync(join(repoDir, ".tmp/release-runner-fixtures/evidence/bundle-inventory.json")),
+      ).toBe(true);
+    });
+
+    it("子进程未刷新预存候选时拒绝把陈旧产物报成新构建", () => {
+      const repoDir = createCleanGitRepo("bundle-stale-repo");
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      const candidateApp = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app");
+      const candidateDmg = join(
+        repoDir,
+        ".tmp/release-runner-fixtures/bundle/dmg/Mind Map_0.1.0_aarch64.dmg",
+      );
+      createMockAppBundle(candidateApp);
+      mkdirSync(dirname(candidateDmg), { recursive: true });
+      writeFileSync(candidateDmg, "stale dmg");
+
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--root",
+        repoDir,
         "--scope-from",
         regPath,
         "--candidate-root",
@@ -228,16 +364,11 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
         "--",
         process.execPath,
         "-e",
-        `const fs = require('fs');
-         fs.mkdirSync('${bundleDir}', { recursive: true });
-         fs.mkdirSync('${mockApp}/Contents/MacOS', { recursive: true });
-         fs.writeFileSync('${mockApp}/Contents/MacOS/mind-map', '#!/bin/sh\\nexit 0\\n');
-         fs.writeFileSync('${mockApp}/Contents/Info.plist', '<plist></plist>');`,
+        "process.exit(0)",
       ]);
 
-      expect(res.status).toBe(0);
-      expect(res.stdout).toContain("PASS — 成功构建并盘点");
-      expect(res.stdout).toContain("Mind Map.app");
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("并非本次构建产生或刷新");
     });
   });
 
@@ -300,6 +431,48 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res2.status).toBe(0);
       expect(res2.stdout).toContain("PLAN SUCCESS");
       expect(existsSync(targetDir)).toBe(false);
+    });
+
+    it("repo 内绝对 candidate/evidence 路径可以规范化并通过 plan", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp);
+
+      const res = runNode(INSTALL_GATE, [
+        "--host",
+        "tauri",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        candidateApp,
+        "--evidence-dir",
+        join(FIXTURE_DIR, "evidence"),
+        "--plan",
+      ]);
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("PLAN SUCCESS");
+    });
+
+    it("evidence 目录只是批准目录的字符串前缀时仍拒绝", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp);
+
+      const res = runNode(INSTALL_GATE, [
+        "--host",
+        "tauri",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence-escape",
+        "--plan",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("不在批准 evidenceOutputPaths 中");
     });
 
     it("--execute 遇到非本 candidate 的预存同名 app 时拒绝覆盖或清理", () => {
@@ -402,7 +575,7 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res.stderr).toContain("候选产物不存在");
     });
 
-    it("approved 范围内消费 mock candidate 能够完成采样并生成 summary/raw evidence", () => {
+    it("少于 20 个 release 样本时 fail-closed", () => {
       const regPath = createSyntheticRegister("approved");
       const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
       createMockAppBundle(candidateApp);
@@ -421,13 +594,97 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
         "--skip-canvas",
       ]);
 
-      expect(res.status).toBe(0);
-      expect(res.stdout).toContain("PASS");
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("至少需要 20 个样本");
+    });
+
+    it("缺少 renderer-ready、RSS 或 native canvas 时生成 INCOMPLETE 证据并返回非零", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp);
+
+      const res = runNode(PERF_RUNNER, [
+        "--scope",
+        "release",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence",
+        "--samples",
+        "20",
+        "--skip-canvas",
+        "--skip-scenarios",
+        "rss,edit,save,png-export",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("INCOMPLETE");
 
       const rawPath = join(FIXTURE_DIR, "evidence/release-performance-raw.json");
       const summaryPath = join(FIXTURE_DIR, "evidence/release-performance-summary.json");
       expect(existsSync(rawPath)).toBe(true);
       expect(existsSync(summaryPath)).toBe(true);
+      const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+      expect(summary.overall).toBe("INCOMPLETE");
+      expect(
+        summary.incompleteReasons.some((reason: string) => reason.includes("renderer-ready")),
+      ).toBe(true);
+    });
+
+    it("PRR-010 协议 mock：stdout perf 事件被采入 raw 并记录 runId/generation 链", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp, PERF_PROTOCOL_BIN);
+
+      const res = runNode(PERF_RUNNER, [
+        "--scope",
+        "release",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence",
+        "--samples",
+        "20",
+        "--skip-canvas",
+        "--skip-scenarios",
+        "canvas,edit,save,png-export",
+      ]);
+
+      // canvas/edit/save/png 跳过 → INCOMPLETE；但 cold/warm/rss 必须已采满。
+      expect(res.status).toBe(1);
+      expect(res.stdout).toContain("INCOMPLETE");
+
+      const raw = JSON.parse(
+        readFileSync(join(FIXTURE_DIR, "evidence/release-performance-raw.json"), "utf8"),
+      );
+      expect(raw.coldSamples).toHaveLength(20);
+      expect(raw.warmSamples).toHaveLength(20);
+      expect(
+        raw.coldRuns.every((run: any) => run.markerFound === true && run.exited === true),
+      ).toBe(true);
+      expect(raw.coldRuns.every((run: any) => run.readyEvent?.milestone === "renderer-ready")).toBe(
+        true,
+      );
+      // rss 来自 stdout 事件（51200/52224 KiB → 50/51 MB，p50 = 50）
+      expect(raw.rssSamples).toEqual([50, 51]);
+      expect(raw.rssResult.measurementSource).toBe("native-candidate");
+      expect(raw.rssResult.readyEvent.milestone).toBe("renderer-ready");
+      expect(raw.samplingProtocol.coldDefinition.length).toBeGreaterThan(0);
+      expect(raw.samplingProtocol.warmDefinition.length).toBeGreaterThan(0);
+      expect(raw.fixture.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(typeof raw.startedAt).toBe("string");
+      expect(typeof raw.finishedAt).toBe("string");
+      const summary = JSON.parse(
+        readFileSync(join(FIXTURE_DIR, "evidence/release-performance-summary.json"), "utf8"),
+      );
+      expect(summary.results.rssStableMb).toBe(51);
+      expect(summary.results.coldStartP95Ms).toBeGreaterThan(0);
+      // HOME 隔离目录在采样后清理
+      expect(existsSync(join(FIXTURE_DIR, "evidence/perf-homes"))).toBe(false);
     });
   });
 });

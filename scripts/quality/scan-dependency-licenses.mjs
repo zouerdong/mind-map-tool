@@ -12,6 +12,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
 const outputIdx = process.argv.indexOf("--output");
 const output = outputIdx === -1 ? null : process.argv[outputIdx + 1];
+const PRODUCT_LICENSE_FILES = ["LICENSE", "LICENSE.md", "LICENSE.txt"];
+const NOTICE_FILES = ["THIRD_PARTY_NOTICES", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.txt"];
 
 // 允许清单：宽松/署名型许可。GPL/AGPL/SSPL/未知 → FAIL（需项目负责人决定）。
 const ALLOWED = new Set([
@@ -92,19 +94,33 @@ async function resolveInstalledLicense(name, fromRel) {
     const p = resolve(base, "node_modules", name, "package.json");
     if (existsSync(p)) {
       const pkg = JSON.parse(await readFile(p, "utf8"));
-      let license = norm(pkg.license);
-      if (!license && Array.isArray(pkg.licenses)) {
-        license = pkg.licenses.map((l) => (typeof l === "string" ? l : l.type)).join(" OR ");
-      }
+      const license = licenseFromPackage(pkg);
       return { license: license || null, version: pkg.version };
     }
   }
   return { missing: true };
 }
 
+function licenseFromPackage(pkg) {
+  let license = typeof pkg.license === "string" ? norm(pkg.license) : norm(pkg.license?.type ?? "");
+  if (!license && Array.isArray(pkg.licenses)) {
+    license = pkg.licenses
+      .map((item) => (typeof item === "string" ? item : item?.type))
+      .filter(Boolean)
+      .join(" OR ");
+  }
+  return license;
+}
+
 const workspaceDeps = await collectWorkspaceDeps();
 const results = [];
 const failures = [];
+
+const productLicenseFile = PRODUCT_LICENSE_FILES.find((path) => existsSync(resolve(ROOT, path)));
+const thirdPartyNoticesFile = NOTICE_FILES.find((path) => existsSync(resolve(ROOT, path)));
+if (!productLicenseFile) failures.push("项目根目录缺少最终 LICENSE 文件（需项目负责人/法律批准）");
+if (!thirdPartyNoticesFile)
+  failures.push("项目根目录缺少 THIRD_PARTY_NOTICES 文件（依赖扫描不能替代随包 notices）");
 
 for (const [name, meta] of workspaceDeps) {
   if (meta.workspace) {
@@ -162,36 +178,107 @@ if (!existsSync(cargoManifest)) {
   }
 }
 
-// also scan the full .pnpm store (transitive) for hard-forbidden copyleft
+// 完整扫描 pnpm virtual store 中每个实际 package.json（含 scoped package）。
+// 传递依赖与直接依赖使用同一 fail-closed allowlist；未知许可不能静默跳过。
 const storeDir = resolve(ROOT, "node_modules/.pnpm");
+const transitiveResults = [];
 if (existsSync(storeDir)) {
   const entries = await readdir(storeDir);
   const seen = new Set();
   for (const entry of entries) {
-    const name = entry.split("@")[0] || entry; // imperfect but catches prefixes
-    void name;
-    const pkgJson = resolve(storeDir, entry, "node_modules");
-    // full transitive scan is expensive; check only license field of store entries
+    const nodeModulesDir = resolve(storeDir, entry, "node_modules");
     try {
-      const sub = await readdir(pkgJson);
-      const depName = sub[0];
-      if (!depName || seen.has(depName)) continue;
-      seen.add(depName);
-      const pj = resolve(pkgJson, depName, "package.json");
-      if (!existsSync(pj)) continue;
-      const pkg = JSON.parse(await readFile(pj, "utf8"));
-      const lic = norm(pkg.license);
-      if (/AGPL|GPL|SSPL|BUSL|commons-clause/i.test(lic)) {
-        failures.push(`(transitive) ${depName}: ${lic}`);
+      const topLevel = await readdir(nodeModulesDir, { withFileTypes: true });
+      const packageJsonPaths = [];
+      for (const dep of topLevel) {
+        if (dep.name.startsWith("@") && dep.isDirectory()) {
+          const scopeDir = resolve(nodeModulesDir, dep.name);
+          for (const scoped of await readdir(scopeDir, { withFileTypes: true })) {
+            if (scoped.isDirectory() || scoped.isSymbolicLink()) {
+              packageJsonPaths.push(resolve(scopeDir, scoped.name, "package.json"));
+            }
+          }
+        } else if (dep.isDirectory() || dep.isSymbolicLink()) {
+          packageJsonPaths.push(resolve(nodeModulesDir, dep.name, "package.json"));
+        }
       }
-    } catch {
-      // ignore layout oddities
+
+      for (const packageJson of packageJsonPaths) {
+        if (!existsSync(packageJson)) continue;
+        const pkg = JSON.parse(await readFile(packageJson, "utf8"));
+        const key = `${pkg.name}@${pkg.version}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const license = licenseFromPackage(pkg) || "UNKNOWN";
+        transitiveResults.push({ name: pkg.name, version: pkg.version, license });
+        if (license === "UNKNOWN") {
+          failures.push(`(transitive) ${key}: package license 缺失（人工审阅）`);
+        } else if (!licenseAllowed(license)) {
+          failures.push(`(transitive) ${key}: 许可 "${license}" 不在允许清单`);
+        }
+      }
+    } catch (error) {
+      if (existsSync(nodeModulesDir)) {
+        failures.push(`(transitive) 无法扫描 ${entry}: ${error.message}`);
+      }
     }
   }
+} else {
+  failures.push("pnpm virtual store 不存在（先 pnpm install）");
+}
+
+// THIRD_PARTY_NOTICES 覆盖校验（PRR-060）：每个随包 JS/Cargo/字体条目都必须
+// 出现在 notices 中，notices 中也不得有当前解析图之外的陈旧条目；两侧不一致
+// 都 fail-closed，提示重新运行 generate-third-party-notices.mjs。
+let noticesStats = null;
+if (thirdPartyNoticesFile) {
+  const noticesText = await readFile(resolve(ROOT, thirdPartyNoticesFile), "utf8");
+  const noticed = new Set();
+  for (const m of noticesText.matchAll(/^(?:★ )?-\s+`([^`]+@[^`]+)`\s+—\s+License:/gm)) {
+    noticed.add(m[1]);
+  }
+  const fontNoticed = new Set(
+    [...noticesText.matchAll(/`(assets\/fonts\/[^`]+)`/g)].map((m) => m[1]),
+  );
+
+  const scannedKeys = new Set([
+    ...transitiveResults.map((r) => `${r.name}@${r.version}`),
+    ...cargoResults.filter((r) => r.source !== "workspace").map((r) => `${r.name}@${r.version}`),
+  ]);
+  for (const key of scannedKeys) {
+    if (!noticed.has(key))
+      failures.push(
+        `(notices) ${key}: 未出现在 ${thirdPartyNoticesFile}（重跑 generate-third-party-notices.mjs）`,
+      );
+  }
+  for (const key of noticed) {
+    if (!scannedKeys.has(key))
+      failures.push(
+        `(notices) ${key}: notices 条目不在当前依赖解析图中（notices 陈旧，需重新生成）`,
+      );
+  }
+
+  const fontDir = resolve(ROOT, "assets/fonts");
+  const shippedFonts = (await readdir(fontDir)).filter(
+    (f) => f.endsWith(".woff2") || f === "OFL-1.1.txt",
+  );
+  for (const f of shippedFonts) {
+    const rel = `assets/fonts/${f}`;
+    if (!fontNoticed.has(rel)) failures.push(`(notices) ${rel}: 随包字体未出现在 notices`);
+  }
+  noticesStats = {
+    file: thirdPartyNoticesFile,
+    packages: scannedKeys.size,
+    staleEntries: [...noticed].filter((k) => !scannedKeys.has(k)).length,
+    fonts: shippedFonts.length,
+  };
+  console.log(
+    `notices coverage: ${scannedKeys.size} packages + ${shippedFonts.length} fonts checked against ${thirdPartyNoticesFile}`,
+  );
 }
 
 console.log(
-  `scanned ${results.length} direct JS dependencies + ${cargoResults.length} Cargo packages (+transitive copyleft scan)`,
+  `scanned ${results.length} direct JS dependencies + ${transitiveResults.length} transitive JS packages + ${cargoResults.length} Cargo packages`,
 );
 for (const r of results) console.log(`  ${r.name.padEnd(32)} ${r.license}`);
 if (cargoResults.length) {
@@ -209,7 +296,13 @@ if (output) {
         schemaVersion: 1,
         generatedAt: new Date().toISOString(),
         allowedLicenses: [...ALLOWED].sort(),
+        releaseArtifacts: {
+          productLicenseFile: productLicenseFile ?? null,
+          thirdPartyNoticesFile: thirdPartyNoticesFile ?? null,
+        },
+        noticesCoverage: noticesStats,
         javascript: results,
+        javascriptTransitive: transitiveResults,
         cargo: cargoResults,
         failures,
         overall: failures.length ? "FAIL" : "PASS",

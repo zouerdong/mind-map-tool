@@ -1,7 +1,7 @@
 // tests/visual/visual-alignment.test.ts — VRA-080 视觉与动效真实验收测试套件
 // 验证静态外观、自动布局、运动协调、三格式导出及交互状态机等六层核心不变量。
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -28,9 +28,11 @@ function loadJsonFixture(relPath: string): MindMapDocumentV1 {
 async function loadFonts() {
   const dir = resolve(ROOT, "assets/fonts");
   return {
-    "noto-sans-sc-regular": new Uint8Array(readFileSync(resolve(dir, "noto-sans-sc-regular.otf"))),
-    "noto-sans-sc-bold": new Uint8Array(readFileSync(resolve(dir, "noto-sans-sc-bold.otf"))),
-    "lxgw-wenkai-regular": new Uint8Array(readFileSync(resolve(dir, "lxgw-wenkai-regular.ttf"))),
+    "noto-sans-sc-regular": new Uint8Array(
+      readFileSync(resolve(dir, "noto-sans-sc-regular.woff2")),
+    ),
+    "noto-sans-sc-bold": new Uint8Array(readFileSync(resolve(dir, "noto-sans-sc-bold.woff2"))),
+    "lxgw-wenkai-regular": new Uint8Array(readFileSync(resolve(dir, "lxgw-wenkai-regular.woff2"))),
   };
 }
 
@@ -314,7 +316,11 @@ describe("VRA-080 视觉与动效真实验收", () => {
       expect(pdfBytes.length).toBeGreaterThan(1000);
 
       // 4. 保存真实样本文件至证据目录
-      const evidenceDir = resolve(ROOT, "docs/quality/evidence/visual-alignment");
+      const evidenceDir = resolve(
+        ROOT,
+        process.env.MINDMAP_VISUAL_EVIDENCE_DIR ?? ".tmp/quality/visual-alignment",
+      );
+      mkdirSync(evidenceDir, { recursive: true });
       writeFileSync(resolve(evidenceDir, "reference-dag-12-export.svg"), svgBytes);
       writeFileSync(resolve(evidenceDir, "reference-dag-12-export.png"), pngResult.bytes);
       writeFileSync(resolve(evidenceDir, "reference-dag-12-export.pdf"), pdfBytes);

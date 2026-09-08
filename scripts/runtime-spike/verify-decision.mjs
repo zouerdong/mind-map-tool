@@ -89,15 +89,18 @@ function checkBootstrap() {
   if (!g1.approvedBy || !g1.approvedAt) fail("G1 approval must name approver and time");
 
   const snap = g1.sourceSpikeResult;
-  if (!snap?.path || !snap.sha256) fail("G1.sourceSpikeResult path/sha256 required");
-  const snapAbs = resolve(REPO_ROOT, snap.path);
-  if (!existsSync(snapAbs)) fail(`source spike snapshot missing: ${snap.path}`);
-  else {
-    const actual = sha256(readFileSync(snapAbs));
-    if (actual !== snap.sha256) fail(`source spike snapshot drift: recorded ${snap.sha256.slice(0, 12)}… actual ${actual.slice(0, 12)}…`);
-    if (snap.generatedAt) {
-      const snapJson = JSON.parse(readFileSync(snapAbs, "utf8"));
-      if (snapJson.generatedAt !== snap.generatedAt) fail("source snapshot generatedAt mismatch");
+  if (!snap?.path || !snap.sha256) {
+    fail("G1.sourceSpikeResult path/sha256 required");
+  } else {
+    const snapAbs = resolve(REPO_ROOT, snap.path);
+    if (!existsSync(snapAbs)) fail(`source spike snapshot missing: ${snap.path}`);
+    else {
+      const actual = sha256(readFileSync(snapAbs));
+      if (actual !== snap.sha256) fail(`source spike snapshot drift: recorded ${snap.sha256.slice(0, 12)}… actual ${actual.slice(0, 12)}…`);
+      if (snap.generatedAt) {
+        const snapJson = JSON.parse(readFileSync(snapAbs, "utf8"));
+        if (snapJson.generatedAt !== snap.generatedAt) fail("source snapshot generatedAt mismatch");
+      }
     }
   }
 
@@ -159,6 +162,14 @@ function checkPackaging() {
   checkBootstrap();
   const g2 = reg.gates?.G2;
   if (g2?.status !== "approved") { fail("G2.status must be approved (packaging)"); return; }
+  const approvedBy = typeof g2.approvedBy === "string" ? g2.approvedBy.trim() : "";
+  if (!approvedBy || /^(project[- ]?owner|owner|tbd|unknown)$/i.test(approvedBy)) {
+    fail("G2.approvedBy must name the real approver, not a project-owner/TBD placeholder");
+  }
+  if (!Number.isFinite(Date.parse(g2.approvedAt))) fail("G2.approvedAt must be a valid date");
+  if (!Array.isArray(g2.evidence) || !g2.evidence.some((e) => typeof e === "string" && e.startsWith("[from-user]"))) {
+    fail("G2.evidence must include an explicit [from-user] approval record");
+  }
   const scope = g2.approvedScope ?? {};
   if (!scope.selectedHost) fail("G2.approvedScope.selectedHost required");
   for (const key of ["candidateOutputPaths", "installationTargets", "allowedActions", "deletionBoundaries"]) {

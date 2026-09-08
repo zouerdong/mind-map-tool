@@ -303,8 +303,8 @@ pub fn platform_launch_errors(
 
 // ---- 应用内 open/new 入口（§5C4：工具条请求 host 入队） ----
 
-/// 工具条"打开…"：原生 open 对话框（无扩展名过滤——扩展名是 G2 前用户
-/// 确认门槛）→ host 解析 identity 入队；不直接替换调用窗口 session。
+/// 工具条"打开…"：原生 open 对话框优先展示正式 `.mindmap` 文档，同时保留
+/// `.json` 兼容入口；选中文件由 host 解析 identity 入队，不直接替换调用窗口 session。
 /// async command：blocking 对话框必须在非主线程调用（同步命令在主线程
 /// 跑，rfd blocking API 会与面板 run loop 互相等待死锁——真实 app 的
 /// 对话框自 MM-060 起从未打开过，2026-08-30 MRT-003 实测确认）。
@@ -313,7 +313,12 @@ pub async fn platform_request_open_intent(
     app: AppHandle,
     runtime: State<'_, Arc<LifecycleRuntime>>,
 ) -> Result<(), crate::file::error::IpcError> {
-    let Some(picked) = app.dialog().file().blocking_pick_file() else {
+    let Some(picked) = app
+        .dialog()
+        .file()
+        .add_filter("Mind Map", &["mindmap", "json"])
+        .blocking_pick_file()
+    else {
         return Ok(()); // 用户取消不是错误
     };
     let path = picked.into_path().map_err(|e| {
@@ -358,7 +363,39 @@ pub async fn platform_request_target_authorization(
             ))
         }
     };
+    // PRR-010 perf 模式：授权完全无对话框——env 指定的精确目标直接批准，
+    // 其余目标一律失败（无人值守采样不得落入阻塞式 save dialog）。
+    if let Some(probe) = app.try_state::<std::sync::Arc<crate::perf::PerfProbe>>() {
+        let save_target = probe.save_target.clone();
+        let export_target = probe.export_target.clone();
+        let target = match (&kind, save_target, export_target) {
+            (TargetKind::Document, Some(save_target), _)
+                if probe.scenario == crate::perf::Scenario::Save =>
+            {
+                save_target
+            }
+            (TargetKind::Export, _, Some(export_target))
+                if probe.scenario == crate::perf::Scenario::PngExport =>
+            {
+                export_target
+            }
+            _ => {
+                return Err(crate::file::error::IpcError::new(
+                    "PERF_PROBE_UNAUTHORIZED_TARGET",
+                    "perf 模式只允许 env 声明的精确采样目标",
+                ))
+            }
+        };
+        let grant = service.grant_authorization(window.label(), kind, &target)?;
+        return Ok(Some(GrantedAuthorizationDto {
+            authorization_ref: grant.authorization_ref,
+            display_path: grant.display_path,
+        }));
+    }
     let mut builder = app.dialog().file();
+    if matches!(&kind, TargetKind::Document) {
+        builder = builder.add_filter("Mind Map", &["mindmap"]);
+    }
     if !suggested_name.is_empty() {
         builder = builder.set_file_name(&suggested_name);
     }
@@ -544,6 +581,53 @@ pub fn platform_resolve_shortcut_invocation(
 #[serde(rename_all = "camelCase")]
 pub struct GlobalShortcutInfo {
     pub accelerator: String,
+}
+
+// ---- perf 诊断协议（PRR-010；仅 MINDMAP_PERF_SAMPLE=1 时存在） ----
+
+/// renderer 查询 perf 采样配置：绑定 caller 窗口并返回 host 权威的
+/// 窗口 generation。未启用时返回 None（生产路径零开销）。
+#[tauri::command]
+pub fn platform_get_perf_probe_config(
+    window: WebviewWindow,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    probe: State<'_, std::sync::Arc<crate::perf::PerfProbe>>,
+) -> Result<Option<crate::perf::PerfProbeConfigDto>, crate::file::error::IpcError> {
+    if !probe.bind_or_check_label(window.label()) {
+        return Err(crate::file::error::IpcError::new(
+            "PERF_PROBE_WINDOW_MISMATCH",
+            "perf 采样已绑定到其他窗口",
+        ));
+    }
+    let generation = runtime
+        .coordinator
+        .window_generation(window.label())
+        .ok_or_else(|| {
+            crate::file::error::IpcError::new(
+                "PERF_PROBE_WINDOW_UNKNOWN",
+                format!("窗口未登记：{}", window.label()),
+            )
+        })?;
+    Ok(Some(crate::perf::PerfProbeConfigDto {
+        run_id: probe.run_id.clone(),
+        scenario: probe.scenario.as_str().to_string(),
+        fixture_json: probe.fixture_json.clone(),
+        samples: probe.samples,
+        window_generation: generation,
+    }))
+}
+
+/// renderer perf 事件上报（renderer-ready / scenario-result / scenario-failed）。
+/// host 校验 run id + caller label + 当前 generation 后输出机器可解析 JSON。
+#[tauri::command]
+pub fn platform_report_perf_event(
+    window: WebviewWindow,
+    app: AppHandle,
+    runtime: State<'_, Arc<LifecycleRuntime>>,
+    payload: crate::perf::PerfEventPayload,
+) -> Result<(), String> {
+    let generation = runtime.coordinator.window_generation(window.label());
+    crate::perf::report_perf_event(&app, window.label(), payload, generation)
 }
 
 /// 定向 emit close-requested：只发给目标窗口，不得全局广播

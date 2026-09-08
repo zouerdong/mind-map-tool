@@ -53,9 +53,9 @@ function App() {
     async function init() {
       const [fixtureRes, notoRegular, notoBold, lxgw] = await Promise.all([
         fetch(`/fixtures/${fixtureName}.json`),
-        fetch("/fonts/noto-sans-sc-regular.otf"),
-        fetch("/fonts/noto-sans-sc-bold.otf"),
-        fetch("/fonts/lxgw-wenkai-regular.ttf"),
+        fetch("/fonts/noto-sans-sc-regular.woff2"),
+        fetch("/fonts/noto-sans-sc-bold.woff2"),
+        fetch("/fonts/lxgw-wenkai-regular.woff2"),
       ]);
 
       const doc = (await fixtureRes.json()) as MindMapDocumentV1;

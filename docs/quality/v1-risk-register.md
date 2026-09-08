@@ -16,7 +16,7 @@
 | R-008 | PDF 分页、字体嵌入或多 viewer 结果不符合首版 | MM-010、MM-040 / 项目负责人、MM-110 | 页数/MediaBox/字体/几何 tolerance FAIL | renderer/PDF 策略阻断；请求 G1 调整而非静默降级 | 两 viewer 结果、PDF golden、用户批准 ADR | open |
 | R-009 | TS/WASM 与 native renderer 均未通过质量/内存/许可 | MM-010、MM-040/MM-045 / MM-110 | 两 candidate 均 FAIL | renderer 轨和顶层 `blocked`；停止 MM-020 | 至少一 renderer PASS + G1 批准 | open |
 | R-010 | OS 级自动化/系统对话框/文件事件无法稳定执行 | MM-090 / MM-110 | runner flaky 超阈值或 API 无法自动化 | 不用 mock 冒充；建立可重复人工 case；关键数据安全项无法验证则 BLOCKED | 两平台人工记录、截图/日志、flaky 分类 | open |
-| R-011 | source-available/双重许可文本误伤允许用途或与依赖不兼容 | MM-100 / 项目负责人、法律审阅、MM-110 | 法律未审、依赖扫描失败、商业边界歧义 | G2 `blocked`；不写最终许可、不公开发布 | 法律审阅记录、最终文本、third-party notices | open |
+| R-011 | 许可文本误伤允许用途或与依赖不兼容（现采用专有软件 / All Rights Reserved，ADR 0007 Accepted；正式公开发布前仍需法律复核最终措辞） | MM-100 / 项目负责人、法律审阅、MM-110 | 公开发布前法律复核缺失、依赖扫描失败、商业边界歧义 | 不公开发布；G2 范围不含对外发布动作 | 法律审阅记录、根 LICENSE、THIRD_PARTY_NOTICES 覆盖校验（`pnpm license:scan`） | open |
 | R-012 | 多 Agent 越界修改/manifest 冲突导致实现不可合并 | 各任务 owner / MM-110 | 修改允许 glob 外文件或 MM-060/MM-045 并行 | 立即 STOP，回报冲突；按依赖串行重新派发 | path diff、任务回报、boundary check | open |
 | R-013 | 缺少 macOS 或 Windows 真实设备，产生单平台推断 | MM-010、MM-060、MM-090、MM-100 / 各卡聚合 owner、MM-110 | v1 必需发布平台为 macOS Apple Silicon，Windows 顺延为后续专门版本（PRD §1.1/AC-14/G1 决定吸收）；缺少 Windows 设备不阻断 v1 发布，但必须在清单明确记录 deferred/not-run | Windows deferred，macOS 原生完整证据放行 | PRD §1.1、ADR 0001、macOS 真实设备验收报告 | accepted-by-user |
 | R-014 | commit 任一阶段失败、外部修改、target handle 生命周期或异步保存导致数据丢失/dirty 误判 | MM-030、MM-060、MM-080 / MM-110 | failure injection、分叉/in-flight、open/Save As 后 ordinary save 或 handle 撤销测试失败 | P0 BLOCKED；修复后 MM-090 全量重跑 | unit/integration/E2E + ordinary-save 无重复弹窗 + 旧文件 hash/dirty 证据 | open |

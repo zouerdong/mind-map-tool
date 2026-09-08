@@ -677,12 +677,14 @@ impl LifecycleRuntime {
                 )
             })?;
         // 读取(锁外):canonicalize 一次,内容/handle/identity 同源。
+        // PRR-050:handle 以交付当前代签发(replace-and-revoke 旧 active)。
         let opened = self
             .file_service
-            .open_file_with_identity(
+            .open_file_with_identity_at_generation(
                 self.provider.as_ref(),
                 caller_label,
                 identity.canonical().as_path(),
+                expected_generation,
             )
             .map_err(|e| IpcError::new(&e.0.code, e.0.message))?;
         // 校验 2(锁内):generation、delivery、intent identity 与 physical
@@ -870,13 +872,16 @@ impl LifecycleRuntime {
                 document_target_handle,
                 expected_version_token,
                 content_json,
-            } => match self.file_service.commit_ordinary_with_identity_from(
-                self.provider.as_ref(),
-                caller_label,
-                &document_target_handle,
-                &expected_version_token,
-                &content_json,
-            ) {
+            } => match self
+                .file_service
+                .commit_ordinary_with_identity_at_generation(
+                    self.provider.as_ref(),
+                    caller_label,
+                    Some(binding.window_generation),
+                    &document_target_handle,
+                    &expected_version_token,
+                    &content_json,
+                ) {
                 Ok(OrdinaryCommitResult::Committed(outcome)) => {
                     self.finish_ordinary_commit(&binding, outcome)
                 }
@@ -2276,10 +2281,17 @@ mod wave2_tests {
             WindowState::Closing,
             "C1:permit 放行才 Closing"
         );
+        let created_before = sink.created_labels().len();
+        let focused_before = sink.focused.lock().unwrap().len();
         runtime.ingest_open_path(&sink, &a);
-        let created = sink.created_labels().len();
-        let focused = sink.focused.lock().unwrap().len();
-        assert_eq!((created, focused), (created, focused)); // 保持快照
+        assert_eq!(
+            (
+                sink.created_labels().len(),
+                sink.focused.lock().unwrap().len()
+            ),
+            (created_before, focused_before),
+            "C1:Closing 窗口持有 identity 时，重复 open 只能入队，不能创建或聚焦窗口"
+        );
         let a_id = UnixFileIdentityProvider.resolve_existing(&a).unwrap();
         assert_eq!(
             runtime
@@ -2675,7 +2687,14 @@ mod wave2_tests {
                 r.begin_loading("editor-1", &g_id, "i-g").unwrap();
                 r.mark_open("editor-1").unwrap();
             });
-            let opened = runtime.file_service.open_file("editor-1", &f).unwrap();
+            let opened = runtime
+                .file_service
+                .open_file_at_generation(
+                    "editor-1",
+                    &f,
+                    runtime.coordinator.window_generation("editor-1").unwrap(),
+                )
+                .unwrap();
             let dto = runtime
                 .commit_document(
                     "editor-1",
@@ -3325,6 +3344,276 @@ mod wave2_tests {
                 runtime.coordinator.window_record("main").unwrap().state,
                 WindowState::Blank
             );
+        }
+
+        // ---- PRR-050:document handle active-session 生命周期(RLS-012) ----
+
+        mod prr050_tests {
+            use super::*;
+
+            fn open_at_current_generation(
+                runtime: &Arc<LifecycleRuntime>,
+                label: &str,
+                path: &std::path::Path,
+            ) -> crate::file::OpenOutcome {
+                let generation = runtime.coordinator.window_generation(label).unwrap();
+                runtime
+                    .file_service
+                    .open_file_at_generation(label, path, generation)
+                    .unwrap()
+            }
+
+            fn ordinary(
+                handle: &str,
+                token: &str,
+                content: &str,
+            ) -> crate::ipc::CommitDocumentPayload {
+                crate::ipc::CommitDocumentPayload::Ordinary {
+                    document_target_handle: handle.to_string(),
+                    expected_version_token: token.to_string(),
+                    content_json: content.to_string(),
+                }
+            }
+
+            fn save_as(
+                authorization_ref: &str,
+                content: &str,
+            ) -> crate::ipc::CommitDocumentPayload {
+                crate::ipc::CommitDocumentPayload::SaveAs {
+                    authorization_ref: authorization_ref.to_string(),
+                    content_json: content.to_string(),
+                }
+            }
+
+            fn read(path: &std::path::Path) -> String {
+                std::fs::read_to_string(path).unwrap()
+            }
+
+            /// 红灯 1:同窗 Save As 成功后,旧 handle + 旧 token 保存旧文件必须
+            /// 返回 INVALID_DOCUMENT_TARGET_HANDLE,旧文件不被改写;新 handle
+            /// 可继续 ordinary save。窗口内恒最多一个 active handle。
+            #[test]
+            fn prr050_old_handle_invalid_after_same_window_save_as() {
+                let dir = tmpdir();
+                let old_target = tmpfile(&dir, "old.mm", r#"{"v":1}"#);
+                let new_target = dir.join("new.mm");
+                let (runtime, _sink) = default_runtime();
+                runtime.window_ready("main");
+
+                let opened = open_at_current_generation(&runtime, "main", &old_target);
+                let grant = runtime
+                    .file_service
+                    .grant_authorization("main", crate::file::TargetKind::Document, &new_target)
+                    .unwrap();
+                let receipt = runtime
+                    .commit_document("main", save_as(&grant.authorization_ref, r#"{"v":2}"#))
+                    .unwrap();
+                assert_eq!(receipt.rebind_state, "finalized");
+
+                // 旧 handle + 旧 token 重放保存旧文件 → capability 错误
+                let err = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &opened.document_target_handle,
+                            &opened.version_token,
+                            r#"{"hijack":true}"#,
+                        ),
+                    )
+                    .unwrap_err();
+                assert_eq!(err.code, "INVALID_DOCUMENT_TARGET_HANDLE");
+                assert_eq!(
+                    read(&old_target),
+                    r#"{"v":1}"#,
+                    "旧目标不得被旧 handle 改写"
+                );
+
+                // 稳定窗口恒 ≤1 active handle,且 active 即新 handle
+                assert_eq!(runtime.file_service.document_handle_count("main"), 1);
+                assert_eq!(
+                    runtime
+                        .file_service
+                        .active_document_handle("main")
+                        .as_deref(),
+                    Some(receipt.document_target_handle.as_str())
+                );
+
+                // 新 handle ordinary save 正常
+                let again = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &receipt.document_target_handle,
+                            &receipt.version_token,
+                            r#"{"v":3}"#,
+                        ),
+                    )
+                    .unwrap();
+                assert_eq!(again.rebind_state, "finalized");
+                assert_eq!(read(&new_target), r#"{"v":3}"#);
+            }
+
+            /// 红灯 2:窗口重建(Destroyed → 同名新代)后,旧代 handle 不能
+            /// 驱动新代窗口的 ordinary save——即使 registry 清理存在竞态残留。
+            #[test]
+            fn prr050_old_generation_handle_rejected_for_rebuilt_window() {
+                let dir = tmpdir();
+                let target = tmpfile(&dir, "f.mm", r#"{"v":1}"#);
+                let (runtime, sink) = default_runtime();
+                runtime.window_ready("main");
+                let opened = open_at_current_generation(&runtime, "main", &target);
+
+                // 窗口销毁并同名重建(模拟清理竞态:只重建,revoke_window 视为漏调用)
+                sink.windows.lock().unwrap().remove("main");
+                runtime.on_window_destroyed(sink.as_ref(), "main");
+                runtime.coordinator.with_registry_mut_for_test(|registry| {
+                    registry.register("main").unwrap();
+                    registry.mark_blank("main").unwrap();
+                });
+                sink.windows.lock().unwrap().insert("main".to_string());
+
+                let err = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &opened.document_target_handle,
+                            &opened.version_token,
+                            r#"{"v":2}"#,
+                        ),
+                    )
+                    .unwrap_err();
+                assert_eq!(err.code, "INVALID_DOCUMENT_TARGET_HANDLE");
+                assert_eq!(read(&target), r#"{"v":1}"#);
+            }
+
+            /// 红灯 3:窗口关闭后 handle 全部失效(跨窗口/重放/关闭后续用)。
+            #[test]
+            fn prr050_handles_invalid_after_window_close() {
+                let dir = tmpdir();
+                let target = tmpfile(&dir, "f.mm", r#"{"v":1}"#);
+                let (runtime, _sink) = default_runtime();
+                runtime.window_ready("main");
+                let opened = open_at_current_generation(&runtime, "main", &target);
+
+                runtime.file_service.revoke_window("main");
+                let err = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &opened.document_target_handle,
+                            &opened.version_token,
+                            r#"{"v":2}"#,
+                        ),
+                    )
+                    .unwrap_err();
+                assert_eq!(err.code, "INVALID_DOCUMENT_TARGET_HANDLE");
+                assert_eq!(runtime.file_service.document_handle_count("main"), 0);
+            }
+
+            /// 红灯 4:同窗重新打开另一文档(open)同样 replace-and-revoke——
+            /// open 后旧文档 handle 不能再保存旧文档。
+            #[test]
+            fn prr050_old_handle_invalid_after_reopen_in_same_window() {
+                let dir = tmpdir();
+                let a = tmpfile(&dir, "a.mm", r#"{"a":1}"#);
+                let b = tmpfile(&dir, "b.mm", r#"{"b":1}"#);
+                let (runtime, _sink) = default_runtime();
+                runtime.window_ready("main");
+
+                let first = open_at_current_generation(&runtime, "main", &a);
+                let _second = open_at_current_generation(&runtime, "main", &b);
+
+                let err = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &first.document_target_handle,
+                            &first.version_token,
+                            r#"{"a":2}"#,
+                        ),
+                    )
+                    .unwrap_err();
+                assert_eq!(err.code, "INVALID_DOCUMENT_TARGET_HANDLE");
+                assert_eq!(read(&a), r#"{"a":1}"#);
+                assert_eq!(
+                    runtime
+                        .file_service
+                        .active_document_handle("main")
+                        .as_deref(),
+                    Some(_second.document_target_handle.as_str())
+                );
+            }
+
+            /// 红灯 5:并发 ordinary save 与 close/reopen——in-flight 提交按当时代
+            /// 完成,窗口重建后旧 handle 立即失效,新 open 的 handle 正常工作。
+            #[test]
+            fn prr050_concurrent_save_and_reopen_replaces_active_handle() {
+                let dir = tmpdir();
+                let a = tmpfile(&dir, "a.mm", r#"{"v":1}"#);
+                let b = tmpfile(&dir, "b.mm", r#"{"w":1}"#);
+                let provider = Arc::new(LatchProvider::new());
+                let (runtime, sink) = runtime_with(provider.clone());
+                runtime.window_ready("main");
+                let opened = open_at_current_generation(&runtime, "main", &a);
+
+                // ordinary save 卡在锁外 refresh(LatchProvider armed)
+                provider.armed.store(true, Ordering::SeqCst);
+                let rt = runtime.clone();
+                let handle = opened.document_target_handle.clone();
+                let token = opened.version_token.clone();
+                let join = std::thread::spawn(move || {
+                    rt.commit_document("main", ordinary(&handle, &token, r#"{"v":2}"#))
+                });
+                provider.wait_taken();
+
+                // 并发 close + 同名重建 + 打开新文档（registry 完整绑定 b，与生产 open 路径一致）
+                runtime.file_service.revoke_window("main");
+                sink.windows.lock().unwrap().remove("main");
+                runtime.on_window_destroyed(sink.as_ref(), "main");
+                let b_id = UnixFileIdentityProvider.resolve_existing(&b).unwrap();
+                runtime.coordinator.with_registry_mut_for_test(|registry| {
+                    registry.register("main").unwrap();
+                    registry.begin_loading("main", &b_id, "i-b").unwrap();
+                    registry.mark_open("main").unwrap();
+                });
+                sink.windows.lock().unwrap().insert("main".to_string());
+                let reopened = open_at_current_generation(&runtime, "main", &b);
+
+                provider.release();
+                let outcome = join.join().unwrap();
+                // in-flight 提交按当时代完成:a 已写入(receipt 如实),不污染新代
+                let receipt = outcome.unwrap();
+                assert_eq!(receipt.rebind_state, "finalized");
+                assert_eq!(read(&a), r#"{"v":2}"#);
+                assert!(runtime.pending_recovery("main").is_none());
+
+                // 旧 handle 在新代不可用;新 handle 是唯一 active 且可保存
+                let err = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &opened.document_target_handle,
+                            &receipt.version_token,
+                            r#"{"v":3}"#,
+                        ),
+                    )
+                    .unwrap_err();
+                assert_eq!(err.code, "INVALID_DOCUMENT_TARGET_HANDLE");
+                assert_eq!(read(&a), r#"{"v":2}"#);
+                assert_eq!(runtime.file_service.document_handle_count("main"), 1);
+                let ok = runtime
+                    .commit_document(
+                        "main",
+                        ordinary(
+                            &reopened.document_target_handle,
+                            &reopened.version_token,
+                            r#"{"w":2}"#,
+                        ),
+                    )
+                    .unwrap();
+                assert_eq!(ok.rebind_state, "finalized");
+                assert_eq!(read(&b), r#"{"w":2}"#);
+            }
         }
     }
 }

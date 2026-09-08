@@ -3,11 +3,12 @@
 
 import { spawnSync, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve, dirname, extname } from "node:path";
+import { resolve, dirname, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { isSameOrDescendant } from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -26,6 +27,7 @@ function staticServer(rootDir, port) {
     ".css": "text/css",
     ".json": "application/json",
     ".otf": "font/otf",
+    ".woff2": "font/woff2",
     ".ttf": "font/ttf",
     ".svg": "image/svg+xml",
   };
@@ -34,6 +36,7 @@ function staticServer(rootDir, port) {
       const urlPath = decodeURIComponent(req.url.split("?")[0]);
       let filePath = resolve(rootDir, "." + urlPath);
       if (extname(filePath) === "") filePath = resolve(rootDir, "index.html");
+      if (!isSameOrDescendant(rootDir, filePath)) throw new Error("path outside harness root");
       const body = await readFile(filePath);
       res.writeHead(200, { "content-type": MIME[extname(filePath)] ?? "application/octet-stream" });
       res.end(body);
@@ -42,7 +45,20 @@ function staticServer(rootDir, port) {
       res.end("not found");
     }
   });
-  return new Promise((done) => server.listen(port, () => done(server)));
+  return new Promise((done) => server.listen(port, "127.0.0.1", () => done(server)));
+}
+
+function assertHarnessAsset(source, target) {
+  if (!existsSync(source) || !existsSync(target)) {
+    throw new Error(
+      `visual harness 资产缺失: ${relative(ROOT, source)} / ${relative(ROOT, target)}`,
+    );
+  }
+  if (!readFileSync(source).equals(readFileSync(target))) {
+    throw new Error(
+      `visual harness 资产漂移: ${relative(ROOT, target)} 必须与 ${relative(ROOT, source)} 一致`,
+    );
+  }
 }
 
 async function main() {
@@ -54,9 +70,10 @@ async function main() {
   // 1. 执行 Vitest 视觉不变量与三格式导出契约测试
   // -------------------------------------------------------------
   console.log("=== 1. 执行核心视觉不变量与三格式导出契约测试 (Vitest) ===");
-  const vitestRes = spawnSync("npx", ["vitest", "run", "tests/visual", "--root", "."], {
+  const vitestRes = spawnSync("pnpm", ["exec", "vitest", "run", "tests/visual", "--root", "."], {
     cwd: ROOT,
     stdio: "inherit",
+    env: { ...process.env, MINDMAP_VISUAL_EVIDENCE_DIR: EVIDENCE_DIR },
   });
   if (vitestRes.status !== 0) {
     console.error("tests/visual 自动化不变量测试失败");
@@ -69,21 +86,19 @@ async function main() {
   // -------------------------------------------------------------
   console.log("=== 2. 构建真实 React Flow 视觉测量宿主 (Vite) ===");
   const pub = resolve(HARNESS, "public");
-  mkdirSync(resolve(pub, "fonts"), { recursive: true });
-  mkdirSync(resolve(pub, "fixtures"), { recursive: true });
   for (const f of [
-    "noto-sans-sc-regular.otf",
-    "noto-sans-sc-bold.otf",
-    "lxgw-wenkai-regular.ttf",
+    "noto-sans-sc-regular.woff2",
+    "noto-sans-sc-bold.woff2",
+    "lxgw-wenkai-regular.woff2",
   ]) {
-    copyFileSync(resolve(ROOT, "assets/fonts", f), resolve(pub, "fonts", f));
+    assertHarnessAsset(resolve(ROOT, "assets/fonts", f), resolve(pub, "fonts", f));
   }
   for (const f of [
     "reference-dag-12.json",
     "reference-dag-12-scattered.json",
     "motion-tree-17.json",
   ]) {
-    copyFileSync(resolve(ROOT, "tests/fixtures/visual", f), resolve(pub, "fixtures", f));
+    assertHarnessAsset(resolve(ROOT, "tests/fixtures/visual", f), resolve(pub, "fixtures", f));
   }
 
   execFileSync("pnpm", ["--dir", resolve(ROOT, "apps/desktop"), "exec", "vite", "build", HARNESS], {
@@ -97,13 +112,28 @@ async function main() {
   // -------------------------------------------------------------
   console.log("=== 3. 采样真实 React Flow 画布与动效截图 (Playwright) ===");
   let browserCaptured = false;
-  let browserNotice = "executed";
+  let browserNotice = "capture completed";
 
   let server = null;
+  let browser = null;
+  const captureStartedAt = Date.now();
+  const browserEvidenceFiles = [
+    "layer1-static-reference-1080x864.png",
+    "layer1-static-dark-1080x864.png",
+    "layer2-layout-horizontal.png",
+    "layer2-layout-vertical.png",
+    "layer3-motion-000ms.png",
+    "layer3-motion-200ms.png",
+    "layer3-motion-400ms.png",
+    "layer3-motion-600ms.png",
+    "layer3-motion-800ms.png",
+    "layer3-motion-tree-17.png",
+    "layer5-interaction-editing.png",
+  ];
   try {
     const PORT = 5298;
     server = await staticServer(resolve(HARNESS, "dist"), PORT);
-    const browser = await chromium.launch();
+    browser = await chromium.launch();
     console.log("  ✓ Headless Chromium 启动成功，开始自动化采样...");
 
     // Layer 1: 1080x864 静态外观（暖白 & 黑板）
@@ -188,14 +218,19 @@ async function main() {
     await p5.close();
     console.log("     ✓ 交互编辑态截图已生成");
 
-    await browser.close();
+    for (const file of browserEvidenceFiles) {
+      const evidencePath = resolve(EVIDENCE_DIR, file);
+      if (!existsSync(evidencePath) || statSync(evidencePath).mtimeMs < captureStartedAt) {
+        throw new Error(`本轮未生成视觉证据: ${relative(ROOT, evidencePath)}`);
+      }
+    }
     browserCaptured = true;
   } catch (err) {
     browserCaptured = false;
-    browserNotice =
-      "Sandbox isolated: Chromium MachPort rendezvous blocked; headless logic verified.";
-    console.log(`  ℹ [Notice] ${browserNotice}`);
+    browserNotice = err instanceof Error ? err.message : String(err);
+    console.error(`  ✗ 浏览器证据采集失败: ${browserNotice}`);
   } finally {
+    if (browser) await browser.close().catch(() => {});
     if (server) {
       await new Promise((done) => server.close(done));
     }
@@ -208,6 +243,11 @@ async function main() {
     batch: "VRA-080",
     title: "参考静态、动态与跨格式真实验收报告",
     generatedAt: new Date().toISOString(),
+    sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    }).trim(),
+    evidenceKind: "web-harness",
     environment: {
       os: process.platform,
       arch: process.arch,
@@ -218,7 +258,7 @@ async function main() {
     verificationLayers: {
       layer1_static: {
         name: "1080×864 参考静态外观",
-        status: "PASS",
+        status: browserCaptured ? "CAPTURED" : "INCOMPLETE",
         files: ["layer1-static-reference-1080x864.png", "layer1-static-dark-1080x864.png"],
         paletteTokens: {
           lightCanvas: "#F9F8F4",
@@ -229,7 +269,7 @@ async function main() {
       },
       layer2_layout: {
         name: "散乱坐标自动规整布局",
-        status: "PASS",
+        status: browserCaptured ? "CAPTURED" : "INCOMPLETE",
         files: ["layer2-layout-horizontal.png", "layer2-layout-vertical.png"],
         checks: {
           nonOverlapping: true,
@@ -241,7 +281,7 @@ async function main() {
       },
       layer3_motion: {
         name: "800ms 动态整理与连续插值",
-        status: "PASS",
+        status: browserCaptured ? "CAPTURED" : "INCOMPLETE",
         files: [
           "layer3-motion-000ms.png",
           "layer3-motion-200ms.png",
@@ -275,7 +315,7 @@ async function main() {
       },
       layer5_interaction: {
         name: "交互编辑与异常安全态",
-        status: "PASS",
+        status: browserCaptured ? "CAPTURED" : "INCOMPLETE",
         files: ["layer5-interaction-editing.png"],
         checks: {
           imeCompositionProtected: true,
@@ -285,12 +325,14 @@ async function main() {
       },
       layer6_performance: {
         name: "规模与性能基线",
-        status: "PASS",
+        status: "NOT_MEASURED_HERE",
         budgetMs: 32,
         attribution: "React Flow",
+        evidenceRequired: "run-performance.mjs 的独立原始样本；发布候选另需 native evidence",
       },
     },
-    conclusion: "PASS",
+    conclusion: browserCaptured ? "EVIDENCE_CAPTURED_OWNER_REVIEW_REQUIRED" : "INCOMPLETE",
+    gFinal: "NOT_GRANTED_BY_THIS_RUNNER",
   };
 
   writeFileSync(
@@ -300,10 +342,11 @@ async function main() {
   );
 
   console.log("\n================================================================================");
-  console.log("  VRA-080 真实验收总结: PASS");
-  console.log("  全部六层验证达标，证据与汇总已保存至: docs/quality/evidence/visual-alignment/");
+  console.log(`  VRA-080 证据采集总结: ${summaryReport.conclusion}`);
+  console.log(`  证据与汇总已保存至: ${relative(ROOT, EVIDENCE_DIR)}`);
+  console.log("  本 runner 不授予 G-FINAL；需项目负责人基于候选应用另行验收。");
   console.log("================================================================================\n");
-  process.exit(0);
+  process.exit(browserCaptured ? 0 : 1);
 }
 
 main().catch((e) => {

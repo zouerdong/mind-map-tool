@@ -11,3 +11,6 @@ packages/*/node_modules/
 .tmp/
 pnpm-lock.yaml
 package-lock.json
+# 确定性生成文件与法律文本不做格式化改写（重跑生成必须字节一致）
+THIRD_PARTY_NOTICES.md
+LICENSE
