@@ -30,7 +30,10 @@
     "category": "Productivity",
     "copyright": "© 2026 ErDong Zou. All rights reserved.",
     "licenseFile": "../../../LICENSE",
-    "resources": ["../../../LICENSE", "../../../THIRD_PARTY_NOTICES.md"],
+    "resources": {
+      "../../../LICENSE": "LICENSE",
+      "../../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "fileAssociations": [
       {
         "ext": ["mindmap"],
