@@ -382,7 +382,7 @@ Save As、重新打开或窗口重建后，旧 document handle 不能继续驱�
 
 类型：产品视觉边界 / desktop command surface / 可访问性
 优先级：P0（PRR-070 新候选前必须完成）
-状态：`READY_FOR_IMPLEMENTATION`
+状态：`IMPLEMENTED / CLEAN_COMMIT_808959b`（2026-09-08 完成实现与全量源码门，报告见 `docs/quality/prr-065-implementation-report-2026-09-08.md`；PRR-070 须从本 commit 之后的新 clean source commit 重做）
 依赖：PRR-000～060 已集成；起点为 `main@89d7c76` 加本任务卡 planning patch
 后继：形成新的 clean source commit，然后从头执行 PRR-070
 
