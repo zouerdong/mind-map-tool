@@ -15,7 +15,7 @@
 - [终审整改开发指南](../planning/pre-release-remediation-development-guide-2026-09-07.md)与[任务卡](../planning/pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090 的实施与验收入口。
 - [PRR-000～050 实现审阅](./prr-000-050-implementation-review-2026-09-07.md)：实现层有条件接受；最终放行仍被负责人输入、PRR-030/060、冻结候选与 PRR-070～090 阻塞。
 - [PRR-070 阶段 A 性能审阅](./prr-070-stage-a-performance-review-2026-09-08.md)：`0c8a93b` 候选因 PNG/CSP、eager loading、RSS 协议和 warm 预算退回 PRR-066；canvas 实际18ms但旧报告口径不一致。
-- [PRR-066 性能整改卡](../planning/prr-066-performance-remediation-task-card-2026-09-08.md)：五项根因已修复（clean commit `f5f8872`）；预检证据 `.tmp/prr-066-f5f8872/`（release-performance-raw/summary.json），`--scope release --samples 20` 全部预算 PASS；状态 `PRR-066 COMPLETE / READY_FOR_INDEPENDENT_REVIEW`，不构成发布放行（G-FINAL 与 PRR-070/080/090 保持阻塞）。
+- [PRR-066 性能整改卡](../planning/prr-066-performance-remediation-task-card-2026-09-08.md)与[独立代码及原生预检审阅](./prr-066-independent-review-2026-09-08.md)：五项根因已在 `f5f8872` 修复并接受；诊断证据隔离 P2 已在 `6302866` 修复。PRR-066 预检只作诊断，PRR-070 已从当前 clean HEAD 解锁；G-FINAL 与 PRR-080/090 仍保持阻塞。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）

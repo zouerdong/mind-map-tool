@@ -3,9 +3,10 @@
 日期：2026-09-08
 类型：生产路径修复 / 性能证据协议修复
 优先级：P0
-状态：`PRR-066 COMPLETE / READY_FOR_INDEPENDENT_REVIEW`
-依赖：PRR-070 阶段 A 在 `0c8a93b` 正确停止；[独立审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)完成
-后继：独立审阅 PRR-066 → 新 clean source commit → PRR-070 从步骤1完整重做
+状态：`PRR-066 COMPLETE / INDEPENDENT_REVIEW_ACCEPTED`
+依赖：PRR-070 阶段 A 在 `0c8a93b` 正确停止；[阶段 A 性能审阅](../quality/prr-070-stage-a-performance-review-2026-09-08.md)完成
+独立验收：[PRR-066 独立代码与原生预检审阅](../quality/prr-066-independent-review-2026-09-08.md)（实现 `f5f8872`；审阅小修 `6302866`）
+后继：从包含状态同步的当前 clean source commit 执行 PRR-070 步骤1～11
 
 ## 派发文本
 

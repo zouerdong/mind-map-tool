@@ -3,6 +3,7 @@
 日期：2026-09-08  
 受审实现：`f5f887257d316e71b8a9c560a11cc5b45dcb89e9`  
 受审状态提交：`a1ed6519a4b9ea6f552f154dd052981c343c591f`  
+审阅小修：`6302866192234e3d29e8864c8e8d0328e11be02e`
 结论：`ACCEPT_WITH_REVIEW_FIX / PRR-070_READY_AFTER_CLEAN_COMMIT`
 
 ## 结论
@@ -58,4 +59,3 @@ PRR-066 的五个根因均已关闭，应用路径与诊断候选的原生结果
 2. 本审阅修改了 runner/verifier，因此 `f5f8872` diagnostic evidence 的 runner hash 对新 HEAD 必然过期；这是预期隔离，不得补写或复用。
 3. PRR-070 必须从包含本审阅修复与状态文档的新 clean HEAD，使用正式 G2 candidate/evidence 路径完整重做。
 4. 仍不得申请或代写 G-FINAL；PRR-080/090 未解锁。
-

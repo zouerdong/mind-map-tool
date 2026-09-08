@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-066_READY`（PRR-070 阶段 A 在 `0c8a93b` 因 production PNG/CSP、warm、RSS 与性能证据协议失败而停止；先执行 PRR-066，独立审阅后再从新 clean commit 重做 PRR-070）
+状态：`IN_PROGRESS / PRR-070_READY`（PRR-066 已在 `f5f8872` 完成并经独立审阅，证据隔离小修见 `6302866`；从包含本状态同步的当前 clean HEAD 重做 PRR-070）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -56,11 +56,11 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-08，PRR-000～065 已集成并完成独立审阅；`808959b`/`79f099c` 是 PRR-065 的实现与状态历史点，独立审阅后另有小修。派发 PRR-070 时以**包含本指南和任务卡的当前 clean HEAD**为唯一 source，不再把历史 hash 当构建基线。因此：
+截至 2026-09-08，PRR-000～066 已集成并完成独立审阅；`f5f8872` 是 PRR-066 实现历史点，`6302866` 是独立审阅的证据隔离小修。派发 PRR-070 时以**包含本指南和任务卡状态同步的当前 clean HEAD**为唯一 source，不再把历史 hash 当构建基线。因此：
 
 1. PRR-070 起点必须满足 `git status --short` 为空，并记录完整 `git rev-parse HEAD`；不得退回 `541d38c`、`caf1c20`、`808959b` 或 `79f099c`，也不得复用其候选/证据。
 2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。
-3. PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回 PRR-065 修复，修复后换新 source hash 从头重做。
+3. PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回对应整改卡，修复后换新 source hash 从头重做。
 4. 执行 Agent 不得自行批准 G-FINAL、MM-110 或 handoff，也不得开始 PRR-080；自动化与 Agent 只能整理一份绑定候选 hash 的负责人验收请求。
 5. 不授权 push/rebase；签名、公证、凭据、系统信任修改、上传和公开发布仍明确禁止。
 

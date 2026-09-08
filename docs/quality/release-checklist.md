@@ -1,6 +1,6 @@
-# 发布前检查清单（PRC 终审后）
+# 发布前检查清单（PRR-066 独立审阅后）
 
-状态：**REJECT / INVALID_CANDIDATE / NOT_READY_TO_RELEASE**。PRC-000～PRC-090 虽已回报完成，但 2026-09-07 的独立复算推翻了旧 MM-110 `ACCEPT` 与 `READY_TO_RELEASE`。本清单以[全面代码审阅](./pre-release-code-review-2026-09-07.md)为准。
+状态：**IN_PROGRESS / PRR-070_READY / NOT_READY_TO_RELEASE**。旧 PRC 候选仍为 `INVALID_CANDIDATE`；PRR-000～066 已完成并经独立审阅，下一步从当前 clean HEAD 重做 PRR-070。当前实现结论以[PRR-066 独立代码与原生预检审阅](./prr-066-independent-review-2026-09-08.md)为准。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -8,20 +8,20 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS AT REVIEW SNAPSHOT | 审阅前 TS unit 44 files / 419 tests、Rust 187 tests + doc tests 通过；审阅小修需按下方验证矩阵复跑 |
-| 初始 entry JS ≤ 500,000B | PASS / HIGH RISK | 审阅小修后的最终隔离 production build 为 `499,804B`，仅余 196B；任何新候选都必须重测 |
-| `.dmg` ≤ 25,000,000B | FAIL | 旧候选 `28,011,310B`；执行 PRR-020，不得提高 Accepted 预算 |
-| G2 授权来源 | FAIL | 登记使用 `project-owner` 占位身份且没有 `[from-user]` 原文；PRR-000 补真实批准人、日期与精确范围 |
-| LICENSE / notices | FAIL | 根 `LICENSE` 与 `THIRD_PARTY_NOTICES` 缺失，ADR 0007 仍为 Proposed；执行 PRR-060 |
-| `.mindmap` bundle 文件关联 | FAIL | 旧候选 plist 没有 `CFBundleDocumentTypes` / `UTExportedTypeDeclarations`；执行 PRR-030 |
-| 最低 macOS 版本一致性 | FAIL | plist 10.13、Mach-O 11.0、产品文档 11+、旧 handoff 12+；执行 PRR-030 |
-| 原生启动 / RSS / dense canvas / edit / save / PNG | FAIL / INVALID EVIDENCE | 旧报告含固定替代值、空样本和 web harness 冒充 native；执行 PRR-010/070 |
-| 原生安装、打开 `.mindmap` 与应用身份 | NOT MEASURED | 旧 install gate 只做临时复制/哈希，没有 LaunchServices、双击打开或真实生命周期验收；执行 PRR-030/070 |
-| 字体切换几何事务 | FAIL | 切换文档字体不会原子重测现有节点持久化尺寸；执行 PRR-040 |
-| active document handle | RESIDUAL P2 | 同窗 Save As/open 后旧 handle 仍有效到窗口关闭；执行 PRR-050 或由负责人书面接受 |
-| CSP / 网络端点 | PASS AT REVIEW SNAPSHOT | 当前 CSP/allowlist 未发现放宽；新候选仍需同源复核 |
-| 依赖漏洞数据库检查 | PARTIAL | JS production audit 当前无已知漏洞；Rust advisory scan 未执行，因为本机未安装 `cargo-audit` |
-| G-FINAL | MISSING | 自动化视觉 runner 不得授予；PRR-070 由负责人绑定新 candidate hash 明确给出 |
+| TypeScript / Rust 常规检查 | PASS AT PRR-066 REVIEW | TS unit 52 files / 512 tests、integration 14 files / 94 tests、Rust 208 tests，以及 lint/typecheck/build/format/clippy 均通过；PRR-070 仍须从 clean source 重跑 |
+| 初始 entry JS ≤ 500,000B | PASS AT PRR-066 REVIEW | production build 为 `485,790B`；PRR-070 候选仍须同源复算 |
+| `.dmg` ≤ 25,000,000B | PASS IN DIAGNOSTIC ONLY | PRR-066 诊断候选为 `24,550,854B`；不得作为最终证据，PRR-070 重测 |
+| G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
+| LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
+| `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
+| 最低 macOS 版本一致性 | PASS AT DIAGNOSTIC BUNDLE | Info.plist 与 Mach-O 均为 macOS 11.0；PRR-070 同源复算 |
+| 原生启动 / RSS / dense canvas / edit / save / PNG | PASS IN DIAGNOSTIC ONLY | 20样本预检全部满足预算，独立抽测再次通过 PNG 与30秒 RSS；诊断数据不得进入最终 manifest，PRR-070 全量重测 |
+| 原生安装、打开 `.mindmap` 与应用身份 | NOT YET RUN ON NEW CANDIDATE | G2 已授权受控安装和 LaunchServices；由 PRR-070 在唯一候选上执行并恢复状态 |
+| 字体切换几何事务 | PASS AT SOURCE REVIEW | PRR-040/066 已覆盖原子重测、并发 join、失败回队和保存屏障；PRR-070 原生矩阵复核 |
+| active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
+| CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
+| 依赖漏洞数据库检查 | PASS ON INVALIDATED PRR-070 RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、17条 allowed warnings；source 已变化，PRR-070 必须重跑 |
+| G-FINAL | MISSING / EXPECTED | PRR-070 阶段 A 生成绑定新 candidate hash 的请求并停下；只能由负责人查看候选后明确给出 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |
 

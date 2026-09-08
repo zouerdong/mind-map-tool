@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-066_READY`
+状态：`IN_PROGRESS / PRR-070_READY`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -15,7 +15,7 @@
 
 旧 `.tmp/release-candidate` 不得修改成“通过”，也不得未经批准清理。任何新证据都进入新的 source/candidate hash 子目录。
 
-执行 Agent 必须从包含 2026-09-07 审阅小修的当前 working-tree snapshot 开始；只从 `main@541d38c` 启动的新 worktree 不具备正确基线。每卡交回时使用以下固定格式：
+执行 Agent 必须从包含 PRR-066 独立审阅小修 `6302866` 与本状态同步的当前 clean HEAD 开始；任何历史 commit 或 working-tree snapshot 都不具备正确的 PRR-070 基线。每卡交回时使用以下固定格式：
 
 ```text
 Task: PRR-XXX
@@ -498,8 +498,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-066`（source `0c8a93b` 阶段 A 在步骤6正确停止；该 candidate 与证据只读作废）
-依赖：PRR-000～066 已集成并经独立审阅；包含 PRR-066 的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`READY / TWO_STAGE_OWNER_GATE`（PRR-066 实现 `f5f8872` 与独立审阅小修 `6302866` 已接受；旧 `0c8a93b` 候选及 PRR-066 诊断证据只读，不得复用）
+依赖：PRR-000～066 已集成并经独立审阅；包含本任务卡状态同步的当前 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标
@@ -513,7 +513,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 - 临时安装仅使用 G2 登记的 `.tmp/release-candidate/installed/Mind Map.app`，由 `install-gate --execute` 按 receipt/hash 核验后清理；若发现外来预存目标，fail-closed 停止，不得强删。
 - 允许临时注册并恢复 LaunchServices 文件关联；不得修改系统信任、默认安全策略或签名设置。
 - 允许使用已有本地 Rust advisory 工具；若 `cargo-audit` 不存在，只可 `cargo install --root .tmp/prr-070-tools cargo-audit --locked`，不得全局安装。
-- PRR-070 不修改源码、测试、runner、生产配置、tracked 文档或 Gate。任何此类修改需求都要返回 PRR-065，形成新 clean commit 后从第 1 步重做。
+- PRR-070 不修改源码、测试、runner、生产配置、tracked 文档或 Gate。任何此类修改需求都要返回对应整改卡，形成新 clean commit 后从第 1 步重做。
 
 ### 阶段 A：候选与完整原生矩阵
 
