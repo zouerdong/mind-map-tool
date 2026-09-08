@@ -380,8 +380,8 @@ Save As、重新打开或窗口重建后，旧 document handle 不能继续驱�
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-000..060`  
-依赖：PRR-000～060、clean source commit、精确 G2
+状态：`BLOCKED_BY_PRR-065`（2026-09-08 负责人指令：新增零画布顶栏产品决定须先经 PRR-065 实施，PRR-070 从其后的新 clean source commit 完整重做；本轮在 caf1c20 上的试跑构建与性能矩阵不作为验收候选冻结）  
+依赖：PRR-000～060、PRR-065、clean source commit、精确 G2
 
 ### 目标
 

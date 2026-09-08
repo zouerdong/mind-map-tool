@@ -163,8 +163,10 @@ pub struct PerfProbeConfigDto {
     pub window_generation: u64,
 }
 
-/// perf 事件上报 payload（renderer → host；serde 契约与 TS 侧对齐）。
+/// perf 事件上报 payload（renderer → host；serde 契约与 TS 侧对齐：
+/// JS 端 reportPerfEvent 以 camelCase 发送，字段必须 rename）。
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PerfEventPayload {
     pub run_id: String,
     pub window_generation: u64,

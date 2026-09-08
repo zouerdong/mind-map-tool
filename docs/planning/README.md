@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / OWNER_INPUTS_PROVIDED`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-010/020/040/050 的实现已在审阅小修后获得有条件接受；PRR-000（G2 真实批准已补齐并复算通过）、PRR-030 与 PRR-060 已实现（产物级 plist/LaunchServices/携带文件验证随 PRR-070 执行）；PRR-070～090 未完成。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
+当前整改批次状态为 `IN_PROGRESS / OWNER_INPUTS_PROVIDED / PRR-070_DEFERRED_TO_PRR-065`。负责人已于 2026-09-08 提供四组输入（G2 批准、生产配置、法律文本、验收环境），原文以 `[from-user]` 记录在 `docs/decisions/decision-register.json` 的 G2 evidence。PRR-010/020/040/050 的实现已在审阅小修后获得有条件接受；PRR-000（G2 真实批准已补齐并复算通过）、PRR-030 与 PRR-060 已实现。2026-09-08 负责人新增零画布顶栏产品决定：须先经 PRR-065 实施，PRR-070 从其后的新 clean source commit 完整重做，本轮试跑候选不冻结、不申请 G-FINAL；PRR-080/090 未开始。在 PRR-000～090 完成、同一新候选的原生证据齐备并取得真实 G-FINAL 前，项目状态保持 `IMPLEMENTATION_NEEDS_REMEDIATION`。
 
 ## 2026-09-07 发布前收口批次（历史）
 
