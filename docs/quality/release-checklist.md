@@ -1,6 +1,6 @@
-# 发布前检查清单（PRR-066 独立审阅后）
+# 发布前检查清单（PRR-070 cold start 失败后）
 
-状态：**IN_PROGRESS / PRR-070_READY / NOT_READY_TO_RELEASE**。旧 PRC 候选仍为 `INVALID_CANDIDATE`；PRR-000～066 已完成并经独立审阅，下一步从当前 clean HEAD 重做 PRR-070。当前实现结论以[PRR-066 独立代码与原生预检审阅](./prr-066-independent-review-2026-09-08.md)为准。
+状态：**IN_PROGRESS / PRR-067_READY / NOT_READY_TO_RELEASE**。旧 PRC 候选仍为 `INVALID_CANDIDATE`；source `ea047e8` 的新 PRR-070 候选也因 cold p95 超预算作废。下一步按[失败独立审阅](./prr-070-stage-a-cold-start-review-2026-09-08.md)执行 PRR-067，完成归因与条件式收口后再从新 clean source 重做 PRR-070。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -15,7 +15,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
 | 最低 macOS 版本一致性 | PASS AT DIAGNOSTIC BUNDLE | Info.plist 与 Mach-O 均为 macOS 11.0；PRR-070 同源复算 |
-| 原生启动 / RSS / dense canvas / edit / save / PNG | PASS IN DIAGNOSTIC ONLY | 20样本预检全部满足预算，独立抽测再次通过 PNG 与30秒 RSS；诊断数据不得进入最终 manifest，PRR-070 全量重测 |
+| 原生启动 / RSS / dense canvas / edit / save / PNG | FAIL / INVALIDATED CANDIDATE | source `ea047e8` 的 cold p95=1685.4ms>1500ms；其余指标 PASS。执行 PRR-067，不得删除首样本或修改估计器 |
 | 原生安装、打开 `.mindmap` 与应用身份 | NOT YET RUN ON NEW CANDIDATE | G2 已授权受控安装和 LaunchServices；由 PRR-070 在唯一候选上执行并恢复状态 |
 | 字体切换几何事务 | PASS AT SOURCE REVIEW | PRR-040/066 已覆盖原子重测、并发 join、失败回队和保存屏障；PRR-070 原生矩阵复核 |
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
