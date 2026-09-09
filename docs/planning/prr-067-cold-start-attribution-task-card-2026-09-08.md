@@ -3,11 +3,15 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`BLOCKED / ENVIRONMENT_RENDER_SESSION`（审阅修正执行中）
+状态：`WAITING_FOR_G_PERF_PROTOCOL`（审阅修正 7/8/9/11 已完成，等待负责人批准协议）
 
 阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
 
-审阅修正执行记录（2026-09-09）：修正 1/3/4/5/6/10 已落地并形成 clean commit `773eaea`（分段埋点、clean worktree 前置、trace fail-closed、--legacy-timing-only、有界原始 stdout/stderr、完整 64 位 hash；35 项 runner 测试全绿，全量门通过）；诊断候选 v2 `dfa0c472…132737` 自该 commit 构建。修正 7 重跑：B0（20/20 max 351.5ms）、B1（5/5 首启 816–1461ms、二启 293–313ms）已完成并绑定该 commit；**B2/B3/D1/D2 被环境阻塞**——2026-09-09 00:31 起用户会话不可渲染（系统日志：WebContent 以 background view 运行，疑似锁屏/显示器熄灭），renderer-ready 挂死，4 次恢复探测均失败（`.tmp/prr-067-experiments/ENVIRONMENT-INCIDENT.md`）。修正 8/9/11 待 B2/B3/D1/D2 完成后执行。恢复会话后继续，不得复用旧 superseded 实验。
+审阅修正执行记录（2026-09-09）：修正 1/3/4/5/6/10 已落地并形成 clean commit `773eaea`（分段埋点、clean worktree 前置、trace fail-closed、--legacy-timing-only、有界原始 stdout/stderr、完整 64 位 hash；35 项 runner 测试全绿，全量门通过）；诊断候选 v2 `dfa0c47246dccaac69747a1fb0426fc66e181282904755253ee7f3de1c132737` 自该 commit 构建。
+
+修正 7 全部完成（2026-09-09，系统 09:06:44 重启恢复渲染会话后）：B0（20/20，290.7–351.5ms）、B1（5/5 副本首启 815.8–1461.3ms、二启 293.4–313.4ms）绑定 `773eaea`；B2（conditioning 322.5ms 成功 + 20/20 样本 322.5–356ms）、B3（3/3，300.4–325.3ms，无 thermal/负载污染）、D1（20/20 带 trace，spawn→main-entered 全部 3.1–19.5ms）、D2（v2 字节一致新副本 2345.1→324.7ms，离群差值 98.7% 落在 spawn→main-entered 界限）绑定 `8e956fe`。环境事故（00:31–09:06 直接 spawn WebContent XPC 挂死）全程记录于 `.tmp/prr-067-experiments/ENVIRONMENT-INCIDENT.md`，挂死期 0 有效样本产物归档于 `incident-2026-09-09/`，未参与结论。**新证据**：重启后已执行路径再次出现首启离群（探测样本 1735.8ms，1155.9ms 落在 spawn→main-entered）——首次执行成本是会话级状态，非一次性机器级成本。
+
+修正 8/9/11 完成：决策包 v2 重制于 `.tmp/prr-067-g-perf-protocol-request/`（md SHA-256 `a6155d2e5613761166909b3e344791bb163f895aaddd1134af342b67994be5ae`、JSON SHA-256 `3073ca249700bccff2a07e55ad3de6eb3f79c9ebe5f8711aef304f7400aea39b`）：结论限定为 exec→main 界限内的系统侧成本且不指认子系统、全部 hash 完整 64 位、全部实验绑定可重建 clean commit 与 runnerSha256、首次安装启动耗时独立成节（§5）。根因判定维持 `MEASUREMENT_BOUNDARY_CONFIRMED`（证据强于第一轮）。未修改预算/样本数/percentile/renderer-ready 完成点/ADR/decision-register。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
