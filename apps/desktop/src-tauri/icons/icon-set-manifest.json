@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "asset": "mind-map-app-icon",
+  "stage": "desktop-icon-set",
+  "generator": {
+    "tool": "@tauri-apps/cli",
+    "version": "2.11.4",
+    "command": "pnpm --filter @mindmap/desktop tauri icon ../../assets/app-icon/source/mind-map-app-icon.svg --output ../../.tmp/prr-068-icon-generation-final",
+    "cwd": "apps/desktop",
+    "icnsNormalization": "canonical chunk re-order by (type, data bytes); no re-encode, no slot removal"
+  },
+  "source": {
+    "path": "assets/app-icon/source/mind-map-app-icon.svg",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "01c7ad41cefbe8f75439bc6ddab48e51fb81b8026f2e923132a411385d11b72e"
+  },
+  "outputs": [
+    {
+      "path": "32x32.png",
+      "kind": "png",
+      "bytes": 1584,
+      "sha256": "613db7531ed6288775ec6c780aef3944355955b213bd6d6e1348c59540e4d725",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "path": "64x64.png",
+      "kind": "png",
+      "bytes": 3957,
+      "sha256": "cdc81c7eca61892fc18edf435a514fea23a9f65e623d3b642ee0257f5a985b7f",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "path": "128x128.png",
+      "kind": "png",
+      "bytes": 10551,
+      "sha256": "a5f8d367a1de8b4ee4c3f6e9ea82edaf1d288549aeb551affb7504f659cd66ff",
+      "width": 128,
+      "height": 128
+    },
+    {
+      "path": "128x128@2x.png",
+      "kind": "png",
+      "bytes": 24965,
+      "sha256": "1f2531341ccf301fc5716f4fbc6413f2c4661a21da010698ee26334188277b7d",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "path": "icon.png",
+      "kind": "png",
+      "bytes": 56161,
+      "sha256": "382144b74207ed819c535ee4eba04665c971dfd177f992476797a6c8ca4f5bee",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "path": "icon.icns",
+      "kind": "icns",
+      "bytes": 307255,
+      "sha256": "7146e7c8788a982c31a8e8455e785b1bbd78783e2498b592b3cc1fd39ce684cc",
+      "chunks": [
+        {
+          "type": "ic07",
+          "length": 10559
+        },
+        {
+          "type": "ic08",
+          "length": 24973
+        },
+        {
+          "type": "ic09",
+          "length": 56169
+        },
+        {
+          "type": "ic10",
+          "length": 124253
+        },
+        {
+          "type": "ic11",
+          "length": 1592
+        },
+        {
+          "type": "ic12",
+          "length": 3965
+        },
+        {
+          "type": "ic13",
+          "length": 24973
+        },
+        {
+          "type": "ic14",
+          "length": 56169
+        },
+        {
+          "type": "il32",
+          "length": 2557
+        },
+        {
+          "type": "is32",
+          "length": 741
+        },
+        {
+          "type": "l8mk",
+          "length": 1032
+        },
+        {
+          "type": "s8mk",
+          "length": 264
+        }
+      ]
+    },
+    {
+      "path": "icon.ico",
+      "kind": "ico",
+      "bytes": 36779,
+      "sha256": "dd586ebef4f994cdc16eeaf8e2d1130c0b057230b080aa88c8170fa4473c495b"
+    }
+  ]
+}

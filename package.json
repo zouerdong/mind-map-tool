@@ -26,7 +26,8 @@
     "license:notices": "node scripts/quality/generate-third-party-notices.mjs",
     "license:scan": "node scripts/quality/scan-dependency-licenses.mjs",
     "net:scan": "node scripts/quality/scan-network-endpoints.mjs",
-    "boundaries": "node scripts/quality/check-boundaries.mjs --scope selected-canvas"
+    "boundaries": "node scripts/quality/check-boundaries.mjs --scope selected-canvas",
+    "icon:verify": "node scripts/quality/verify-icons.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
