@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-067_COMPLETE / PRE-PRR-070_ICON_HOLD`。PRR-067 已完成首次执行归因，负责人批准 v3 双指标协议，PRR-067B 实施及[独立审阅](../quality/prr-067b-independent-review-2026-09-09.md)均通过；审阅修复后同目录覆盖、conditioning bytes 绑定、native report 双指标传播与 ADR 0006 决策漂移均 fail-closed。source `ea047e8` 的旧 PRR-070 失败候选及证据继续只读保留，不得复用。下一步先把负责人已选定的应用图标方案生产化并集成，再从新的 clean source 执行 PRR-070；PRR-080/090 与 G-FINAL 仍保持阻塞。
+当前整改批次状态为 `IN_PROGRESS / PRR-068_READY / PRE-PRR-070_ICON_HOLD`。PRR-067 已完成首次执行归因，负责人批准 v3 双指标协议，PRR-067B 实施及[独立审阅](../quality/prr-067b-independent-review-2026-09-09.md)均通过；审阅修复后同目录覆盖、conditioning bytes 绑定、native report 双指标传播与 ADR 0006 决策漂移均 fail-closed。负责人选定的 C 方案已完成[产品图标规格](../product/app-icon-spec-2026-09-09.md)和 SVG 母版，现在从 [PRR-068 应用图标集成卡](./prr-068-app-icon-integration-task-card-2026-09-09.md)派发。source `ea047e8` 的旧 PRR-070 失败候选及证据继续只读保留，不得复用；PRR-068 独立审阅通过后，才从新的 clean source 执行 PRR-070。PRR-080/090 与 G-FINAL 仍保持阻塞。
 
 ## 2026-09-07 发布前收口批次（历史）
 

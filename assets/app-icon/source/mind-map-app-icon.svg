@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Mind Map application icon</title>
+  <desc id="desc">A white idea origin connected by six straight blue, violet, and pink rays to differently sized idea points on a dark indigo background.</desc>
+  <defs>
+    <linearGradient id="background-base" x1="120" y1="88" x2="904" y2="948" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18204B"/>
+      <stop offset="0.52" stop-color="#12183A"/>
+      <stop offset="1" stop-color="#0F1430"/>
+    </linearGradient>
+    <radialGradient id="background-focus" cx="0" cy="0" r="1" gradientTransform="translate(512 500) rotate(90) scale(445)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#303777" stop-opacity="0.52"/>
+      <stop offset="0.58" stop-color="#202653" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#11162F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ray-blue" x1="322" y1="282" x2="625" y2="676" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#718BFF"/>
+      <stop offset="1" stop-color="#5B7EFF"/>
+    </linearGradient>
+    <linearGradient id="ray-violet" x1="342" y1="733" x2="666" y2="326" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8D5BFF"/>
+      <stop offset="1" stop-color="#B05CFF"/>
+    </linearGradient>
+    <linearGradient id="ray-pink" x1="284" y1="490" x2="773" y2="542" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF4BBB"/>
+      <stop offset="1" stop-color="#F64CCB"/>
+    </linearGradient>
+    <linearGradient id="origin" x1="465" y1="451" x2="566" y2="572" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2F1EE"/>
+    </linearGradient>
+    <clipPath id="icon-shape">
+      <rect x="32" y="32" width="960" height="960" rx="212"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#icon-shape)">
+    <rect x="32" y="32" width="960" height="960" rx="212" fill="url(#background-base)"/>
+    <rect x="32" y="32" width="960" height="960" rx="212" fill="url(#background-focus)"/>
+
+    <g fill="none" stroke-linecap="round">
+      <line x1="512" y1="508" x2="336" y2="297" stroke="url(#ray-blue)" stroke-width="18"/>
+      <line x1="512" y1="508" x2="642" y2="335" stroke="url(#ray-violet)" stroke-width="17"/>
+      <line x1="512" y1="508" x2="744" y2="531" stroke="url(#ray-pink)" stroke-width="19"/>
+      <line x1="512" y1="508" x2="608" y2="649" stroke="url(#ray-blue)" stroke-width="16"/>
+      <line x1="512" y1="508" x2="350" y2="720" stroke="url(#ray-violet)" stroke-width="21"/>
+      <line x1="512" y1="508" x2="305" y2="492" stroke="url(#ray-pink)" stroke-width="17"/>
+    </g>
+
+    <g>
+      <circle cx="336" cy="297" r="53" fill="url(#ray-blue)"/>
+      <circle cx="642" cy="335" r="23" fill="url(#ray-violet)"/>
+      <circle cx="744" cy="531" r="49" fill="url(#ray-pink)"/>
+      <circle cx="608" cy="649" r="21" fill="url(#ray-blue)"/>
+      <circle cx="350" cy="720" r="46" fill="url(#ray-violet)"/>
+      <circle cx="305" cy="492" r="22" fill="url(#ray-pink)"/>
+      <circle cx="512" cy="508" r="72" fill="url(#origin)"/>
+    </g>
+  </g>
+</svg>

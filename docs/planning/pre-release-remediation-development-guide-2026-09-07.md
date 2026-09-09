@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-067_READY`（source `ea047e8` 的 PRR-070 阶段 A 因首个 cold 样本1685.4ms超过1500ms停止；先完成 PRR-067 归因，再从新 clean commit 重做 PRR-070）
+状态：`IN_PROGRESS / PRR-068_READY / PRE-PRR-070_ICON_HOLD`（PRR-067 双指标协议已实施并通过独立审阅；负责人选定的 C 方案已形成 SVG 母版，先完成 PRR-068 图标生产集成与独立审阅，再从新 clean commit 重做 PRR-070）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)

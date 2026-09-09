@@ -1,12 +1,14 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-067_COMPLETE / PRE-PRR-070_ICON_HOLD`
+状态：`IN_PROGRESS / PRR-068_READY / PRE-PRR-070_ICON_HOLD`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
 性能回卡：[PRR-066 候选性能与 PNG/CSP 根因整改](./prr-066-performance-remediation-task-card-2026-09-08.md)
 冷启动回卡：[PRR-067 冷启动首次执行归因与协议收口](./prr-067-cold-start-attribution-task-card-2026-09-08.md)
+
+图标集成回卡：[PRR-068 应用图标生产集成与原生验证](./prr-068-app-icon-integration-task-card-2026-09-09.md)
 
 ## 共同执行合同
 

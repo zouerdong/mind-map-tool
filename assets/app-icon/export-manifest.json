@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "asset": "mind-map-app-icon",
+  "status": "visual-review-exports",
+  "source": {
+    "path": "source/mind-map-app-icon.svg",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "01c7ad41cefbe8f75439bc6ddab48e51fb81b8026f2e923132a411385d11b72e"
+  },
+  "approvedReference": {
+    "label": "selected concept C",
+    "sha256": "2c6d0250180526bb32a6be97530ed568d5a36d36fd946d49eb89f47741adc0d9"
+  },
+  "renderer": {
+    "tool": "Playwright Chromium",
+    "playwrightVersion": "1.62.1",
+    "method": "SVG scaled to the exact transparent viewport and captured at deviceScaleFactor 1"
+  },
+  "exports": [
+    {
+      "path": "exports/mind-map-app-icon-16.png",
+      "width": 16,
+      "height": 16,
+      "bytes": 683,
+      "sha256": "5a996da4386445bfa70b63c3232189628f357dfb1e91462390d8b7983ddf797f"
+    },
+    {
+      "path": "exports/mind-map-app-icon-32.png",
+      "width": 32,
+      "height": 32,
+      "bytes": 1636,
+      "sha256": "755382fc2330d90263b389260bb31a8bdfe4301d1cc201485f6c6c307901e179"
+    },
+    {
+      "path": "exports/mind-map-app-icon-64.png",
+      "width": 64,
+      "height": 64,
+      "bytes": 4634,
+      "sha256": "9fd8a225e1c0db15867811ef5c82d49e00f9a5a615949a412bd2eeae4d67a94d"
+    },
+    {
+      "path": "exports/mind-map-app-icon-128.png",
+      "width": 128,
+      "height": 128,
+      "bytes": 13873,
+      "sha256": "81e4cf75bd7d52a528df42c35bc2ebe26bbd9ce741c544e95c3b7e9838081fde"
+    },
+    {
+      "path": "exports/mind-map-app-icon-256.png",
+      "width": 256,
+      "height": 256,
+      "bytes": 45023,
+      "sha256": "f384098f53fe6eb09fd8e2504bd373cbf103575159a31f4244d6ef14479d7e5d"
+    },
+    {
+      "path": "exports/mind-map-app-icon-512.png",
+      "width": 512,
+      "height": 512,
+      "bytes": 143620,
+      "sha256": "84ad5abb0521490472c40bec339d94d34db32e80061fa43e4d0025a4f5f66cbb"
+    },
+    {
+      "path": "exports/mind-map-app-icon-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 439258,
+      "sha256": "efc39ddb387f959d7dcc9b9334f7b581a9eddff4929f42e26ef90d7b1af3c126"
+    }
+  ]
+}
