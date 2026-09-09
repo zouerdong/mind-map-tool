@@ -3,9 +3,11 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`WAITING_FOR_G_PERF_PROTOCOL`
+状态：`BLOCKED / ENVIRONMENT_RENDER_SESSION`（审阅修正执行中）
 
-阶段 A 执行记录（2026-09-08，@ `4251894`）：A1 复算确认失败（首样本 1685.4ms 唯一离群）；A2 perf-only 分段埋点 + 红灯测试 + 零生产行为实证（无 env 启动 stdout 0 条 perf 行）；A3 完成 B0–B3 与 D1/D2 对照；A4 判定 `MEASUREMENT_BOUNDARY_CONFIRMED`（离群 ~98% 落在 spawn→main-entered 界限，应用分段稳定）。决策包位于 `.tmp/prr-067-g-perf-protocol-request/`；未改预算/样本数/percentile/ready 完成点/ADR/register。
+阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
+
+审阅修正执行记录（2026-09-09）：修正 1/3/4/5/6/10 已落地并形成 clean commit `773eaea`（分段埋点、clean worktree 前置、trace fail-closed、--legacy-timing-only、有界原始 stdout/stderr、完整 64 位 hash；35 项 runner 测试全绿，全量门通过）；诊断候选 v2 `dfa0c472…132737` 自该 commit 构建。修正 7 重跑：B0（20/20 max 351.5ms）、B1（5/5 首启 816–1461ms、二启 293–313ms）已完成并绑定该 commit；**B2/B3/D1/D2 被环境阻塞**——2026-09-09 00:31 起用户会话不可渲染（系统日志：WebContent 以 background view 运行，疑似锁屏/显示器熄灭），renderer-ready 挂死，4 次恢复探测均失败（`.tmp/prr-067-experiments/ENVIRONMENT-INCIDENT.md`）。修正 8/9/11 待 B2/B3/D1/D2 完成后执行。恢复会话后继续，不得复用旧 superseded 实验。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
