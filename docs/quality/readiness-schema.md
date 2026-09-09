@@ -63,6 +63,7 @@ required 平台（v1 为 `macos`）必须 `status: verified`、`exitCode: 0`，a
 - `evidenceKind: "native-candidate"`（不是 `.app` 路径或 web harness 输出）；
 - `sourceCommit`/`candidateSha256`/`platform` 与 manifest 一致；
 - `overall` 或 `status` 为 `PASS`。
+- `performance` 必须绑定同轮 `release-performance-summary.json` 的路径与 SHA-256，并逐值携带 `conditionedColdStartP95Ms` 与记录型 `sessionFirstLaunchMs`；`verify-evidence` 会与 performance summary 交叉复算，禁止只在 summary 展示而从原生报告遗漏首次执行体验。
 
 deferred 平台必须给出 `reason` 与存在的 `decisionRef`，且不得与 required 重叠。
 

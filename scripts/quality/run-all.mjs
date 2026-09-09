@@ -53,6 +53,17 @@ const STAGES = {
       ],
       ROOT,
     ),
+  decision: () =>
+    run(
+      "node",
+      [
+        resolve(ROOT, "scripts/runtime-spike/verify-decision.mjs"),
+        "--phase",
+        "packaging",
+        "docs/decisions/decision-register.json",
+      ],
+      ROOT,
+    ),
   boundaries: () =>
     run("node", [resolve(HERE, "check-boundaries.mjs"), "--scope", "selected-canvas"], ROOT),
   licenses: () =>
@@ -128,6 +139,7 @@ const SUITES = {
     "cargoFmt",
     "cargoTest",
     "cargoClippy",
+    "decision",
     "boundaries",
     "licenses",
     "network",

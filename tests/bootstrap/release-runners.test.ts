@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, chmodSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve, join, dirname, relative } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
@@ -8,6 +9,10 @@ const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
 const INSTALL_GATE = resolve(ROOT, "scripts/quality/install-gate.mjs");
 const PERF_RUNNER = resolve(ROOT, "scripts/quality/run-performance.mjs");
 const FIXTURE_DIR = resolve(ROOT, ".tmp/release-runner-fixtures");
+
+function fileSha256(path: string) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
 
 function runNode(script: string, args: string[], env: Record<string, string> = {}) {
   try {
@@ -590,6 +595,33 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res.stderr).toContain("候选产物不存在");
     });
 
+    it("已有性能轮次证据时拒绝覆盖，失败轮次原文保持不变", () => {
+      const regPath = createSyntheticRegister("approved");
+      const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
+      createMockAppBundle(candidateApp, PERF_PROTOCOL_BIN);
+      const priorPath = join(FIXTURE_DIR, "evidence/cold-conditioning.json");
+      mkdirSync(dirname(priorPath), { recursive: true });
+      const prior = '{"sentinel":"prior-failed-round"}\n';
+      writeFileSync(priorPath, prior);
+
+      const res = runNode(PERF_RUNNER, [
+        "--scope",
+        "release",
+        "--scope-from",
+        regPath,
+        "--candidate",
+        ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app",
+        "--evidence-dir",
+        ".tmp/release-runner-fixtures/evidence",
+        "--samples",
+        "20",
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("禁止覆盖或混样");
+      expect(readFileSync(priorPath, "utf8")).toBe(prior);
+    });
+
     it("少于 20 个 release 样本时 fail-closed", () => {
       const regPath = createSyntheticRegister("approved");
       const candidateApp = join(FIXTURE_DIR, "bundle/macos/Mind Map.app");
@@ -728,6 +760,11 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(conditioning.sourceCommit).toBe(raw.sourceCommit);
       expect(conditioning.candidateSha256).toBe(raw.candidateSha256);
       expect(conditioning.runnerSha256).toBe(raw.runnerSha256);
+      expect(raw.conditioning.artifactSha256).toBe(
+        fileSha256(join(FIXTURE_DIR, "evidence/cold-conditioning.json")),
+      );
+      expect(raw.conditioning.artifactSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(summary.conditioning.artifactSha256).toBe(raw.conditioning.artifactSha256);
       // HOME 隔离目录在采样后清理
       expect(existsSync(join(FIXTURE_DIR, "evidence/perf-homes"))).toBe(false);
     });

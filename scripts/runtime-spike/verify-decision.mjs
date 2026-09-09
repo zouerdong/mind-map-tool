@@ -155,6 +155,60 @@ function checkBootstrap() {
       fail(`acceptedAdrVersions entry for ${track} inconsistent with approvedTracks`);
     }
   }
+
+  // PRR-067 / G-PERF-PROTOCOL：性能协议是 G1 的重审签补充，必须与当前
+  // ADR 0006 bytes 和批准的不可变参数一致。否则 register 中虽然记录了 hash，
+  // 但旧 verifier 会完全忽略该字段，ADR/预算漂移仍可能被包装门放行。
+  const perf = g1.performanceProtocol;
+  if (!perf || typeof perf !== "object") {
+    fail("G1.performanceProtocol missing (PRR-067 G-PERF-PROTOCOL)");
+  } else {
+    if (perf.adrId !== "0006-performance-platform" || perf.adrVersion !== "1.1.0") {
+      fail("G1.performanceProtocol ADR id/version mismatch");
+    }
+    if (!/^[a-f0-9]{64}$/i.test(perf.adrSha256 ?? "")) {
+      fail("G1.performanceProtocol.adrSha256 must be a full SHA-256");
+    } else {
+      const perfAdrPath = resolve(REPO_ROOT, "docs/decisions/0006-performance-platform.md");
+      if (!existsSync(perfAdrPath)) {
+        fail("performance protocol ADR missing: 0006-performance-platform.md");
+      } else {
+        const actual = sha256(readFileSync(perfAdrPath));
+        if (actual !== perf.adrSha256)
+          fail("ADR 0006-performance-platform bytes drifted from G-PERF-PROTOCOL binding");
+      }
+    }
+    if (!/^[a-f0-9]{64}$/i.test(perf.decisionPacketSha256 ?? ""))
+      fail("G1.performanceProtocol.decisionPacketSha256 must be a full SHA-256");
+    const perfApprover = typeof perf.approvedBy === "string" ? perf.approvedBy.trim() : "";
+    if (!perfApprover || /^(project[- ]?owner|owner|tbd|unknown)$/i.test(perfApprover))
+      fail("G1.performanceProtocol.approvedBy must name the real approver");
+    if (!Number.isFinite(Date.parse(perf.approvedAt)))
+      fail("G1.performanceProtocol.approvedAt must be a valid date");
+    if (
+      typeof perf.approvalReference !== "string" ||
+      !perf.approvalReference.startsWith("[from-user]") ||
+      !Array.isArray(g1.evidence) ||
+      !g1.evidence.some(
+        (entry) => typeof entry === "string" && entry.startsWith("[from-user]") && entry.includes("G-PERF-PROTOCOL"),
+      )
+    ) {
+      fail("G1.performanceProtocol must retain a [from-user] G-PERF-PROTOCOL approval record");
+    }
+    if (
+      perf.conditionedColdStartP95BudgetMs !== 1500 ||
+      perf.warmP95BudgetMs !== 800 ||
+      perf.samplesEach !== 20 ||
+      perf.readyCompletionPoint !== "renderer-ready" ||
+      perf.estimator !== "sorted[floor(n*0.95)]" ||
+      typeof perf.sessionFirstLaunchBudget !== "string" ||
+      !perf.sessionFirstLaunchBudget.includes("no PASS/FAIL in v0.1.0") ||
+      typeof perf.conditioningFailureSemantics !== "string" ||
+      !perf.conditioningFailureSemantics.includes("whole round INCOMPLETE")
+    ) {
+      fail("G1.performanceProtocol parameters drifted from approved PRR-067 v3 protocol");
+    }
+  }
 }
 
 // ---------- packaging additions ----------

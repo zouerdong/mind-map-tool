@@ -230,6 +230,7 @@ function sameMetric(actual, expected) {
 }
 
 const commandIds = new Set();
+let releasePerformanceBinding = null;
 if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
   fail("commands 必须为非空数组");
 } else {
@@ -289,6 +290,8 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
     }
 
     if (command.id === "cmd-release-performance" && artifact) {
+      if (artifact.schemaVersion !== 3)
+        fail(`${label}.artifact schemaVersion 必须为 3（双指标协议）`);
       if (artifact.overall !== "PASS")
         fail(`${label}.artifact release performance 必须为 PASS（实际 ${artifact.overall}）`);
       if (artifact.measurementMode !== "release")
@@ -337,6 +340,7 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
         fail(`${label}.artifact 缺少 release-performance-raw.json`);
       } else {
         const raw = readJsonArtifact(rawPath, `${label}.raw`);
+        if (raw?.schemaVersion !== 3) fail(`${label}.raw schemaVersion 必须为 3（双指标协议）`);
         validateEvidenceTimestamp(raw, `${label}.raw`, true);
         validateArtifactIntegrity(rawPath, artifact.rawSha256, `${label}.raw`, "rawSha256");
         if (raw?.measurementSource !== "native-candidate")
@@ -465,10 +469,20 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
         // runner SHA-256；conditioning 必须成功（失败=整轮 INCOMPLETE，PASS 证据
         // 不可能携带失败 conditioning）；sessionFirstLaunchMs 与 summary 一致。
         const conditioningPath = resolve(dirname(artifactPath), "cold-conditioning.json");
+        const conditioningArtifact = relative(ROOT, conditioningPath);
         if (!existsSync(conditioningPath)) {
           fail(`${label}.cold-conditioning.json 缺失（双指标协议要求独立 conditioning artifact）`);
         } else {
+          if (artifact?.conditioning?.artifact !== conditioningArtifact)
+            fail(`${label}.artifact conditioning.artifact 未绑定同轮 cold-conditioning.json`);
+          validateArtifactIntegrity(
+            conditioningPath,
+            artifact?.conditioning?.artifactSha256,
+            `${label}.conditioning`,
+          );
           const conditioning = readJsonArtifact(conditioningPath, `${label}.cold-conditioning`);
+          if (conditioning?.schemaVersion !== 3)
+            fail(`${label}.cold-conditioning schemaVersion 必须为 3`);
           validateEvidenceTimestamp(conditioning, `${label}.cold-conditioning`, true);
           if (conditioning?.evidenceKind !== "cold-conditioning")
             fail(`${label}.cold-conditioning evidenceKind 必须为 cold-conditioning`);
@@ -499,7 +513,29 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
             );
           if (!sameMetric(condRun.elapsedMs, artifact.results?.sessionFirstLaunchMs))
             fail(`${label}.artifact results.sessionFirstLaunchMs 与 cold-conditioning 不一致`);
+          if (
+            raw?.conditioning?.success !== true ||
+            raw?.conditioning?.artifact !== conditioningArtifact ||
+            raw?.conditioning?.artifactSha256 !== artifact?.conditioning?.artifactSha256 ||
+            !sameMetric(raw?.conditioning?.durationMs, condRun.elapsedMs) ||
+            !sameMetric(raw?.conditioning?.sessionFirstLaunchMs, condRun.elapsedMs)
+          )
+            fail(`${label}.raw conditioning 与独立 cold-conditioning/summary 不一致`);
+          if (
+            raw?.conditioningRun?.runId !== condRun?.runId ||
+            raw?.conditioningRun?.markerFound !== true ||
+            raw?.conditioningRun?.exited !== true ||
+            raw?.conditioningRun?.code !== 0 ||
+            !sameMetric(raw?.conditioningRun?.elapsedMs, condRun.elapsedMs)
+          )
+            fail(`${label}.raw conditioningRun 与独立 cold-conditioning 不一致`);
         }
+        releasePerformanceBinding = {
+          summaryArtifact: command.artifact,
+          summarySha256: command.artifactSha256,
+          conditionedColdStartP95Ms: artifact.results?.conditionedColdStartP95Ms,
+          sessionFirstLaunchMs: artifact.results?.sessionFirstLaunchMs,
+        };
       }
     }
   }
@@ -730,6 +766,28 @@ if (manifest.releaseScope) {
         fail(`${label}.artifact platform 与 releaseScope 不一致`);
       if (reportArtifact.overall !== "PASS" && reportArtifact.status !== "PASS")
         fail(`${label}.artifact 没有 PASS 结论`);
+      if (releasePerformanceBinding) {
+        const performance = reportArtifact.performance;
+        if (
+          performance?.summaryArtifact !== releasePerformanceBinding.summaryArtifact ||
+          performance?.summarySha256 !== releasePerformanceBinding.summarySha256
+        )
+          fail(`${label}.artifact performance 未绑定同轮 release performance summary/hash`);
+        if (
+          !sameMetric(
+            performance?.conditionedColdStartP95Ms,
+            releasePerformanceBinding.conditionedColdStartP95Ms,
+          )
+        )
+          fail(`${label}.artifact conditionedColdStartP95Ms 与 performance summary 不一致`);
+        if (
+          !sameMetric(
+            performance?.sessionFirstLaunchMs,
+            releasePerformanceBinding.sessionFirstLaunchMs,
+          )
+        )
+          fail(`${label}.artifact sessionFirstLaunchMs 与 performance summary 不一致`);
+      }
     }
   }
 

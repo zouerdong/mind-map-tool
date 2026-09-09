@@ -1123,6 +1123,31 @@ if (scope === "release") {
     process.exit(1);
   }
 
+  // G-PERF-PROTOCOL：一次 release 性能调用就是一个不可覆写的完整轮次。
+  // 失败后必须换用全新的 evidence 子目录；否则会覆盖旧 conditioning/raw/summary，
+  // 破坏“重试=新一轮、旧轮保留作废”以及每个 HOME 必须全新的约束。
+  const roundOwnedPaths = [
+    "cold-conditioning.json",
+    "release-performance-raw.json",
+    "release-performance-summary.json",
+    "release-assets.json",
+    "perf-homes",
+    "perf-scenario-home",
+    "perf-sample-save.mindmap",
+    "perf-sample-export.png",
+  ].map((entry) => join(evidenceDirAbs, entry));
+  if (outputRel) roundOwnedPaths.push(resolve(ROOT, outputRel));
+  const existingRoundPaths = [...new Set(roundOwnedPaths)].filter((entry) => existsSync(entry));
+  if (existingRoundPaths.length > 0) {
+    console.error(
+      "run-performance: BLOCKED — evidence-dir 已含本轮性能产物，禁止覆盖或混样；" +
+        `请使用全新的 attempt 子目录（冲突: ${existingRoundPaths
+          .map((entry) => relative(ROOT, entry))
+          .join(", ")}）`,
+    );
+    process.exit(1);
+  }
+
   const binPath = findCandidateExecutable(candidateAbs);
   if (!binPath) {
     console.error(`run-performance: FAIL — 无法在候选产物中找到可执行文件: ${candidate}`);
@@ -1240,10 +1265,13 @@ if (scope === "release") {
     description: samplingProtocolConditioningDefinition,
     note: "conditioning 不计入任何样本与 percentile；失败则整轮 INCOMPLETE（证据保留，重试=新一轮）",
   };
-  writeFileSync(
-    join(evidenceDirAbs, "cold-conditioning.json"),
-    JSON.stringify(conditioningEvidence, null, 2) + "\n",
-  );
+  const conditioningEvidencePath = join(evidenceDirAbs, "cold-conditioning.json");
+  const conditioningArtifact = relative(ROOT, conditioningEvidencePath);
+  writeFileSync(conditioningEvidencePath, JSON.stringify(conditioningEvidence, null, 2) + "\n", {
+    encoding: "utf8",
+    flag: "wx",
+  });
+  const conditioningArtifactSha256 = computeFileSha256(conditioningEvidencePath);
   if (!conditioningOk) {
     console.error(
       `run-performance: FAIL — release cold conditioning 未达成有效 renderer-ready+真实退出：` +
@@ -1620,7 +1648,8 @@ if (scope === "release") {
       success: conditioningOk,
       durationMs: conditioningOk ? conditioningRun.elapsedMs : null,
       sessionFirstLaunchMs: conditioningOk ? conditioningRun.elapsedMs : null,
-      artifact: relative(ROOT, join(evidenceDirAbs, "cold-conditioning.json")),
+      artifact: conditioningArtifact,
+      artifactSha256: conditioningArtifactSha256,
     },
     fixture: {
       path: relative(ROOT, FIXTURE_SRC),
@@ -1677,16 +1706,24 @@ if (scope === "release") {
       saveP95Ms: saveStats.p95,
       pngExportP95Ms: pngStats.p95,
     },
+    conditioning: {
+      artifact: conditioningArtifact,
+      artifactSha256: conditioningArtifactSha256,
+    },
     incompleteReasons,
   };
 
   mkdirSync(evidenceDirAbs, { recursive: true });
   const rawEvidencePath = join(evidenceDirAbs, "release-performance-raw.json");
-  writeFileSync(rawEvidencePath, JSON.stringify(rawEvidence, null, 2) + "\n");
+  writeFileSync(rawEvidencePath, JSON.stringify(rawEvidence, null, 2) + "\n", {
+    encoding: "utf8",
+    flag: "wx",
+  });
   summaryEvidence.rawSha256 = computeFileSha256(rawEvidencePath);
   writeFileSync(
     join(evidenceDirAbs, "release-performance-summary.json"),
     JSON.stringify(summaryEvidence, null, 2) + "\n",
+    { encoding: "utf8", flag: "wx" },
   );
 
   if (outputRel) {

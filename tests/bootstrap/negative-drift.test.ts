@@ -78,6 +78,24 @@ describe("verify-decision bootstrap drift (negative)", () => {
     expect(runVerify(p).status).not.toBe(0);
   });
 
+  it("篡改 G-PERF-PROTOCOL 的 ADR 0006 hash 必须失败", () => {
+    const p = tamper((reg) => {
+      (reg as any).gates.G1.performanceProtocol.adrSha256 = "b".repeat(64);
+    });
+    const { status, stderr } = runVerify(p);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("ADR 0006-performance-platform bytes drifted");
+  });
+
+  it("篡改 G-PERF-PROTOCOL 的样本数或预算必须失败", () => {
+    const p = tamper((reg) => {
+      (reg as any).gates.G1.performanceProtocol.samplesEach = 19;
+    });
+    const { status, stderr } = runVerify(p);
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("parameters drifted");
+  });
+
   it("G1 退回 pending 必须失败", () => {
     const p = tamper((reg) => {
       (reg as any).gates.G1.status = "pending";

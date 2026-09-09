@@ -221,8 +221,40 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
       windowGeneration: 1,
     },
   }));
+  const conditioningRun = {
+    success: true,
+    elapsedMs: 20,
+    runId: "cond-run",
+    markerFound: true,
+    exited: true,
+    code: 0,
+    readyEvent: { runId: "cond-run", milestone: "renderer-ready", windowGeneration: 1 },
+  };
+  const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
+  const conditioningArtifact = ".tmp/quality-test-fixtures/cold-conditioning.json";
+  writeFileSync(
+    conditioningPath,
+    JSON.stringify(
+      {
+        schemaVersion: 3,
+        evidenceKind: "cold-conditioning",
+        sourceCommit: manifest.source.commit,
+        candidateSha256: manifest.candidate.sha256,
+        runnerSha256,
+        generatedAt: finishedAt,
+        startedAt,
+        finishedAt,
+        sessionFirstLaunchMs: 20,
+        conditioning: conditioningRun,
+      },
+      null,
+      2,
+    ),
+  );
+  const conditioningArtifactSha256 = fileSha256(conditioningPath);
   const rawPath = resolve(FIXTURE_DIR, "release-performance-raw.json");
   const raw = {
+    schemaVersion: 3,
     measurementSource: "native-candidate",
     measurementMode: "release",
     sourceCommit: manifest.source.commit,
@@ -239,6 +271,14 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
     pngExportSamples: samples,
     coldRuns: runs,
     warmRuns: runs,
+    conditioningRun,
+    conditioning: {
+      success: true,
+      durationMs: 20,
+      sessionFirstLaunchMs: 20,
+      artifact: conditioningArtifact,
+      artifactSha256: conditioningArtifactSha256,
+    },
     samplingProtocol: { coldDefinition: "isolated", warmDefinition: "shared" },
     rssResult: {
       measurementSource: "native-candidate",
@@ -251,6 +291,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
   writeFileSync(rawPath, JSON.stringify(raw, null, 2));
   const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
   const summary = {
+    schemaVersion: 3,
     overall: "PASS",
     measurementMode: "release",
     sourceCommit: manifest.source.commit,
@@ -282,36 +323,11 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
       pngExportP95Ms: 20,
       installerBytes: readFileSync(resolve(ROOT, "package.json")).byteLength,
     },
+    conditioning: {
+      artifact: conditioningArtifact,
+      artifactSha256: conditioningArtifactSha256,
+    },
   };
-  // ADR 0006 1.1.0 双指标协议：cold conditional 独立 artifact（与 summary 同目录）。
-  const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
-  writeFileSync(
-    conditioningPath,
-    JSON.stringify(
-      {
-        schemaVersion: 3,
-        evidenceKind: "cold-conditioning",
-        sourceCommit: manifest.source.commit,
-        candidateSha256: manifest.candidate.sha256,
-        runnerSha256,
-        generatedAt: finishedAt,
-        startedAt,
-        finishedAt,
-        sessionFirstLaunchMs: 20,
-        conditioning: {
-          success: true,
-          elapsedMs: 20,
-          runId: "cond-run",
-          markerFound: true,
-          exited: true,
-          code: 0,
-          readyEvent: { runId: "cond-run", milestone: "renderer-ready", windowGeneration: 1 },
-        },
-      },
-      null,
-      2,
-    ),
-  );
   writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
   manifest.commands.push({
     id: "cmd-release-performance",
@@ -322,6 +338,16 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
     artifact: ".tmp/quality-test-fixtures/release-performance-summary.json",
     artifactSha256: fileSha256(summaryPath),
   });
+  const nativeReportPath = resolve(FIXTURE_DIR, "native-candidate-report.json");
+  const nativeReport = JSON.parse(readFileSync(nativeReportPath, "utf8"));
+  nativeReport.performance = {
+    summaryArtifact: ".tmp/quality-test-fixtures/release-performance-summary.json",
+    summarySha256: fileSha256(summaryPath),
+    conditionedColdStartP95Ms: 20,
+    sessionFirstLaunchMs: 20,
+  };
+  writeFileSync(nativeReportPath, JSON.stringify(nativeReport, null, 2));
+  manifest.platformReports.macos.artifactSha256 = fileSha256(nativeReportPath);
 }
 
 describe("verify-evidence releaseScope verification", () => {
@@ -687,6 +713,30 @@ describe("verify-evidence releaseScope verification", () => {
     expect(res.stderr).toContain("cold-conditioning candidateSha256 与 manifest 不一致");
   });
 
+  it("双指标协议：cold-conditioning 内容变化但 summary hash 未更新时拒绝", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
+    const conditioning = JSON.parse(readFileSync(conditioningPath, "utf8"));
+    conditioning.note = "tampered after summary binding";
+    writeFileSync(conditioningPath, JSON.stringify(conditioning, null, 2));
+
+    const fixturePath = resolve(FIXTURE_DIR, "conditioning-artifact-drift.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("conditioning.artifactSha256 与当前 artifact 不一致");
+  });
+
   it("双指标协议：conditioning 失败态（success=false）时拒绝", () => {
     const manifest = baseManifest();
     attachPerformanceEvidence(manifest, {
@@ -736,5 +786,30 @@ describe("verify-evidence releaseScope verification", () => {
     const res = runVerifier(["--manifest", fixturePath]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("results.sessionFirstLaunchMs 与 cold-conditioning 不一致");
+  });
+
+  it("双指标协议：native report 未传播 sessionFirstLaunchMs 时拒绝", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    const nativeReportPath = resolve(FIXTURE_DIR, "native-candidate-report.json");
+    const nativeReport = JSON.parse(readFileSync(nativeReportPath, "utf8"));
+    delete nativeReport.performance.sessionFirstLaunchMs;
+    writeFileSync(nativeReportPath, JSON.stringify(nativeReport, null, 2));
+    manifest.platformReports.macos.artifactSha256 = fileSha256(nativeReportPath);
+
+    const fixturePath = resolve(FIXTURE_DIR, "native-report-missing-session-first.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("artifact sessionFirstLaunchMs 与 performance summary 不一致");
   });
 });
