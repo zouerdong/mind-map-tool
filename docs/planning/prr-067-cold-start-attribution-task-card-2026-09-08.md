@@ -3,7 +3,7 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`WAITING_FOR_G_PERF_PROTOCOL`（PRR-067A-v3 已通过独立审阅；等待项目负责人批准协议）
+状态：`APPROVED_G_PERF_PROTOCOL`（PRR-067A-v3 已通过独立审阅；2026-09-09 [from-user] 正式批准 v3 双指标协议，批准文本见本段；PRR-067B 实施授权已给出，实施前后均须独立审阅）
 
 阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
 
@@ -14,6 +14,22 @@
 修正 8/9/11 完成：决策包 v2 重制于 `.tmp/prr-067-g-perf-protocol-request/`（v2 md SHA-256 `a6155d2e5613761166909b3e344791bb163f895aaddd1134af342b67994be5ae`）：结论限定为 exec→main 界限内的系统侧成本且不指认子系统、全部 hash 完整 64 位、全部实验绑定可重建 clean commit 与 runnerSha256、首次执行耗时独立成节（§5）。根因判定维持 `MEASUREMENT_BOUNDARY_CONFIRMED`（证据强于第一轮）。未修改预算/样本数/percentile/renderer-ready 完成点/ADR/decision-register。
 
 **PRR-067A-v3 决策包语义修正（2026-09-09，负责人指令，base `912fd59`）**：仅修改决策包与本状态记录；未改代码/ADR/预算/estimator/样本数，未重跑实验，未开始 PRR-070。落实：① 删除"该成本只发生在安装后的第一次"与"等同/同类于首次 WebView 安装"表述（正文 §3/§5 已清除；§10 修正记录表中保留指令原文作审计）；② 证据边界收敛为三条可证明项：成本主要位于 exec→main 边界、新路径首次执行与系统重启后首次执行均可能出现、具体 macOS 子系统不可确定；③ 协议改双指标：`sessionFirstLaunchMs`（conditioning 启动耗时，完整记录与展示——durationMs 进 cold-conditioning.json/performance summary/native report/G-FINAL request；v0.1.0 无硬预算）+ `conditionedColdStartP95Ms`（成功 conditioning 后 20 cold 样本，沿用 estimator，≤1500ms 预算不变）；④ conditioning 失败整轮 INCOMPLETE，不得补跑/挑样/混样；⑤ cold-conditioning.json 必须绑定 source/candidate/runner hash。独立审阅一致性修正后：MD v3 SHA-256 `b88850e82a2f6b7962a5e7ac581d806d140bf56dbafcc2a0cc7514d9ff5ba85b`，JSON SHA-256 `ac4ea609b0e85369478d591da43b3ff25f219b11be3e4432722260e84894f21c`，JSON 内 `requestMarkdownSha256` 与 MD 一致。仍停 `WAITING_FOR_G_PERF_PROTOCOL`，未实施任何 ADR/runner/verifier 修改。
+
+**G-PERF-PROTOCOL 正式批准（2026-09-09，[from-user]，批准人 ErDong Zou，产品版本 0.1.0，批准对象：PRR-067 v3）**。批准文本原文（审阅一致性修正后的决策包即被批准对象）：
+
+> 批准采用双指标 cold 启动协议：
+> 1. release cold 采样前，对同一候选路径执行恰好一次 conditioning。
+> 2. conditioning 使用一次性隔离 HOME，必须完成 renderer-ready 和真实退出。
+> 3. conditioning 单独保存为 cold-conditioning.json，并绑定完整 source、candidate、runner SHA-256。
+> 4. sessionFirstLaunchMs 必须写入 cold-conditioning.json、performance summary、native report 和 G-FINAL request；v0.1.0 只记录和展示，不设 PASS/FAIL 硬预算。
+> 5. conditioning 成功后采集 20 个 cold 样本，每个样本使用不同的全新隔离 HOME。
+> 6. conditionedColdStartP95Ms 继续使用 sorted[floor(n×0.95)] 估计器，预算保持 ≤1500ms。
+> 7. warmStartP95Ms ≤800ms、20 个 warm 样本及 renderer-ready 完成点保持不变。
+> 8. conditioning 失败则整轮 INCOMPLETE；禁止补跑、挑样、删除样本或混合不同轮次。
+> 9. 授权据此修改 ADR 0006、decision register、runner、verifier、evidence schema、测试和相关文档。
+> 10. PRR-067B 完成并通过独立审阅前，不得开始 PRR-070、申请 G-FINAL 或执行 PRR-080。
+
+本状态记录由 PRR-067B 实施回合持有；后续任何决策包内容漂移须经获批准的 hash 绑定重新审签，同 G1 批准记录纪律。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
