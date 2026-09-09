@@ -36,7 +36,7 @@
 **PRR-067B 独立审阅完成（2026-09-09）**：主体实现通过；审阅发现的同目录覆盖、conditioning artifact 自身未绑定、native report/G-FINAL request 指标漏传约束、performanceProtocol 未进入 decision gate 四项局部缺口，已由审阅者在 `f52e771` 修复并补红灯。定向 `78/78`、全量 `534/534`、format/typecheck/lint 与 packaging decision gate 均通过。完整结论见 [PRR-067B 独立审阅](../quality/prr-067b-independent-review-2026-09-09.md)。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
-后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
+后继：负责人已选定的产品图标生产化与集成 → 图标变更独立审阅 → 新 clean source commit → PRR-070 从步骤 1 完整重做
 
 ## 派发文本
 
