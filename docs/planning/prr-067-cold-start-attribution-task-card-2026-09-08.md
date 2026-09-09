@@ -3,7 +3,7 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`APPROVED_G_PERF_PROTOCOL`（PRR-067A-v3 已通过独立审阅；2026-09-09 [from-user] 正式批准 v3 双指标协议，批准文本见本段；PRR-067B 实施已落地，commit `f9d2a75`，见"PRR-067B 实施完成"段；按卡 §5 待再次独立审阅，审阅通过后方转 COMPLETE）
+状态：`COMPLETE`（PRR-067A-v3 与 PRR-067B 均已通过独立审阅；实施 `f9d2a75`，审阅修复 `f52e771`；PRR-070 已解除本卡技术阻塞，但须在产品图标收口后从新 clean source 完整重做）
 
 阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
 
@@ -32,6 +32,8 @@
 本状态记录由 PRR-067B 实施回合持有；后续任何决策包内容漂移须经获批准的 hash 绑定重新审签，同 G1 批准记录纪律。
 
 **PRR-067B 实施完成（2026-09-09，base `000f299`，实施 commit `f9d2a75`）**：按批准文本第 1–9 条实施，未触及批准文本之外的项目。ADR 0006 升 v1.1.0（SHA-256 `12768465e9ab5b06ce73b16cc3e5f07f784be8c14914fe5f4873645ac4181e4e`）；decision register 登记 G1.performanceProtocol（批准人 ErDong Zou / 2026-09-09 / 决策包 hash 绑定 `b88850e8…`）；runner 增加 conditioning 段与 cold-conditioning.json 写出；verifier 增加 conditioning 校验块；raw/summary schemaVersion 2→3；release-budgets 与 v1-quality-gates 同步；测试 verify 24 + runner 35（59 项，含 4 个 conditioning 红灯用例）与全量 529 tests、typecheck、lint、format 全绿；旧 v2 证据归档不动。批准第 10 条已遵守：未开始 PRR-070、未申请 G-FINAL、未执行 PRR-080。下一步：独立审阅本回合（审阅通过后本卡转 COMPLETE）。
+
+**PRR-067B 独立审阅完成（2026-09-09）**：主体实现通过；审阅发现的同目录覆盖、conditioning artifact 自身未绑定、native report/G-FINAL request 指标漏传约束、performanceProtocol 未进入 decision gate 四项局部缺口，已由审阅者在 `f52e771` 修复并补红灯。定向 `78/78`、全量 `534/534`、format/typecheck/lint 与 packaging decision gate 均通过。完整结论见 [PRR-067B 独立审阅](../quality/prr-067b-independent-review-2026-09-09.md)。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做

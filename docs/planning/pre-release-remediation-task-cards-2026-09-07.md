@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-067_READY`
+状态：`IN_PROGRESS / PRR-067_COMPLETE / PRE-PRR-070_ICON_HOLD`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -48,7 +48,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 4 | PRR-065 | 不可并行 | PRR-000～060 已集成；负责人要求打开即零菜单画布 | 零画布顶栏与原生命令承载 |
 | 5 | PRR-066 | 不可并行 | PRR-070 阶段 A 性能回卡 | PNG/CSP、按需加载与性能协议整改 |
 | 6 | PRR-067 | 不可并行 | PRR-070 source `ea047e8` cold 预算失败 | 首次执行归因与条件式收口 |
-| 7 | PRR-070 | 不可并行 | PRR-067 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
+| 7 | PRR-070 | 不可并行 | PRR-067 独立审阅通过、负责人选定的产品图标已生产化集成、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
 | 8 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
 | 9 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
 
@@ -501,8 +501,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-067`（source `ea047e8` 阶段 A 在步骤6因 cold p95 1685.4ms正确停止；该候选与证据只读作废）
-依赖：PRR-000～067 已集成并经独立审阅；包含 PRR-067 收口与任务卡状态同步的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`HOLD_FOR_APP_ICON`（PRR-067 已完成并通过独立审阅；source `ea047e8` 旧候选与证据只读作废；须先完成负责人选定图标的生产化集成）
+依赖：PRR-000～067 已集成并经独立审阅；产品图标生产化集成通过审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标

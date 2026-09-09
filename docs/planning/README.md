@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-067_READY`。PRR-066 已关闭 production PNG/CSP、按需加载、30秒 RSS、canvas 聚合和稳定错误码五项根因并通过[独立审阅](../quality/prr-066-independent-review-2026-09-08.md)。随后 source `ea047e8` 的 PRR-070 阶段 A 在步骤6正确停止：20个 cold 样本的第1个为1685.4ms，其余19个为341.2～374.5ms，固定 p95 estimator 因而超过1500ms预算；其余性能、源码门、advisory、bundle、身份与 DMG 均通过。独立复算见[冷启动失败审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)。下一步只执行 [PRR-067 冷启动首次执行归因与协议收口](./prr-067-cold-start-attribution-task-card-2026-09-08.md)；不得删样、重跑挑绿、改 estimator/样本数/预算或静默预热。PRR-070 失败目录只读保留，PRR-070/080/090 与 G-FINAL 保持阻塞。
+当前整改批次状态为 `IN_PROGRESS / PRR-067_COMPLETE / PRE-PRR-070_ICON_HOLD`。PRR-067 已完成首次执行归因，负责人批准 v3 双指标协议，PRR-067B 实施及[独立审阅](../quality/prr-067b-independent-review-2026-09-09.md)均通过；审阅修复后同目录覆盖、conditioning bytes 绑定、native report 双指标传播与 ADR 0006 决策漂移均 fail-closed。source `ea047e8` 的旧 PRR-070 失败候选及证据继续只读保留，不得复用。下一步先把负责人已选定的应用图标方案生产化并集成，再从新的 clean source 执行 PRR-070；PRR-080/090 与 G-FINAL 仍保持阻塞。
 
 ## 2026-09-07 发布前收口批次（历史）
 
