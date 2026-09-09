@@ -3,7 +3,7 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`WAITING_FOR_G_PERF_PROTOCOL`（v2 审阅修正完成；决策包已按负责人 PRR-067A-v3 指令完成语义修正，交回独立审阅）
+状态：`WAITING_FOR_G_PERF_PROTOCOL`（PRR-067A-v3 已通过独立审阅；等待项目负责人批准协议）
 
 阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
 
@@ -13,7 +13,7 @@
 
 修正 8/9/11 完成：决策包 v2 重制于 `.tmp/prr-067-g-perf-protocol-request/`（v2 md SHA-256 `a6155d2e5613761166909b3e344791bb163f895aaddd1134af342b67994be5ae`）：结论限定为 exec→main 界限内的系统侧成本且不指认子系统、全部 hash 完整 64 位、全部实验绑定可重建 clean commit 与 runnerSha256、首次执行耗时独立成节（§5）。根因判定维持 `MEASUREMENT_BOUNDARY_CONFIRMED`（证据强于第一轮）。未修改预算/样本数/percentile/renderer-ready 完成点/ADR/decision-register。
 
-**PRR-067A-v3 决策包语义修正（2026-09-09，负责人指令，base `912fd59`）**：仅修改决策包与本状态记录；未改代码/ADR/预算/estimator/样本数，未重跑实验，未开始 PRR-070。落实：① 删除"该成本只发生在安装后的第一次"与"等同/同类于首次 WebView 安装"表述（正文 §3/§5 已清除；§10 修正记录表中保留指令原文作审计）；② 证据边界收敛为三条可证明项：成本主要位于 exec→main 边界、新路径首次执行与系统重启后首次执行均可能出现、具体 macOS 子系统不可确定；③ 协议改双指标：`sessionFirstLaunchMs`（conditioning 启动耗时，完整记录与展示——durationMs 进 cold-conditioning.json/performance summary/native report/G-FINAL request；v0.1.0 无硬预算）+ `conditionedColdStartP95Ms`（成功 conditioning 后 20 cold 样本，沿用 estimator，≤1500ms 预算不变）；④ conditioning 失败整轮 INCOMPLETE，不得补跑/挑样/混样；⑤ cold-conditioning.json 必须绑定 source/candidate/runner hash。MD v3 SHA-256 `ad9c2277af8409ae5c8c0d49c692d686168eb2df03d582dd2bd45af81572d6a5`（JSON 内 `requestMarkdownSha256` 同步）。仍停 `WAITING_FOR_G_PERF_PROTOCOL`，交回独立审阅；未实施任何 ADR/runner/verifier 修改。
+**PRR-067A-v3 决策包语义修正（2026-09-09，负责人指令，base `912fd59`）**：仅修改决策包与本状态记录；未改代码/ADR/预算/estimator/样本数，未重跑实验，未开始 PRR-070。落实：① 删除"该成本只发生在安装后的第一次"与"等同/同类于首次 WebView 安装"表述（正文 §3/§5 已清除；§10 修正记录表中保留指令原文作审计）；② 证据边界收敛为三条可证明项：成本主要位于 exec→main 边界、新路径首次执行与系统重启后首次执行均可能出现、具体 macOS 子系统不可确定；③ 协议改双指标：`sessionFirstLaunchMs`（conditioning 启动耗时，完整记录与展示——durationMs 进 cold-conditioning.json/performance summary/native report/G-FINAL request；v0.1.0 无硬预算）+ `conditionedColdStartP95Ms`（成功 conditioning 后 20 cold 样本，沿用 estimator，≤1500ms 预算不变）；④ conditioning 失败整轮 INCOMPLETE，不得补跑/挑样/混样；⑤ cold-conditioning.json 必须绑定 source/candidate/runner hash。独立审阅一致性修正后：MD v3 SHA-256 `b88850e82a2f6b7962a5e7ac581d806d140bf56dbafcc2a0cc7514d9ff5ba85b`，JSON SHA-256 `ac4ea609b0e85369478d591da43b3ff25f219b11be3e4432722260e84894f21c`，JSON 内 `requestMarkdownSha256` 与 MD 一致。仍停 `WAITING_FOR_G_PERF_PROTOCOL`，未实施任何 ADR/runner/verifier 修改。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
@@ -98,7 +98,7 @@
 只允许以下三种结论：
 
 - `APP_PATH_CONFIRMED`：可重复的超时主要落在 host/renderer 某一分段，并能映射到具体同步工作。进入阶段 B1。
-- `MEASUREMENT_BOUNDARY_CONFIRMED`：超时只与新构建/新路径的首次系统执行相关，应用分段本身稳定，且需要 conditioning 才能满足 ADR 的“已安装 WebView”语义。生成 `g-perf-protocol-request.md/json` 后停在 `WAITING_FOR_G_PERF_PROTOCOL`。
+- `MEASUREMENT_BOUNDARY_CONFIRMED`：离群成本主要位于 `exec→main` 边界；新 app 路径首次执行与系统重启后首次执行均可能出现；具体 macOS 子系统无法由现有证据确定。若解决需要显式定义采样前 conditioning，则生成 `g-perf-protocol-request.md/json` 后停在 `WAITING_FOR_G_PERF_PROTOCOL`。
 - `INCONCLUSIVE`：不能稳定复现或无法归因。返回 `BLOCKED`，列出缺失能力；不得选一个方便的解释。
 
 ## 阶段 B：条件式收口
