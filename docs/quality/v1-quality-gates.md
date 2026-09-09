@@ -29,7 +29,8 @@
 
 | 指标 | 建议目标（P95） | 测量方式 |
 | --- | ---: | --- |
-| 冷启动至可交互空白画布 | ≤ 1.5 s | 发布构建、本地 SSD、各 20 次，排除首次 WebView 安装 |
+| 冷启动至可交互空白画布（conditioned cold） | ≤ 1.5 s | 一次成功 conditioning 之后（同上），20 个全新隔离 HOME cold 样本，`sorted[floor(n×0.95)]` |
+| 冷启动 conditioning 耗时（`sessionFirstLaunchMs`） | 记录型，v0.1.0 无硬预算 | release cold 采样前恰好一次 conditioning（一次性隔离 HOME，完整 renderer-ready + 真实退出），写入 `cold-conditioning.json`/summary/native report/G-FINAL request；conditioning 失败整轮 INCOMPLETE |
 | 热启动/已安装 WebView | ≤ 0.8 s | 各 20 次 |
 | 空白文档空闲 RSS | ≤ 120 MB | 窗口稳定 30 s 后采样 |
 | 300/450 拖动与缩放帧时间 | ≤ 32 ms | 固定合成数据 `dense-300-450` |

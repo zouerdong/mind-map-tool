@@ -231,11 +231,29 @@
           "sha256": "90b96016ded53e1a639aa657f1aa3c66285565a65f2dbe3aeca8a07994974268"
         }
       ],
+      "performanceProtocol": {
+        "adrId": "0006-performance-platform",
+        "adrVersion": "1.1.0",
+        "adrSha256": "12768465e9ab5b06ce73b16cc3e5f07f784be8c14914fe5f4873645ac4181e4e",
+        "protoName": "two-metric-cold-start (sessionFirstLaunchMs record-only + conditionedColdStartP95Ms)",
+        "approvedBy": "ErDong Zou",
+        "approvedAt": "2026-09-09",
+        "approvalReference": "[from-user] G-PERF-PROTOCOL (PRR-067 v3)",
+        "decisionPacketSha256": "b88850e82a2f6b7962a5e7ac581d806d140bf56dbafcc2a0cc7514d9ff5ba85b",
+        "conditionedColdStartP95BudgetMs": 1500,
+        "sessionFirstLaunchBudget": "record-only (no PASS/FAIL in v0.1.0; durationMs propagated to cold-conditioning.json / performance summary / native report / G-FINAL request)",
+        "warmP95BudgetMs": 800,
+        "samplesEach": 20,
+        "readyCompletionPoint": "renderer-ready",
+        "estimator": "sorted[floor(n*0.95)]",
+        "conditioningFailureSemantics": "whole round INCOMPLETE; no re-run patching, no sample selection, no mixing rounds (retry = new round, old round kept and voided)"
+      },
       "evidence": [
         "[from-user] 2026-08-26 会话决策：四轨选型（Tauri 2 / React Flow / web-ts-wasm / Noto Sans SC + LXGW WenKai 手写字体）",
         "[from-user] 2026-08-26 平台范围变更：v1 macOS 先行、Windows 专门版本 + 移植就绪约束（PRD §1.1）",
         "macOS Spike 快照与原始 metrics（.tmp/runtime-spike/**，digest 已绑定）",
-        "ADR 0001-0006 转 Accepted 1.0.0"
+        "ADR 0001-0006 转 Accepted 1.0.0",
+        "[from-user] 2026-09-09 G-PERF-PROTOCOL 批准（PRR-067 v3）：ADR 0006 重审签 1.1.0 双指标 cold 协议（决策包 b88850e82a2f6b7962a5e7ac581d806d140bf56dbafcc2a0cc7514d9ff5ba85b）"
       ]
     },
     "G2": {

@@ -1,8 +1,9 @@
 # ADR 0006: 性能预算与平台覆盖矩阵
 
 - Status: Accepted
-- ADR-Version: 1.0.0
+- ADR-Version: 1.1.0
 - Date: 2026-08-26
+- Revised: 2026-09-09（cold 协议按 [from-user] G-PERF-PROTOCOL（PRR-067 v3）批准修订为双指标；见"G1 批准记录"末段与 decision-register）
 - Owners: Project maintainers
 - Track: 性能/平台基线（G1 批准后才成为约束性预算）
 
@@ -26,7 +27,7 @@ Proposed 预算基线（P95，双平台各自达标）：
 
 | 指标 | 建议目标 |
 | --- | ---: |
-| 冷启动至可交互空白画布 | ≤ 1.5 s（排除首次 WebView 安装） |
+| 冷启动至可交互空白画布（conditioned cold p95） | ≤ 1.5 s（一次成功 conditioning 之后的 20 个全新隔离 HOME cold 样本；见"测量协议"） |
 | 热启动/已安装 WebView | ≤ 0.8 s |
 | 空白文档空闲 RSS | ≤ 120 MB |
 | 300 节点/450 连接拖动与缩放帧时间 | ≤ 32 ms |
@@ -37,7 +38,12 @@ Proposed 预算基线（P95，双平台各自达标）：
 
 Proposed 平台矩阵基线：macOS Apple Silicon 必测（Intel 是否覆盖待用户确认）；Windows x64 必测（ARM64 是否覆盖待用户确认）；系统缩放 100%/150%/200%；中文 IME；WebView2 已有/缺失/旧版本三种状态。
 
-测量协议：各 20 次、本地 SSD、发布或接近发布构建、固定合成数据；报告含设备与脚本版本。
+测量协议（v1.1.0，cold 部分为双指标）：
+
+- **conditioning（协议先导，恰好一次）**：release cold 采样开始前，对同一候选路径执行恰好一次 conditioning 启动——一次性隔离 HOME（采样后删除），走完整 `renderer-ready` + 进程真实退出（与 measured 样本相同校验）。单独保存为 `cold-conditioning.json` 独立 artifact，必须绑定完整 source/candidate/runner SHA-256；**conditioning 失败则整轮采样判 INCOMPLETE**：不得补跑、不得挑样、不得将重试样本与旧轮混样（重试=新一轮，旧轮整体作废并保留）；conditioning 不计入 20 个 cold 样本，不参与任何 percentile。
+- **指标一 `sessionFirstLaunchMs`（记录型，无硬预算）**：conditioning 启动本身的耗时（`renderer-ready` 完成点，与 measured 样本同一计时口径），必须完整记录与展示——写入 `cold-conditioning.json`、performance summary、native report 与 G-FINAL request；v0.1.0 不设 PASS/FAIL 预算，后续版本可依据积累数据再议。
+- **指标二 `conditionedColdStartP95Ms`（判定指标）**：一次成功 conditioning 之后，20 个 cold 样本（每样本互不相同的全新隔离 HOME；不丢样、不挑样），沿用 estimator `sorted[floor(n×0.95)]`，≤ 1500ms。
+- 各 20 次、热启动 warm p95 ≤ 800ms、本地 SSD、发布或接近发布构建、固定合成数据；报告含设备与脚本版本。warm/RSS/canvas/edit/save/PNG/DMG 预算与 `renderer-ready` 完成点不变。
 
 ## Consequences
 
@@ -58,3 +64,10 @@ MM-010 Spike 建立基线 → G1 批准 → MM-050/MM-090 用 `run-performance.m
 - **批准人**：ErDong Zou（项目负责人），2026-08-26，基于 macOS Spike 证据（`docs/quality/runtime-spike-decision.json`）。
 - **批准决定**：macOS 实测校准预算；v1 平台 = macOS Apple Silicon
 - **绑定**：本版本（1.0.0）内容 hash 已登记于 `docs/decisions/decision-register.json` G1.acceptedAdr；批准后任何内容漂移使 G1 失效并需重新审签。
+
+## G-PERF-PROTOCOL 重审签记录（2026-09-09，v1.1.0）
+
+- **批准人**：ErDong Zou（项目负责人），2026-09-09，批准对象：PRR-067 v3 决策包（`g-perf-protocol-request.md` SHA-256 `b88850e82a2f6b7962a5e7ac581d806d140bf56dbafcc2a0cc7514d9ff5ba85b`；JSON `ac4ea609b0e85369478d591da43b3ff25f219b11be3e4432722260e84894f21c`）。
+- **批准决定**：cold 协议修订为双指标（`sessionFirstLaunchMs` 记录型 + `conditionedColdStartP95Ms` ≤1500ms，见上方测量协议）；warm p95 ≤800ms、各 20 样本、`renderer-ready` 完成点、estimator 与其余预算不变；授权修改 ADR/register/runner/verifier/schema/测试/文档。
+- **依据**：PRR-067 阶段 A 归因 `MEASUREMENT_BOUNDARY_CONFIRMED`（离群成本位于 exec→main 边界，应用分段稳定；新路径首启与系统重启后首启均可能出现；具体 macOS 子系统不可确定），经 PRR-067A-v3 决策包+独立审阅。
+- **绑定**：本版本（1.1.0）内容 hash 已登记于 `docs/decisions/decision-register.json` G1.performanceProtocol；批准后任何内容漂移使本记录失效并需重新审签。

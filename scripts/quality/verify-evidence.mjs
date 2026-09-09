@@ -305,7 +305,11 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
       if (artifact.runnerSha256 !== expectedRunnerHash)
         fail(`${label}.artifact runnerSha256 与当前 source runner 不一致`);
       for (const metric of [
-        "coldStartP95Ms",
+        // ADR 0006 1.1.0（G-PERF-PROTOCOL 2026-09-09）：判定指标
+        // conditionedColdStartP95Ms；sessionFirstLaunchMs 为记录型指标，
+        // PASS 证据同样必须存在（否则说明 conditioning 链路不完整）。
+        "conditionedColdStartP95Ms",
+        "sessionFirstLaunchMs",
         "warmStartP95Ms",
         "rssStableMb",
         "canvasFrameP95Ms",
@@ -418,9 +422,12 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
 
         if (
           coldValid &&
-          !sameMetric(percentile(raw.coldSamples, 0.95), artifact.results?.coldStartP95Ms)
+          !sameMetric(
+            percentile(raw.coldSamples, 0.95),
+            artifact.results?.conditionedColdStartP95Ms,
+          )
         )
-          fail(`${label}.artifact coldStartP95Ms 不能由 raw coldSamples 复算`);
+          fail(`${label}.artifact conditionedColdStartP95Ms 不能由 raw coldSamples 复算`);
         if (
           warmValid &&
           !sameMetric(percentile(raw.warmSamples, 0.95), artifact.results?.warmStartP95Ms)
@@ -452,6 +459,47 @@ if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
           fail(`${label}.artifact canvasFrameP95Ms 不能由 raw canvasResult 复算`);
         if (Array.isArray(raw?.incompleteReasons) && raw.incompleteReasons.length > 0)
           fail(`${label}.raw 仍包含 incompleteReasons`);
+
+        // ADR 0006 1.1.0（G-PERF-PROTOCOL 2026-09-09）：双指标协议要求
+        // cold-conditioning.json 独立 artifact 存在且绑定完整 source/candidate/
+        // runner SHA-256；conditioning 必须成功（失败=整轮 INCOMPLETE，PASS 证据
+        // 不可能携带失败 conditioning）；sessionFirstLaunchMs 与 summary 一致。
+        const conditioningPath = resolve(dirname(artifactPath), "cold-conditioning.json");
+        if (!existsSync(conditioningPath)) {
+          fail(`${label}.cold-conditioning.json 缺失（双指标协议要求独立 conditioning artifact）`);
+        } else {
+          const conditioning = readJsonArtifact(conditioningPath, `${label}.cold-conditioning`);
+          validateEvidenceTimestamp(conditioning, `${label}.cold-conditioning`, true);
+          if (conditioning?.evidenceKind !== "cold-conditioning")
+            fail(`${label}.cold-conditioning evidenceKind 必须为 cold-conditioning`);
+          if (conditioning?.sourceCommit !== source.commit)
+            fail(`${label}.cold-conditioning sourceCommit 与 manifest 不一致`);
+          if (conditioning?.candidateSha256 !== manifest.candidate?.sha256)
+            fail(`${label}.cold-conditioning candidateSha256 与 manifest 不一致`);
+          if (conditioning?.runnerSha256 !== expectedRunnerHash)
+            fail(`${label}.cold-conditioning runnerSha256 与当前 source runner 不一致`);
+          const condRun = conditioning?.conditioning;
+          if (condRun?.success !== true)
+            fail(`${label}.cold-conditioning conditioning 必须为成功（失败=整轮 INCOMPLETE）`);
+          if (
+            condRun?.markerFound !== true ||
+            condRun?.exited !== true ||
+            condRun?.code !== 0 ||
+            condRun?.readyEvent?.runId !== condRun?.runId ||
+            condRun?.readyEvent?.milestone !== "renderer-ready" ||
+            !Number.isInteger(condRun?.readyEvent?.windowGeneration) ||
+            condRun?.readyEvent?.windowGeneration <= 0
+          )
+            fail(`${label}.cold-conditioning 缺少有效的 renderer-ready/真实退出链`);
+          if (!Number.isFinite(condRun?.elapsedMs) || condRun.elapsedMs <= 0)
+            fail(`${label}.cold-conditioning elapsedMs 缺失或非正数`);
+          if (!sameMetric(condRun.elapsedMs, conditioning?.sessionFirstLaunchMs))
+            fail(
+              `${label}.cold-conditioning sessionFirstLaunchMs 与 conditioning.elapsedMs 不一致`,
+            );
+          if (!sameMetric(condRun.elapsedMs, artifact.results?.sessionFirstLaunchMs))
+            fail(`${label}.artifact results.sessionFirstLaunchMs 与 cold-conditioning 不一致`);
+        }
       }
     }
   }

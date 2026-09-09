@@ -646,6 +646,19 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(
         summary.incompleteReasons.some((reason: string) => reason.includes("renderer-ready")),
       ).toBe(true);
+      // ADR 0006 1.1.0：conditioning 失败 → 整轮 INCOMPLETE，measured cold 不补跑；
+      // 失败态也落盘为 cold-conditioning.json 证据。
+      expect(
+        summary.incompleteReasons.some((reason: string) => reason.includes("cold conditioning")),
+      ).toBe(true);
+      const raw = JSON.parse(readFileSync(rawPath, "utf8"));
+      expect(raw.coldSamples).toHaveLength(0);
+      expect(raw.conditioning.success).toBe(false);
+      const conditioning = JSON.parse(
+        readFileSync(join(FIXTURE_DIR, "evidence/cold-conditioning.json"), "utf8"),
+      );
+      expect(conditioning.conditioning.success).toBe(false);
+      expect(conditioning.conditioning.error).toContain("renderer-ready");
     });
 
     it("PRR-010 协议 mock：stdout perf 事件被采入 raw 并记录 runId/generation 链", () => {
@@ -700,7 +713,21 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
         readFileSync(join(FIXTURE_DIR, "evidence/release-performance-summary.json"), "utf8"),
       );
       expect(summary.results.rssStableMb).toBe(51);
-      expect(summary.results.coldStartP95Ms).toBeGreaterThan(0);
+      expect(summary.results.conditionedColdStartP95Ms).toBeGreaterThan(0);
+      // ADR 0006 1.1.0 双指标协议：sessionFirstLaunchMs 记录型指标与
+      // cold-conditioning.json 独立 artifact（绑定完整 source/candidate/runner hash）。
+      expect(summary.results.sessionFirstLaunchMs).toBeGreaterThan(0);
+      const conditioning = JSON.parse(
+        readFileSync(join(FIXTURE_DIR, "evidence/cold-conditioning.json"), "utf8"),
+      );
+      expect(conditioning.evidenceKind).toBe("cold-conditioning");
+      expect(conditioning.conditioning.success).toBe(true);
+      expect(conditioning.conditioning.markerFound).toBe(true);
+      expect(conditioning.conditioning.readyEvent?.milestone).toBe("renderer-ready");
+      expect(conditioning.sessionFirstLaunchMs).toBe(summary.results.sessionFirstLaunchMs);
+      expect(conditioning.sourceCommit).toBe(raw.sourceCommit);
+      expect(conditioning.candidateSha256).toBe(raw.candidateSha256);
+      expect(conditioning.runnerSha256).toBe(raw.runnerSha256);
       // HOME 隔离目录在采样后清理
       expect(existsSync(join(FIXTURE_DIR, "evidence/perf-homes"))).toBe(false);
     });

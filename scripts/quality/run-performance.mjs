@@ -1177,12 +1177,91 @@ if (scope === "release") {
   const saveTarget = join(evidenceDirAbs, "perf-sample-save.mindmap");
   const exportTarget = join(evidenceDirAbs, "perf-sample-export.png");
   const samplingStartedAt = new Date().toISOString();
+  // sourceCommit 在采样开始前固定（conditioning/cold-cond 证据与 raw/summary
+  // 引用同一个 HEAD；采样期间本进程不提交任何 commit）。
+  let gitHead = "unknown";
+  try {
+    gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  } catch {
+    gitHead = "unknown";
+  }
 
-  // 3. 冷启动采样（cold 定义：每样本全新隔离 HOME——WebView 缓存与应用
-  // 支持目录在样本内首次创建；目录位于 G2 批准 evidence 边界内，样本后删除）
+  // 3.0 协议先导 conditioning（ADR 0006 1.1.0 / G-PERF-PROTOCOL 2026-09-09）：
+  // release cold 采样开始前，对同一候选路径执行恰好一次 conditioning 启动——
+  // 一次性隔离 HOME（采样后删除）、完整 renderer-ready + 进程真实退出（与
+  // measured 样本相同校验）。成功则单独保存 cold-conditioning.json（绑定完整
+  // source/candidate/runner SHA-256）；失败则整轮 INCOMPLETE——不补跑、不挑样、
+  // 不与旧轮混样（重试=新一轮，旧轮保留作废）。conditioning 不计入 20 个
+  // cold 样本。注意：attribution 诊断区的 --conditioning-first（shared-HOME
+  // 预热）与 release conditioning 语义不同，后者是协议先导成功记录。
+  const samplingProtocolConditioningDefinition =
+    "release cold 采样前对同一候选路径执行恰好一次 conditioning：一次性隔离 HOME（采样后删除），完整 renderer-ready + 真实退出（与 measured 样本相同校验）；成功保存 cold-conditioning.json（绑定 source/candidate/runner SHA-256），失败整轮 INCOMPLETE；不计入 20 个 cold 样本";
+  const conditioningHome = join(homeRoot, "conditioning");
+  mkdirSync(conditioningHome, { recursive: true });
+  const conditioningStartedAt = new Date().toISOString();
+  const conditioningRun = await runLaunchSample(binPath, { homeDir: conditioningHome });
+  rmSync(conditioningHome, { recursive: true, force: true });
+  const conditioningFinishedAt = new Date().toISOString();
+  const conditioningOk =
+    conditioningRun.markerFound === true && Number.isFinite(conditioningRun.elapsedMs);
+  const conditioningEvidence = {
+    schemaVersion: 3,
+    evidenceKind: "cold-conditioning",
+    task: "MRT-011",
+    scope: "release",
+    platform: "macOS",
+    arch: process.arch,
+    sourceCommit: gitHead,
+    runnerSha256: computeFileSha256(RUNNER_PATH),
+    command: [process.execPath, ...process.argv.slice(1)].join(" "),
+    candidate,
+    candidateSha256,
+    generatedAt: conditioningFinishedAt,
+    startedAt: conditioningStartedAt,
+    finishedAt: conditioningFinishedAt,
+    // 指标一 sessionFirstLaunchMs（记录型，无硬预算）：conditioning 启动耗时
+    // （renderer-ready 完成点，与 measured 样本同一计时口径）；必须完整记录与
+    // 展示（本 artifact + performance summary + native report + G-FINAL request）。
+    sessionFirstLaunchMs: conditioningOk ? conditioningRun.elapsedMs : null,
+    conditioning: {
+      success: conditioningOk,
+      elapsedMs: conditioningOk ? conditioningRun.elapsedMs : null,
+      runId: conditioningRun.runId,
+      markerFound: conditioningRun.markerFound,
+      exited: conditioningRun.exited,
+      code: conditioningRun.code ?? null,
+      signal: conditioningRun.signal ?? null,
+      readyEvent: conditioningRun.readyEvent ?? null,
+      ...(conditioningRun.error ? { error: conditioningRun.error } : {}),
+      startupTrace: conditioningRun.startupTrace,
+    },
+    homeIsolation:
+      "conditioning 使用一次性隔离 HOME（采样后删除），与 measured cold 样本相同全新隔离语义",
+    description: samplingProtocolConditioningDefinition,
+    note: "conditioning 不计入任何样本与 percentile；失败则整轮 INCOMPLETE（证据保留，重试=新一轮）",
+  };
+  writeFileSync(
+    join(evidenceDirAbs, "cold-conditioning.json"),
+    JSON.stringify(conditioningEvidence, null, 2) + "\n",
+  );
+  if (!conditioningOk) {
+    console.error(
+      `run-performance: FAIL — release cold conditioning 未达成有效 renderer-ready+真实退出：` +
+        `${conditioningRun.error ?? "unknown"}（整轮 INCOMPLETE；不得补跑/挑样/混样）`,
+    );
+  } else {
+    console.log(
+      `run-performance: cold conditioning 成功 sessionFirstLaunchMs=${conditioningRun.elapsedMs}ms → ` +
+        `${join(evidenceDirAbs, "cold-conditioning.json")}`,
+    );
+  }
+
+  // 3. 冷启动采样（conditioned cold 定义：一次成功 conditioning 之后的
+  // candidate 路径启动，每样本全新隔离 HOME——WebView 缓存与应用支持目录在
+  // 样本内首次创建；目录位于 G2 批准 evidence 边界内，样本后删除）
   const coldSamples = [];
   const coldRuns = [];
-  for (let i = 0; i < samplesCount; i++) {
+  for (let i = 0; conditioningOk && i < samplesCount; i++) {
     const homeDir = join(homeRoot, `cold-${i}`);
     mkdirSync(homeDir, { recursive: true });
     const res = await runLaunchSample(binPath, { homeDir });
@@ -1429,6 +1508,10 @@ if (scope === "release") {
 
   // 7. 评估门禁预算
   const incompleteReasons = [];
+  if (!conditioningOk)
+    incompleteReasons.push(
+      `cold conditioning 未达成有效 renderer-ready+真实退出: ${conditioningRun.error ?? "unknown"}（整轮 INCOMPLETE；不得补跑/挑样/混样）`,
+    );
   if (coldSamples.length !== samplesCount)
     incompleteReasons.push(
       `cold launch 缺少 renderer-ready 样本 (${coldSamples.length}/${samplesCount})`,
@@ -1474,7 +1557,8 @@ if (scope === "release") {
   }
   if (assetExitCode !== 0) incompleteReasons.push(`release asset probe 退出码 ${assetExitCode}`);
 
-  const coldPass = Number.isFinite(coldStats.p95) && coldStats.p95 <= BUDGETS.coldStartP95Ms;
+  const coldPass =
+    Number.isFinite(coldStats.p95) && coldStats.p95 <= BUDGETS.conditionedColdStartP95Ms;
   const warmPass = Number.isFinite(warmStats.p95) && warmStats.p95 <= BUDGETS.warmStartP95Ms;
   const rssPass = Number.isFinite(rssStableMb) && rssStableMb <= BUDGETS.rssStableMb;
   const installerPass = Number.isFinite(installerBytes) && installerBytes <= BUDGETS.installerBytes;
@@ -1498,14 +1582,9 @@ if (scope === "release") {
     savePass &&
     pngPass;
 
-  let gitHead = "unknown";
-  try {
-    gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
-  } catch {}
-
   const samplingFinishedAt = new Date().toISOString();
   const coldDefinition =
-    "每样本在 G2 批准 evidence 边界内创建全新隔离 HOME（WebView 缓存与应用支持目录首次创建），采样后删除；renderer-ready 由 host 校验 runId/windowGeneration 后输出唯一 JSON，sampler 等待进程真实退出";
+    "一次成功 conditioning（记录在 cold-conditioning.json，绑定 source/candidate/runner SHA-256）之后的 candidate 路径启动；每样本在 G2 批准 evidence 边界内创建全新隔离 HOME（WebView 缓存与应用支持目录首次创建），采样后删除；renderer-ready 由 host 校验 runId/windowGeneration 后输出唯一 JSON，sampler 等待进程真实退出";
   const warmDefinition =
     "全部样本共享同一隔离 HOME，先执行一次不计入的预热启动再连续采样；renderer-ready 判定与 cold 相同";
   // PRR-066：RSS 30 秒稳定窗协议（docs/quality/v1-quality-gates.md）；host
@@ -1513,7 +1592,7 @@ if (scope === "release") {
   const rssSettleDefinition = `renderer-ready 后等待至少 ${RSS_MIN_SETTLE_MS}ms 稳定窗再采样自身 RSS；全部 rss 事件声明一致且 ≥${RSS_MIN_SETTLE_MS} 的 settleMs，runner 与 verify-evidence 均校验`;
 
   const rawEvidence = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     task: "MRT-011",
     scope: "release",
     platform: "macOS",
@@ -1532,6 +1611,16 @@ if (scope === "release") {
       coldDefinition,
       warmDefinition,
       rssSettleDefinition,
+      conditioningDefinition: samplingProtocolConditioningDefinition,
+    },
+    // 双指标协议（ADR 0006 1.1.0）：conditioning 启动耗时（记录型）与
+    // conditioned cold p95 判定指标；conditioningRun 保留原始 run 供复算。
+    conditioningRun,
+    conditioning: {
+      success: conditioningOk,
+      durationMs: conditioningOk ? conditioningRun.elapsedMs : null,
+      sessionFirstLaunchMs: conditioningOk ? conditioningRun.elapsedMs : null,
+      artifact: relative(ROOT, join(evidenceDirAbs, "cold-conditioning.json")),
     },
     fixture: {
       path: relative(ROOT, FIXTURE_SRC),
@@ -1556,7 +1645,7 @@ if (scope === "release") {
   };
 
   const summaryEvidence = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     task: "MRT-011",
     scope: "release",
     platform: "macOS",
@@ -1573,7 +1662,10 @@ if (scope === "release") {
     measurementMode: diagnostic ? "diagnostic-preflight" : "release",
     budgets: BUDGETS,
     results: {
-      coldStartP95Ms: coldStats.p95,
+      // ADR 0006 1.1.0（G-PERF-PROTOCOL 2026-09-09）：判定指标名
+      // conditionedColdStartP95Ms；sessionFirstLaunchMs 记录型（v0.1.0 无预算）。
+      conditionedColdStartP95Ms: coldStats.p95,
+      sessionFirstLaunchMs: conditioningOk ? conditioningRun.elapsedMs : null,
       coldStartMinMs: coldStats.min,
       coldStartMaxMs: coldStats.max,
       warmStartP95Ms: warmStats.p95,
@@ -1604,7 +1696,8 @@ if (scope === "release") {
   }
 
   console.log(
-    `run-performance: release summary: coldStart(p95)=${coldStats.p95}ms (budget<=${BUDGETS.coldStartP95Ms}ms) ` +
+    `run-performance: release summary: conditionedColdStart(p95)=${coldStats.p95}ms (budget<=${BUDGETS.conditionedColdStartP95Ms}ms) ` +
+      `sessionFirstLaunch=${conditioningOk ? conditioningRun.elapsedMs : "INCOMPLETE"}ms ` +
       `warmStart(p95)=${warmStats.p95}ms rss=${rssStableMb}MB (budget<=${BUDGETS.rssStableMb}MB) ` +
       `canvasFrame(p95)=${canvasFrameP95}ms (budget<=${BUDGETS.canvasFrameP95Ms}ms) ` +
       `installer=${installerBytes}B (budget<=${BUDGETS.installerBytes}B) ` +

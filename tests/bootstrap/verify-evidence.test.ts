@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -262,7 +262,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
     finishedAt,
     rawSha256: fileSha256(rawPath),
     budgets: {
-      coldStartP95Ms: 1500,
+      conditionedColdStartP95Ms: 1500,
       warmStartP95Ms: 800,
       rssStableMb: 120,
       canvasFrameP95Ms: 32,
@@ -272,7 +272,8 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
       installerBytes: 25_000_000,
     },
     results: {
-      coldStartP95Ms: 20,
+      conditionedColdStartP95Ms: 20,
+      sessionFirstLaunchMs: 20,
       warmStartP95Ms: 20,
       rssStableMb: 3,
       canvasFrameP95Ms: 1,
@@ -282,6 +283,35 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
       installerBytes: readFileSync(resolve(ROOT, "package.json")).byteLength,
     },
   };
+  // ADR 0006 1.1.0 双指标协议：cold conditional 独立 artifact（与 summary 同目录）。
+  const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
+  writeFileSync(
+    conditioningPath,
+    JSON.stringify(
+      {
+        schemaVersion: 3,
+        evidenceKind: "cold-conditioning",
+        sourceCommit: manifest.source.commit,
+        candidateSha256: manifest.candidate.sha256,
+        runnerSha256,
+        generatedAt: finishedAt,
+        startedAt,
+        finishedAt,
+        sessionFirstLaunchMs: 20,
+        conditioning: {
+          success: true,
+          elapsedMs: 20,
+          runId: "cond-run",
+          markerFound: true,
+          exited: true,
+          code: 0,
+          readyEvent: { runId: "cond-run", milestone: "renderer-ready", windowGeneration: 1 },
+        },
+      },
+      null,
+      2,
+    ),
+  );
   writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
   manifest.commands.push({
     id: "cmd-release-performance",
@@ -610,5 +640,101 @@ describe("verify-evidence releaseScope verification", () => {
     const res = runVerifier(["--manifest", fixturePath]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("measurementMode 必须为 release");
+  });
+
+  it("双指标协议：cold-conditioning.json 缺失时拒绝（ADR 0006 1.1.0）", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    rmSync(resolve(FIXTURE_DIR, "cold-conditioning.json"));
+
+    const fixturePath = resolve(FIXTURE_DIR, "missing-cold-conditioning.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("cold-conditioning.json 缺失");
+  });
+
+  it("双指标协议：conditioning 绑定 candidate hash 不一致时拒绝", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
+    const conditioning = JSON.parse(readFileSync(conditioningPath, "utf8"));
+    conditioning.candidateSha256 = "a".repeat(64);
+    writeFileSync(conditioningPath, JSON.stringify(conditioning, null, 2));
+
+    const fixturePath = resolve(FIXTURE_DIR, "conditioning-hash-mismatch.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("cold-conditioning candidateSha256 与 manifest 不一致");
+  });
+
+  it("双指标协议：conditioning 失败态（success=false）时拒绝", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    const conditioningPath = resolve(FIXTURE_DIR, "cold-conditioning.json");
+    const conditioning = JSON.parse(readFileSync(conditioningPath, "utf8"));
+    conditioning.conditioning.success = false;
+    conditioning.conditioning.error = "renderer-ready 缺失";
+    writeFileSync(conditioningPath, JSON.stringify(conditioning, null, 2));
+
+    const fixturePath = resolve(FIXTURE_DIR, "conditioning-failed.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("conditioning 必须为成功");
+  });
+
+  it("双指标协议：summary results.sessionFirstLaunchMs 与 conditioning 不一致时拒绝", () => {
+    const manifest = baseManifest();
+    attachPerformanceEvidence(manifest, {
+      measurementSource: "native-candidate",
+      rounds: 20,
+      fixtureNodes: 300,
+      fixtureEdges: 450,
+      frameP95Ms: 8,
+      panFrameSamples: Array.from({ length: 20 }, () => 8),
+      nodeDragFrameSamples: Array.from({ length: 20 }, () => 8),
+      zoomFrameSamples: Array.from({ length: 20 }, () => 8),
+    });
+    const summaryPath = resolve(FIXTURE_DIR, "release-performance-summary.json");
+    const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+    summary.results.sessionFirstLaunchMs = 999;
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    const command = manifest.commands.find((c: any) => c.id === "cmd-release-performance");
+    command.artifactSha256 = fileSha256(summaryPath);
+
+    const fixturePath = resolve(FIXTURE_DIR, "session-first-launch-mismatch.json");
+    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2));
+    const res = runVerifier(["--manifest", fixturePath]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("results.sessionFirstLaunchMs 与 cold-conditioning 不一致");
   });
 });
