@@ -3,7 +3,7 @@
 日期：2026-09-08  
 类型：性能根因诊断 / 诊断可观测性 / 条件式修复  
 优先级：P0  
-状态：`WAITING_FOR_G_PERF_PROTOCOL`（审阅修正 7/8/9/11 已完成，等待负责人批准协议）
+状态：`WAITING_FOR_G_PERF_PROTOCOL`（v2 审阅修正完成；决策包已按负责人 PRR-067A-v3 指令完成语义修正，交回独立审阅）
 
 阶段 A 第一轮（2026-09-08，@ `4251894`）已被独立审阅判 CHANGES_REQUESTED；其结论与决策包降级 superseded（`.tmp/SUPERSEDED-README.md`）。
 
@@ -11,7 +11,9 @@
 
 修正 7 全部完成（2026-09-09，系统 09:06:44 重启恢复渲染会话后）：B0（20/20，290.7–351.5ms）、B1（5/5 副本首启 815.8–1461.3ms、二启 293.4–313.4ms）绑定 `773eaea`；B2（conditioning 322.5ms 成功 + 20/20 样本 322.5–356ms）、B3（3/3，300.4–325.3ms，无 thermal/负载污染）、D1（20/20 带 trace，spawn→main-entered 全部 3.1–19.5ms）、D2（v2 字节一致新副本 2345.1→324.7ms，离群差值 98.7% 落在 spawn→main-entered 界限）绑定 `8e956fe`。环境事故（00:31–09:06 直接 spawn WebContent XPC 挂死）全程记录于 `.tmp/prr-067-experiments/ENVIRONMENT-INCIDENT.md`，挂死期 0 有效样本产物归档于 `incident-2026-09-09/`，未参与结论。**新证据**：重启后已执行路径再次出现首启离群（探测样本 1735.8ms，1155.9ms 落在 spawn→main-entered）——首次执行成本是会话级状态，非一次性机器级成本。
 
-修正 8/9/11 完成：决策包 v2 重制于 `.tmp/prr-067-g-perf-protocol-request/`（md SHA-256 `a6155d2e5613761166909b3e344791bb163f895aaddd1134af342b67994be5ae`、JSON SHA-256 `3073ca249700bccff2a07e55ad3de6eb3f79c9ebe5f8711aef304f7400aea39b`）：结论限定为 exec→main 界限内的系统侧成本且不指认子系统、全部 hash 完整 64 位、全部实验绑定可重建 clean commit 与 runnerSha256、首次安装启动耗时独立成节（§5）。根因判定维持 `MEASUREMENT_BOUNDARY_CONFIRMED`（证据强于第一轮）。未修改预算/样本数/percentile/renderer-ready 完成点/ADR/decision-register。
+修正 8/9/11 完成：决策包 v2 重制于 `.tmp/prr-067-g-perf-protocol-request/`（v2 md SHA-256 `a6155d2e5613761166909b3e344791bb163f895aaddd1134af342b67994be5ae`）：结论限定为 exec→main 界限内的系统侧成本且不指认子系统、全部 hash 完整 64 位、全部实验绑定可重建 clean commit 与 runnerSha256、首次执行耗时独立成节（§5）。根因判定维持 `MEASUREMENT_BOUNDARY_CONFIRMED`（证据强于第一轮）。未修改预算/样本数/percentile/renderer-ready 完成点/ADR/decision-register。
+
+**PRR-067A-v3 决策包语义修正（2026-09-09，负责人指令，base `912fd59`）**：仅修改决策包与本状态记录；未改代码/ADR/预算/estimator/样本数，未重跑实验，未开始 PRR-070。落实：① 删除"该成本只发生在安装后的第一次"与"等同/同类于首次 WebView 安装"表述（正文 §3/§5 已清除；§10 修正记录表中保留指令原文作审计）；② 证据边界收敛为三条可证明项：成本主要位于 exec→main 边界、新路径首次执行与系统重启后首次执行均可能出现、具体 macOS 子系统不可确定；③ 协议改双指标：`sessionFirstLaunchMs`（conditioning 启动耗时，完整记录与展示——durationMs 进 cold-conditioning.json/performance summary/native report/G-FINAL request；v0.1.0 无硬预算）+ `conditionedColdStartP95Ms`（成功 conditioning 后 20 cold 样本，沿用 estimator，≤1500ms 预算不变）；④ conditioning 失败整轮 INCOMPLETE，不得补跑/挑样/混样；⑤ cold-conditioning.json 必须绑定 source/candidate/runner hash。MD v3 SHA-256 `ad9c2277af8409ae5c8c0d49c692d686168eb2df03d582dd2bd45af81572d6a5`（JSON 内 `requestMarkdownSha256` 同步）。仍停 `WAITING_FOR_G_PERF_PROTOCOL`，交回独立审阅；未实施任何 ADR/runner/verifier 修改。
 
 输入：[PRR-070 阶段 A 冷启动失败独立审阅](../quality/prr-070-stage-a-cold-start-review-2026-09-08.md)  
 后继：负责人 `[from-user]` G-PERF-PROTOCOL 批准 → 新回合实施 ADR/runner/verifier/schema 修改并独立审阅 → 新 clean source commit → PRR-070 从步骤1完整重做
