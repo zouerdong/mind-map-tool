@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED`（PRR-070 source `b45dc0c` 再次命中 Tauri Finder `.DS_Store` 无上限等待并按 STOP 作废；先执行确定性 DMG 装配整改）
+状态：`IN_PROGRESS / PRR-069C_STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`（PRR-069C 已实现并完成三轮正式预检，等待独立审阅形成新 clean HEAD 后才重做 PRR-070）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)

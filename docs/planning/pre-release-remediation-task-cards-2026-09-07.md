@@ -53,7 +53,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 5 | PRR-066 | 不可并行 | PRR-070 阶段 A 性能回卡 | PNG/CSP、按需加载与性能协议整改 |
 | 6 | PRR-067 | 不可并行 | PRR-070 source `ea047e8` cold 预算失败 | 首次执行归因与条件式收口 |
 | 7 | PRR-068 | 不可并行 | PRR-067 独立审阅通过、负责人已选定产品图标 | 确定性桌面图标与原生验证 |
-| 8A | PRR-069C | 不可并行 | `b45dc0c` 候选命中 `.DS_Store` STOP；ADR 0013 v1.1.0 | 确定性无 Finder DMG 装配与三轮预检 |
+| 8A | PRR-069C | 不可并行 | `b45dc0c` 候选命中 `.DS_Store` STOP；ADR 0013 v1.1.0 | `STOP_FOR_INDEPENDENT_REVIEW`：确定性无 Finder DMG 装配与三轮预检已交回 |
 | 8B | PRR-070 | 不可并行 | PRR-069C 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
 | 9 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
 | 10 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
@@ -511,9 +511,10 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 优先级：P0
 
-状态：`READY_FOR_DISPATCH`
+状态：`STOP_FOR_INDEPENDENT_REVIEW`（实现完成并三轮预检通过；source `cf392e6`）
 
 任务卡：[prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md](./prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)
+实施报告：[prr-069c-implementation-report-2026-09-10.md](../quality/prr-069c-implementation-report-2026-09-10.md)
 
 依赖：source `b45dc0c` 的 PRR-070 STOP 现场只读冻结；ADR 0013 v1.1.0 已记录替代路线
 后继：实现交回独立审阅；审阅通过并形成新 clean source 后，从步骤 1 完整重做 PRR-070

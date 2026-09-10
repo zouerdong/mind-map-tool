@@ -1,6 +1,6 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-状态：**IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；source `b45dc0c` 的构建再次命中 Tauri Finder `.DS_Store` STOP，之后自然完成的 candidate 仍只读作废。下一步先完成 PRR-069C 确定性 DMG 装配。
+状态：**IN_PROGRESS / PRR-069C_STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；source `b45dc0c` 的构建再次命中 Tauri Finder `.DS_Store` STOP，之后自然完成的 candidate 仍只读作废。下一步先完成 PRR-069C 确定性 DMG 装配。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -21,7 +21,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| DMG 装配可重复性 | FAIL / PRR-069C READY | 两次独立 clean build 均长时间等待 Finder `.DS_Store`；禁止延长等待、伪造文件、CI 绕过或重跑挑结果，改为 app-only + 系统工具受控装配 |
+| DMG 装配可重复性 | PASS PENDING INDEPENDENT REVIEW | PRR-069C 已用 app-only build + `assemble-dmg.mjs` 受控装配替换 Finder 路径；三轮独立预检全部通过（装配 11.8/10.7/9.7s，DMG 均 ULMO、CRC32 VALID、≤25,000,000B，EULA/Applications/卷图标/payload identity 全 PASS）。见[实施报告](./prr-069c-implementation-report-2026-09-10.md) |
 | source/evidence 时间拓扑 | NEW EVIDENCE REQUIRED | `b45dc0c` STOP 后自然完成记录含非法 UTC `04:20:39.3NZ`，整轮已作废；PRR-069C/070 必须只接受机器生成可解析 UTC |
 | G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |

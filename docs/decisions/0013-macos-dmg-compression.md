@@ -55,4 +55,4 @@ PRR-069 实现后，两次相互独立的 clean build 都在 Tauri 2.11.4 上游
 
 ## Validation
 
-PRR-069 已验证 ULMO；PRR-069C 实现并独立审阅确定性装配 runner。PRR-069C 必须至少连续三次在不调用 Finder/AppleScript、没有 `.DS_Store` 输入的情况下完成 app-only build → DMG，并验证超时/失败分支。之后从新的 clean source 完整重跑 PRR-070。PRR-070 必须验证最终 DMG 格式、预算、EULA、Applications 链接、卷图标、只读挂载 payload identity 和时间拓扑；任何失败均按原 STOP 规则中止。
+PRR-069 已验证 ULMO；PRR-069C 已实现确定性装配 runner（`scripts/quality/assemble-dmg.mjs`：udrw → 卷图标属性 → ULMO → `udifrez` 注入根 LICENSE 生成的挂载前 EULA → 只读挂载复核），正式命令为 `tauri build --bundles app` + 受控装配，三轮真实预检全部通过，现等待独立审阅。PRR-069C 必须至少连续三次在不调用 Finder/AppleScript、没有 `.DS_Store` 输入的情况下完成 app-only build → DMG，并验证超时/失败分支。之后从新的 clean source 完整重跑 PRR-070。PRR-070 必须验证最终 DMG 格式、预算、EULA、Applications 链接、卷图标、只读挂载 payload identity 和时间拓扑；任何失败均按原 STOP 规则中止。
