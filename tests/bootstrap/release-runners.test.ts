@@ -6,6 +6,7 @@ import { resolve, join, dirname, relative } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
+const REPACK_DMG = resolve(ROOT, "scripts/quality/repack-dmg.mjs");
 const INSTALL_GATE = resolve(ROOT, "scripts/quality/install-gate.mjs");
 const PERF_RUNNER = resolve(ROOT, "scripts/quality/run-performance.mjs");
 const FIXTURE_DIR = resolve(ROOT, ".tmp/release-runner-fixtures");
@@ -148,6 +149,64 @@ function createCleanGitRepo(name: string): string {
   });
   return repoDir;
 }
+
+/**
+ * PRR-069 mock hdiutil：按 env 控制行为，供 repack-dmg 红灯注入。
+ * MOCK_CONVERT_FAIL / MOCK_INFO_FAIL / MOCK_VERIFY_FAIL 使对应子命令非零退出；
+ * MOCK_FORMAT 覆盖 imageinfo 声明的格式（伪造 Format 红灯）；
+ * MOCK_SIGNED / MOCK_ENCRYPTED 使 imageinfo 声明签名/加密镜像；
+ * MOCK_TOUCH_DIRTY 让 convert 在执行期间向仓库写入 untracked 文件。
+ * convert 成功时把输入复制到 -o 目标并追加 ULMO-CONVERTED 标记，
+ * 使转换后 hash 与转换前必然不同（供 inventory 绑定断言）。
+ */
+function createMockHdiutil(dir: string): string {
+  const script = `#!/bin/sh
+cmd="$1"; shift
+case "$cmd" in
+  convert)
+    [ -n "$MOCK_CONVERT_FAIL" ] && { echo "mock convert failure" >&2; exit 3; }
+    [ -n "$MOCK_TOUCH_DIRTY" ] && echo dirty > "$MOCK_TOUCH_DIRTY"
+    in=""; out=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -format) shift 2 ;;
+        -o) out="$2"; shift 2 ;;
+        *) in="$1"; shift ;;
+      esac
+    done
+    cp "$in" "$out" || exit 4
+    printf 'ULMO-CONVERTED\\n' >> "$out"
+    ;;
+  imageinfo)
+    [ -n "$MOCK_INFO_FAIL" ] && exit 5
+    printf 'Format: %s\\n' "\${MOCK_FORMAT:-ULMO}"
+    [ -n "$MOCK_SIGNED" ] && printf 'Signed For: mock-signer\\n'
+    [ -n "$MOCK_ENCRYPTED" ] && printf 'Encrypted: Yes\\n'
+    ;;
+  verify)
+    [ -n "$MOCK_VERIFY_FAIL" ] && { echo "CRC32 mismatch" >&2; exit 6; }
+    printf '已验证CRC32 $DEADBEEF\\n'
+    ;;
+  *) echo "unknown subcommand: $cmd" >&2; exit 9 ;;
+esac
+exit 0
+`;
+  const p = join(dir, "mock-hdiutil.sh");
+  writeFileSync(p, script);
+  chmodSync(p, 0o755);
+  return p;
+}
+
+/** PRR-069 fixture：在 clean git repo 的批准 DMG 路径写入合成 UDZO 内容。 */
+function createSyntheticDmg(repoDir: string, content = "synthetic udzo dmg"): string {
+  const dmgDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/dmg");
+  mkdirSync(dmgDir, { recursive: true });
+  const dmgPath = join(dmgDir, "Mind Map_0.1.0_aarch64.dmg");
+  writeFileSync(dmgPath, content);
+  return dmgPath;
+}
+
+const REPACK_DMG_REL = ".tmp/release-runner-fixtures/bundle/dmg/Mind Map_0.1.0_aarch64.dmg";
 
 /** PRR-010 协议 mock：按 env 输出带 runId/generation 的 perf JSON 行。 */
 const PERF_PROTOCOL_BIN = `#!/bin/sh
@@ -389,6 +448,332 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
 
       expect(res.status).toBe(1);
       expect(res.stderr).toContain("并非本次构建产生或刷新");
+    });
+
+    it("PRR-069：--dmg-format ULMO 全链成功，inventory 绑定转换后 hash 与 repack 元数据", () => {
+      const repoDir = createCleanGitRepo("bundle-ulmo-ok-repo");
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      const mockHdiutil = createMockHdiutil(join(repoDir, ".tmp"));
+      const dmgPath = join(repoDir, REPACK_DMG_REL);
+      const dmgBeforeSha = (() => {
+        createSyntheticDmg(repoDir, "synthetic udzo dmg for ulmo");
+        return fileSha256(dmgPath);
+      })();
+      const bundleDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos");
+      const inventoryPath = join(
+        repoDir,
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+      );
+
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--root",
+        repoDir,
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--dmg-format",
+        "ULMO",
+        "--repack-hdiutil",
+        mockHdiutil,
+        "--inventory",
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+        "--",
+        process.execPath,
+        "-e",
+        `const fs = require('fs');
+           fs.mkdirSync('${bundleDir}', { recursive: true });
+           fs.mkdirSync('${join(dmgPath, "..")}', { recursive: true });
+           fs.mkdirSync('${join(bundleDir, "Mind Map.app/Contents/MacOS")}', { recursive: true });
+           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/Info.plist")}', '<plist></plist>');
+           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/MacOS/mind-map")}', '#!/bin/sh\\nexit 0\\n');
+           fs.writeFileSync('${dmgPath}', 'synthetic udzo dmg for ulmo');`,
+      ]);
+
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("dmgFormat=ULMO");
+      const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
+      expect(inventory.dmgFormat).toBe("ULMO");
+      expect(inventory.dmgRepack.runner).toBe("repack-dmg.mjs");
+      expect(inventory.dmgRepack.afterSha256).not.toBe(dmgBeforeSha);
+      // inventory 的 artifact hash 必须是转换后文件（含 ULMO-CONVERTED 标记）
+      const dmgArtifact = inventory.artifacts.find((a: any) => a.path.endsWith(".dmg"));
+      expect(dmgArtifact.sha256).toBe(fileSha256(dmgPath));
+      expect(dmgArtifact.sha256).not.toBe(dmgBeforeSha);
+      expect(dmgArtifact.sha256).toBe(inventory.dmgRepack.afterSha256);
+      expect(readFileSync(dmgPath, "utf8")).toContain("ULMO-CONVERTED");
+      expect(existsSync(dmgPath.replace(/\.dmg$/, ".repack-ULMO.tmp.dmg"))).toBe(false);
+      expect(
+        existsSync(join(repoDir, ".tmp/release-runner-fixtures/evidence/dmg-repack-report.json")),
+      ).toBe(true);
+    });
+
+    it("PRR-069：repack 失败时 bundle gate 整体失败且不写 inventory（不回退 UDZO）", () => {
+      const repoDir = createCleanGitRepo("bundle-ulmo-fail-repo");
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      const mockHdiutil = createMockHdiutil(join(repoDir, ".tmp"));
+      const dmgPath = join(repoDir, REPACK_DMG_REL);
+      const bundleDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos");
+      const inventoryPath = join(
+        repoDir,
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+      );
+
+      const res = runNode(
+        BUNDLE_GATE,
+        [
+          "--host",
+          "tauri",
+          "--root",
+          repoDir,
+          "--scope-from",
+          regPath,
+          "--candidate-root",
+          ".tmp/release-runner-fixtures/bundle",
+          "--dmg-format",
+          "ULMO",
+          "--repack-hdiutil",
+          mockHdiutil,
+          "--inventory",
+          ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+          "--",
+          process.execPath,
+          "-e",
+          `const fs = require('fs');
+           fs.mkdirSync('${bundleDir}', { recursive: true });
+           fs.mkdirSync('${join(dmgPath, "..")}', { recursive: true });
+           fs.mkdirSync('${join(bundleDir, "Mind Map.app/Contents/MacOS")}', { recursive: true });
+           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/Info.plist")}', '<plist></plist>');
+           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/MacOS/mind-map")}', '#!/bin/sh\\nexit 0\\n');
+           fs.writeFileSync('${dmgPath}', 'synthetic udzo dmg');`,
+        ],
+        { MOCK_CONVERT_FAIL: "1" },
+      );
+
+      expect(res.status).not.toBe(0);
+      expect(res.stderr).toContain("DMG 容器格式转换失败");
+      expect(existsSync(inventoryPath)).toBe(false);
+      // 转换失败后原 DMG 内容保持原样（未被破坏、未被替换）
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+  });
+
+  // ==================== 1b. repack-dmg 测试（PRR-069） ====================
+  describe("repack-dmg (PRR-069 DMG 容器格式转换)", () => {
+    function setup(name: string, content = "synthetic udzo dmg") {
+      const repoDir = createCleanGitRepo(name);
+      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+      const mockHdiutil = createMockHdiutil(join(repoDir, ".tmp"));
+      const dmgPath = createSyntheticDmg(repoDir, content);
+      return { repoDir, regPath, mockHdiutil, dmgPath };
+    }
+
+    function runRepack(
+      repoDir: string,
+      regPath: string,
+      mockHdiutil: string,
+      extra: string[] = [],
+      env: Record<string, string> = {},
+    ) {
+      return runNode(
+        REPACK_DMG,
+        [
+          "--input",
+          REPACK_DMG_REL,
+          "--format",
+          "ULMO",
+          "--scope-from",
+          regPath,
+          "--root",
+          repoDir,
+          "--after",
+          "2020-01-01T00:00:00Z",
+          "--hdiutil",
+          mockHdiutil,
+          ...extra,
+        ],
+        env,
+      );
+    }
+
+    it("缺 --format 时直接 fail-closed", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-no-format-repo");
+      const res = runNode(REPACK_DMG, [
+        "--input",
+        REPACK_DMG_REL,
+        "--scope-from",
+        regPath,
+        "--root",
+        repoDir,
+        "--hdiutil",
+        mockHdiutil,
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("缺少 --format");
+    });
+
+    it("不允许的格式（UDZO/UDBZ）被拒绝", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-bad-format-repo");
+      for (const bad of ["UDZO", "UDBZ", "ulmo"]) {
+        const res = runNode(REPACK_DMG, [
+          "--input",
+          REPACK_DMG_REL,
+          "--format",
+          bad,
+          "--scope-from",
+          regPath,
+          "--root",
+          repoDir,
+          "--hdiutil",
+          mockHdiutil,
+        ]);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toContain("不允许的 DMG 目标格式");
+      }
+    });
+
+    it("输入路径穿越 (..) 或越出 repo root 时直接失败", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-escape-repo");
+      const escaping: string[] = ["../../evil.dmg", join("/tmp", "evil-repack.dmg")];
+      for (const bad of escaping) {
+        const res = runNode(REPACK_DMG, [
+          "--input",
+          bad,
+          "--format",
+          "ULMO",
+          "--scope-from",
+          regPath,
+          "--root",
+          repoDir,
+          "--hdiutil",
+          mockHdiutil,
+        ]);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toMatch(/路径穿越|越界 repo root|不能指向仓库根目录/);
+      }
+    });
+
+    it("输入不在 G2 批准的 DMG candidateOutputPaths 内时拒绝", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-unapproved-repo");
+      mkdirSync(join(repoDir, ".tmp/release-runner-fixtures/bundle/dmg/other"), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(repoDir, ".tmp/release-runner-fixtures/bundle/dmg/other/Other.dmg"),
+        "unapproved",
+      );
+      const res = runNode(REPACK_DMG, [
+        "--input",
+        ".tmp/release-runner-fixtures/bundle/dmg/other/Other.dmg",
+        "--format",
+        "ULMO",
+        "--scope-from",
+        regPath,
+        "--root",
+        repoDir,
+        "--hdiutil",
+        mockHdiutil,
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("candidate");
+    });
+
+    it("输入 DMG 不是本轮构建刷新（mtime 早于 --after）时拒绝", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-stale-repo");
+      const res = runNode(REPACK_DMG, [
+        "--input",
+        REPACK_DMG_REL,
+        "--format",
+        "ULMO",
+        "--scope-from",
+        regPath,
+        "--root",
+        repoDir,
+        "--after",
+        "2999-01-01T00:00:00Z",
+        "--hdiutil",
+        mockHdiutil,
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("不是本轮构建刷新");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("临时目标预存时 fail-closed", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-tmp-exists-repo");
+      const tmpPath = join(repoDir, REPACK_DMG_REL).replace(/\.dmg$/, ".repack-ULMO.tmp.dmg");
+      writeFileSync(tmpPath, "leftover from failed prior run");
+      const res = runRepack(repoDir, regPath, mockHdiutil);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("临时目标已存在");
+      expect(readFileSync(tmpPath, "utf8")).toBe("leftover from failed prior run");
+    });
+
+    it("hdiutil convert 失败时 fail-closed，原 DMG 与临时现场保持原样语义", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-convert-fail-repo");
+      const res = runRepack(repoDir, regPath, mockHdiutil, [], { MOCK_CONVERT_FAIL: "1" });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("hdiutil convert 失败");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("imageinfo 声明的 Format 与目标不符（伪造/静默回退）时失败", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-fake-format-repo");
+      const res = runRepack(repoDir, regPath, mockHdiutil, [], { MOCK_FORMAT: "UDZO" });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("Format=UDZO");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("输出是签名或加密镜像时失败", () => {
+      const { repoDir, regPath, mockHdiutil } = setup("repack-signed-repo");
+      const signed = runRepack(repoDir, regPath, mockHdiutil, [], { MOCK_SIGNED: "1" });
+      expect(signed.status).toBe(1);
+      expect(signed.stderr).toContain("签名或加密镜像");
+      const encrypted = runRepack(repoDir, regPath, mockHdiutil, [], { MOCK_ENCRYPTED: "1" });
+      expect(encrypted.status).toBe(1);
+      expect(encrypted.stderr).toContain("签名或加密镜像");
+    });
+
+    it("CRC32 校验失败时 fail-closed", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-crc-fail-repo");
+      const res = runRepack(repoDir, regPath, mockHdiutil, [], { MOCK_VERIFY_FAIL: "1" });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("CRC32");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("转换期间 worktree 被 touch 脏时 fail-closed（source 不可归因）", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-dirty-repo");
+      const res = runRepack(repoDir, regPath, mockHdiutil, [], {
+        MOCK_TOUCH_DIRTY: join(repoDir, "untracked-dirty.txt"),
+      });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("worktree 非 clean");
+      // 原 DMG 已被替换（rename 先于 git 复核），但流程报 FAIL，候选不得被采信；
+      // 残留的 untracked 文件证明检测生效。
+      expect(existsSync(join(repoDir, "untracked-dirty.txt"))).toBe(true);
+      expect(readFileSync(dmgPath, "utf8")).toContain("ULMO-CONVERTED");
+    });
+
+    it("成功路径：转换后文件为 ULMO 标记、临时文件消失、stdout 输出绑定 hash 的 JSON 报告", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-ok-repo", "udzo payload v1");
+      const res = runRepack(repoDir, regPath, mockHdiutil);
+      expect(res.status).toBe(0);
+      const reportLine = res.stdout
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("{"))
+        .pop()!;
+      const report = JSON.parse(reportLine);
+      expect(report.dmgFormat).toBe("ULMO");
+      expect(report.beforeSha256).not.toBe(report.afterSha256);
+      expect(report.afterSha256).toBe(fileSha256(dmgPath));
+      expect(report.formatEvidence).toBe("Format: ULMO");
+      expect(readFileSync(dmgPath, "utf8")).toContain("ULMO-CONVERTED");
+      expect(existsSync(dmgPath.replace(/\.dmg$/, ".repack-ULMO.tmp.dmg"))).toBe(false);
     });
   });
 

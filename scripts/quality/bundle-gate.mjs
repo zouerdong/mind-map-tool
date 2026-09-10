@@ -1,7 +1,9 @@
 // bundle-gate.mjs — 打包 fail-closed 门（PRC-055 契约）。
 // 强制校验 G2 scope（build 动作授权与 candidate-root 边界），检测到签名配置/凭据即拒绝。
 // 构建完成后盘点批准目录内的新产物，生成 inventory 与 hash。
-// 用法：node bundle-gate.mjs --host tauri [--scope-from <register>] [--candidate-root <path>] -- <tauri-build-command>
+// --dmg-format ULMO（PRR-069 / ADR 0013）：在盘点前把本轮唯一 DMG 原位转换为
+// 目标容器压缩格式；转换失败即整体失败，不回退 UDZO。
+// 用法：node bundle-gate.mjs --host tauri [--scope-from <register>] [--candidate-root <path>] [--dmg-format ULMO] -- <tauri-build-command>
 
 import { spawnSync, execFileSync } from "node:child_process";
 import { existsSync, readdirSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
@@ -18,6 +20,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
+const REPACK_PATH = resolve(HERE, "repack-dmg.mjs");
 
 const args = process.argv.slice(2);
 
@@ -34,6 +37,11 @@ const host = flag("host");
 const scopeFrom = flag("scope-from") ?? "docs/decisions/decision-register.json";
 const candidateRoot = flag("candidate-root") ?? "apps/desktop/src-tauri/target/release/bundle";
 const inventoryOutput = flag("inventory");
+// PRR-069：DMG 容器格式必须由正式命令显式声明（如 --dmg-format ULMO），
+// 不读环境变量、无隐式默认；缺省时不做转换（非发布路径的旧用法保持原语义）。
+// --repack-hdiutil 是测试注入入口（透传 repack-dmg 的 --hdiutil），生产调用不传。
+const dmgFormat = flag("dmg-format");
+const repackHdiutil = flag("repack-hdiutil");
 const dashdash = args.indexOf("--");
 const command = dashdash === -1 ? [] : args.slice(dashdash + 1);
 
@@ -160,6 +168,79 @@ if (gitHeadAfter !== gitHead || sourceStatusAfter.length > 0) {
   process.exit(1);
 }
 
+// 4b. PRR-069 / ADR 0013：在盘点（inventory hash 计算）之前，把本轮唯一
+// 批准的 DMG 原位转换为目标容器压缩格式。转换由 repack-dmg.mjs fail-closed
+// 执行；任何失败都让本轮整体失败，绝不回退 UDZO 后写 PASS。
+let dmgRepack = null;
+if (dmgFormat) {
+  const approvedDmgs = validated.normalized.candidateOutputPaths.filter((p) => p.endsWith(".dmg"));
+  if (approvedDmgs.length !== 1) {
+    console.error(
+      `bundle-gate: FAIL — G2 批准的 DMG 候选不是恰好一个（得到 ${approvedDmgs.length} 个），拒绝 glob 猜测转换目标`,
+    );
+    process.exit(1);
+  }
+  const repackArgs = [
+    REPACK_PATH,
+    "--input",
+    approvedDmgs[0],
+    "--format",
+    dmgFormat,
+    "--scope-from",
+    scopeFrom,
+    "--after",
+    buildStartedAt,
+    "--root",
+    ROOT,
+  ];
+  let repackReportPath = null;
+  if (inventoryOutputRel) {
+    repackReportPath = join(dirname(inventoryOutputRel), "dmg-repack-report.json");
+    repackArgs.push("--report", repackReportPath);
+  }
+  if (repackHdiutil) repackArgs.push("--hdiutil", repackHdiutil);
+  const repackResult = spawnSync(process.execPath, repackArgs, {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if ((repackResult.status ?? 1) !== 0) {
+    console.error("bundle-gate: FAIL — DMG 容器格式转换失败，本轮候选作废（不回退原格式）");
+    console.error(repackResult.stderr || repackResult.stdout);
+    process.exit(repackResult.status ?? 1);
+  }
+  // 解析 repack stdout 的单行 JSON 报告并嵌入 inventory 证据链。
+  const reportLine = (repackResult.stdout || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("{"))
+    .pop();
+  if (!reportLine) {
+    console.error("bundle-gate: FAIL — repack-dmg 未输出可解析的 JSON 报告");
+    process.exit(1);
+  }
+  try {
+    dmgRepack = JSON.parse(reportLine);
+  } catch {
+    console.error("bundle-gate: FAIL — repack-dmg 报告 JSON 解析失败");
+    process.exit(1);
+  }
+  // 转换后 source/worktree 再复核：转换期间仓库发生变化即 fail-closed。
+  const gitHeadAfterRepack = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  }).trim();
+  const sourceStatusAfterRepack = execFileSync(
+    "git",
+    ["status", "--porcelain=v1", "--untracked-files=all"],
+    { cwd: ROOT, encoding: "utf8" },
+  ).trim();
+  if (gitHeadAfterRepack !== gitHead || sourceStatusAfterRepack.length > 0) {
+    console.error("bundle-gate: FAIL — DMG 转换期间 source commit/worktree 发生变化，候选不可归因");
+    process.exit(1);
+  }
+}
+
 // 5. 盘点产生的新候选产物并核实范围
 const currentEntries = scanDirEntries(candidateRootAbs);
 const newEntries = [...currentEntries].filter((e) => !preExisting.has(e));
@@ -226,6 +307,9 @@ function artifactLatestMtimeMs(path) {
   return latest;
 }
 
+// 时间拓扑：inventory 的时间必须覆盖 repack 完成点（PRR-069 要求
+// bundle start <= bundle finish 对含转换的完整流程成立）。
+const inventoryFinishedAt = dmgRepack ? dmgRepack.finishedAt : buildFinishedAt;
 const inventory = {
   sourceCommit: gitHead,
   sourceWorktree: "clean",
@@ -234,9 +318,10 @@ const inventory = {
   os: process.platform,
   arch: process.arch,
   command: command.join(" "),
-  generatedAt: buildFinishedAt,
+  generatedAt: inventoryFinishedAt,
   startedAt: buildStartedAt,
-  finishedAt: buildFinishedAt,
+  finishedAt: inventoryFinishedAt,
+  ...(dmgFormat ? { dmgFormat, dmgRepack } : {}),
   newEntries,
   artifacts: candidateArtifacts,
 };
@@ -248,6 +333,11 @@ if (inventoryOutputRel) {
 }
 
 console.log(`bundle-gate: PASS — 成功构建并盘点 ${candidateArtifacts.length} 个候选产物`);
+if (dmgFormat) {
+  console.log(
+    `  dmgFormat=${dmgFormat} (repack ${dmgRepack?.beforeBytes ?? "?"}B -> ${dmgRepack?.afterBytes ?? "?"}B)`,
+  );
+}
 for (const art of candidateArtifacts) {
   console.log(`  - ${art.path} (sha256: ${art.sha256.slice(0, 16)}… size: ${art.sizeBytes}B)`);
 }
