@@ -505,7 +505,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-069`（source `58003c0` 的本轮候选因 DMG 25153239B 超过 25000000B 而在步骤 5 正确停止；不得继续该候选）
+状态：`READY_FOR_DISPATCH`（PRR-069 已完成并通过独立审阅；source `58003c0` 的超预算候选继续只读作废；只从包含 `198710d` 审阅修复与状态同步的最新 clean HEAD 开始）
 依赖：PRR-000～069 已集成并经独立审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 

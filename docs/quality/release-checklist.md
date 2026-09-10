@@ -1,6 +1,6 @@
 # 发布前检查清单（PRR-070 DMG 体积失败后）
 
-状态：**IN_PROGRESS / PRR-069_READY / NOT_READY_TO_RELEASE**。PRR-067 双指标协议与 PRR-068 图标均已通过独立审阅；source `58003c0` 的 PRR-070 候选因 DMG 超预算在步骤 5 作废。下一步按[失败独立审阅](./prr-070-stage-a-dmg-size-review-2026-09-10.md)执行 PRR-069，通过独立审阅后再从新 clean source 完整重做 PRR-070。
+状态：**IN_PROGRESS / PRR-070_READY / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；source `58003c0` 的超预算候选继续作废。下一步从包含 PRR-069 审阅修复与状态同步的最新 clean source 完整重做 PRR-070。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -10,7 +10,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | --- | --- | --- |
 | TypeScript / Rust 常规检查 | PASS ON INVALIDATED `58003c0` CANDIDATE | 17 项源码门全部 exit 0；PRR-069 修改 runner 后，PRR-070 仍须从 clean source 全部重跑 |
 | 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `58003c0` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | FAIL / INVALIDATED CANDIDATE | UDZO DMG 为 `25,153,239B`；ADR 0013 的 ULMO 独立实验为 `24,288,652B`，但只有 PRR-069 集成并经独立审阅后的新 PRR-070 结果可作为正式证据 |
+| `.dmg` ≤ 25,000,000B | RUNNER FIX ACCEPTED / NEW CANDIDATE REQUIRED | PRR-069 实施预检 ULMO 为 `24,288,684B`，最终 runner 独立复算为 `24,288,652B`；均不是 PRR-070 正式候选，下一轮仍须同源实测 |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
@@ -21,7 +21,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `58003c0` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| source/evidence 时间拓扑 | FAIL ON INVALIDATED `58003c0` RUN | source freeze 把本地 08:45 误标为 `08:45Z`，晚于约 `01:58Z` 的源码门；PRR-069/070 必须机器生成 UTC 并 fail-closed 复算顺序 |
+| source/evidence 时间拓扑 | RUNNER FIX ACCEPTED / NEW EVIDENCE REQUIRED | PRR-069 已强制 repack UTC、runner hash、HEAD/clean、before/after hash 与 bundle 时间窗；PRR-070 仍须从步骤 1 机器生成 UTC 并复算完整链 |
 | G-FINAL | MISSING / EXPECTED | 本轮在步骤 5 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |

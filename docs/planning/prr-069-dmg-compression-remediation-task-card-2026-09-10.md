@@ -1,6 +1,6 @@
 # PRR-069：macOS DMG ULMO 压缩与证据时间拓扑整改
 
-状态：`STOP_FOR_INDEPENDENT_REVIEW`（2026-09-10 实施完成并预检通过，等待独立审阅；PRR-070 NOT STARTED。实施报告：[prr-069-implementation-report-2026-09-10.md](../quality/prr-069-implementation-report-2026-09-10.md)，实现 commit `cfa4dfe`，基线 `5e7b99c`；预检 ULMO DMG 24,288,684B / 余量 711,316B / payload·EULA·图标逐字节一致）
+状态：`COMPLETE / INDEPENDENT_REVIEW_ACCEPTED`（2026-09-10；实施 `cfa4dfe`，审阅修复 `198710d`；[独立审阅](../quality/prr-069-independent-review-2026-09-10.md)确认最终 runner、ULMO/CRC、payload/EULA/图标与 fail-closed 证据绑定通过。PRR-070 仍未在本卡执行）
 
 类型：发布 runner 根因整改
 

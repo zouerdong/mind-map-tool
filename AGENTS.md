@@ -2,7 +2,7 @@
 
 ## 项目阶段
 
-当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～068 已完成并独立验收；ADR 0006 v1.1.0 已采用经负责人批准的双指标 cold 协议，负责人选定的 C 方案已完成确定性桌面图标集成。source `58003c0` 的 PRR-070 候选因 DMG 25153239B 超过 25000000B 在步骤 5 作废并只读保留；独立审阅另确认 source freeze UTC 时间戳错误。ADR 0013 已接受 ULMO 容器压缩路线；下一步只执行 PRR-069 runner/时间拓扑整改并独立审阅，随后才从新 clean HEAD 完整重做 PRR-070。PRR-080/090 与 G-FINAL 保持阻塞。
+当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 采用 ULMO DMG 压缩；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选及全部历史证据继续只读作废。下一步只从包含 PRR-069 审阅修复与状态同步的最新 clean HEAD 完整执行 PRR-070；若 Tauri 上游 Finder `.DS_Store` 美化再次挂起必须 STOP，不得伪造或跳过。PRR-080/090 与 G-FINAL 保持阻塞。
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 
