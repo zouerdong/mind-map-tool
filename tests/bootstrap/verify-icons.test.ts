@@ -446,6 +446,14 @@ describe("verify-icons.mjs（黑盒：execFileSync 子进程）", () => {
     expect(res.stderr).toContain("StoreLogo.png");
   });
 
+  it("icons 目录混入子目录时稳定失败而不是未捕获异常", () => {
+    const testCase = runCase("mobile-dir-mixed");
+    mkdirSync(join(testCase.paths.icons, "ios"));
+    const res = testCase.run();
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("icons 目录条目必须是普通文件：ios");
+  });
+
   it("bundle.icon 引用不存在文件时失败", () => {
     const res = runCase("config-ref-missing", {
       configRefs: ["icons/icon.png", "icons/icon.icns", "icons/icon.ico", "icons/nope.png"],
@@ -459,7 +467,29 @@ describe("verify-icons.mjs（黑盒：execFileSync 子进程）", () => {
       configRefs: ["icons/icon.png", "icons/icon.ico"],
     }).run();
     expect(res.status).toBe(1);
-    expect(res.stderr).toContain("缺少桌面必需 ICNS");
+    expect(res.stderr).toContain("缺少必需图标引用：icons/icon.icns");
+  });
+
+  it("bundle.icon 保留 ICNS/ICO 但缺任一 PNG 时仍失败", () => {
+    const res = runCase("config-no-32", {
+      configRefs: ALL_CONFIG_REFS.filter((ref) => ref !== "icons/32x32.png"),
+    }).run();
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("缺少必需图标引用：icons/32x32.png");
+  });
+
+  it("bundle.icon 指向目录外同名文件时失败", () => {
+    const testCase = runCase("config-external-same-name");
+    const externalDir = join(testCase.paths.dir, "external");
+    mkdirSync(externalDir);
+    copyFileSync(join(testCase.paths.icons, "icon.png"), join(externalDir, "icon.png"));
+    writeConfig(
+      testCase.paths.config,
+      ALL_CONFIG_REFS.map((ref) => (ref === "icons/icon.png" ? "external/icon.png" : ref)),
+    );
+    const res = testCase.run();
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("必须直接引用受管 icons 目录内的文件：external/icon.png");
   });
 
   it("bundle.icon 缺失时失败", () => {

@@ -17,6 +17,7 @@ pnpm lint                        # ESLint
 pnpm format / format:check       # Prettier
 pnpm test:unit                   # Vitest（含 decision-register 漂移负向测试）
 pnpm build                       # apps/desktop 前端构建（vite）
+pnpm icon:verify                 # 应用图标母版、桌面导出、manifest 与 Tauri 引用
 pnpm quality                     # 质量总入口（类型/lint/单测/边界/许可/网络/golden/性能）
 
 node scripts/quality/check-boundaries.mjs --scope selected-canvas   # 架构边界断言

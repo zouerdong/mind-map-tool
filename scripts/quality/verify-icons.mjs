@@ -5,8 +5,8 @@
 // 桌面 icons 目录只允许 7 件输出 + manifest，不允许 mobile/Appx 派生物。
 // 任一失败（含缺文件）退出非零；只读校验，不修改任何文件。
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalIcns, computeSha256, parseIcns, parseIco, readPngIhdr } from "./icon-utils.mjs";
 import {
@@ -87,9 +87,19 @@ export function verifyIconSet(options = {}) {
     fail(`icons 目录存在不允许的文件/目录：${name}（禁止 mobile/Appx 派生物混入桌面集合）`);
   }
   for (const name of diskNames) {
-    const legacy = legacySha256Values.find(
-      (sha) => sha === computeSha256(readFileSync(join(iconsDir, name))),
-    );
+    const abs = join(iconsDir, name);
+    let isFile = false;
+    try {
+      isFile = lstatSync(abs).isFile();
+    } catch (error) {
+      fail(`无法读取 icons 条目 ${name}：${error.message}`);
+      continue;
+    }
+    if (!isFile) {
+      fail(`icons 目录条目必须是普通文件：${name}`);
+      continue;
+    }
+    const legacy = legacySha256Values.find((sha) => sha === computeSha256(readFileSync(abs)));
     if (legacy) fail(`icons 目录存在旧纯蓝占位图标（${name}，SHA-256 ${legacy}）`);
   }
 
@@ -103,6 +113,10 @@ export function verifyIconSet(options = {}) {
       }
       if (output.path.includes("/") || output.path.includes("\\")) {
         fail(`manifest 输出路径必须为 icons 目录内的纯文件名：${output.path}`);
+        continue;
+      }
+      if (manifestPaths.has(output.path)) {
+        fail(`manifest.outputs 存在重复 path：${output.path}`);
         continue;
       }
       manifestPaths.set(output.path, output);
@@ -196,6 +210,10 @@ export function verifyIconSet(options = {}) {
   if (manifestReadable) {
     const declared = [...manifestPaths.keys()].sort();
     for (const p of declared)
+      if (!ICON_FILE_NAMES.includes(p)) fail(`manifest 声明了不允许的桌面输出：${p}`);
+    for (const p of ICON_FILE_NAMES)
+      if (!manifestPaths.has(p)) fail(`manifest 缺少必需桌面输出：${p}`);
+    for (const p of declared)
       if (!diskIconNames.includes(p)) fail(`manifest 声明 ${p} 但磁盘集合缺少它`);
     for (const p of diskIconNames.filter((name) => ICON_FILE_NAMES.includes(name)))
       if (!manifestPaths.has(p)) fail(`磁盘图标文件 ${p} 未在 manifest 中登记`);
@@ -214,21 +232,32 @@ export function verifyIconSet(options = {}) {
     fail("tauri.conf.json bundle.icon 缺失或为空");
   else {
     const basenameOf = (ref) => ref.replaceAll("\\", "/").split("/").at(-1);
+    const expectedRefs = new Map(
+      ICON_FILE_NAMES.map((name) => [
+        relative(configDir, join(iconsDir, name)).replaceAll("\\", "/"),
+        resolve(iconsDir, name),
+      ]),
+    );
+    const seenRefs = new Set();
     for (const ref of iconRefs) {
       if (typeof ref !== "string" || ref.length === 0) {
         fail("bundle.icon 存在空引用");
         continue;
       }
       const abs = resolve(configDir, ref);
+      const normalizedRef = relative(configDir, abs).replaceAll("\\", "/");
+      if (seenRefs.has(normalizedRef)) fail(`bundle.icon 存在重复引用：${ref}`);
+      seenRefs.add(normalizedRef);
       if (!existsSync(abs)) fail(`bundle.icon 引用文件不存在：${ref}`);
       // manifest 可读且已登记输出时才做登记校验；manifest 缺失时不猜测，只保留存在性检查
       else if (manifestPaths.size > 0 && !manifestPaths.has(basenameOf(ref)))
         fail(`bundle.icon 引用 ${ref} 未在图标 manifest 中登记`);
+      const expectedAbs = expectedRefs.get(normalizedRef);
+      if (expectedAbs === undefined || expectedAbs !== abs)
+        fail(`bundle.icon 必须直接引用受管 icons 目录内的文件：${ref}`);
     }
-    if (!iconRefs.some((ref) => ref.replaceAll("\\", "/").endsWith("icon.icns")))
-      fail("bundle.icon 缺少桌面必需 ICNS（macOS）");
-    if (!iconRefs.some((ref) => ref.replaceAll("\\", "/").endsWith("icon.ico")))
-      fail("bundle.icon 缺少 Windows 移植入口必需的 ICO");
+    for (const expectedRef of expectedRefs.keys())
+      if (!seenRefs.has(expectedRef)) fail(`bundle.icon 缺少必需图标引用：${expectedRef}`);
   }
 
   return { ok: errors.length === 0, errors };

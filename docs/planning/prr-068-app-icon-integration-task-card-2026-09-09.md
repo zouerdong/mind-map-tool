@@ -3,7 +3,7 @@
 日期：2026-09-09  
 类型：产品视觉资产 / Tauri 打包集成 / 原生验证  
 优先级：P0  
-状态：`AWAITING_INDEPENDENT_REVIEW`（实施完成 2026-09-09；验证证据 `.tmp/prr-068-app-icon/verify-summary.md`；下一步骤：独立审阅 → PRR-070）  
+状态：`AWAITING_INDEPENDENT_REVIEW`（实施完成 2026-09-09；验证证据 `.tmp/prr-068-app-icon/verify-summary.md`；下一步骤：独立审阅 → PRR-070）
 前置：PRR-067 已完成并通过独立审阅；负责人选定的 C 方案已完成矢量母版与尺寸检查；PRR-070 继续保持阻塞
 
 ## 派发文本
