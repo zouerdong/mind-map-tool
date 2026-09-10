@@ -153,9 +153,13 @@ export function extractEulaTextFromRezXml(rezXml) {
   throw new Error(`udifderez 输出中没有 ${EULA_TEXT_RESOURCE.type} ID ${EULA_TEXT_RESOURCE.id}`);
 }
 
-/** EULA 是否已被镜像声明：hdiutil imageinfo 的机器可读字段。 */
+/**
+ * EULA 是否已被镜像声明：hdiutil imageinfo 的机器可读字段。
+ * 真实 hdiutil 输出的该行带前导制表符（`\tSoftware License Agreement: true`），
+ * 因此必须容忍行首空白，不能按行首精确匹配。
+ */
 export function imageInfoDeclaresLicenseAgreement(imageInfoStdout) {
-  return /^Software License Agreement:\s*true\s*$/im.test(imageInfoStdout);
+  return /^\s*Software License Agreement:\s*true\s*$/im.test(imageInfoStdout);
 }
 
 export function sha256(bytes) {

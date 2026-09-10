@@ -349,7 +349,8 @@ if (tool === "hdiutil") {
     if (env.MOCK_INFO_FAIL) die(8, "mock imageinfo failure");
     const image = readImage(resolve(last()));
     process.stdout.write("Format: " + (env.MOCK_FORMAT || (image && image.format) || "UDZO") + "\\n");
-    process.stdout.write("Software License Agreement: " + (image && image.eulaText ? "true" : "false") + "\\n");
+    // 真实 hdiutil 的该字段带前导制表符，mock 必须复刻该格式，否则会漏检行首空白缺陷。
+    process.stdout.write("\\tSoftware License Agreement: " + (image && image.eulaText ? "true" : "false") + "\\n");
     if (env.MOCK_SIGNED) process.stdout.write("Signed For: mock\\n");
     process.exit(0);
   }
