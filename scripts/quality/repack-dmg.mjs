@@ -19,7 +19,12 @@ import {
 } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadAndValidateG2Scope, computeFileSha256, validateSafePath } from "./g2-scope.mjs";
+import {
+  loadAndValidateG2Scope,
+  computeFileSha256,
+  validateSafePath,
+  isSameOrDescendant,
+} from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
@@ -86,9 +91,31 @@ if (approvedDmgs[0] !== inputRel) {
   fail(`输入不在 G2 批准的 DMG candidateOutputPaths 内: ${inputRel}`);
 }
 
+// 报告目标同样必须在任何产物变更前完成授权校验。否则一个无效 --report
+// 可能在最后一步才失败，而此时最终 DMG 已经被替换。
+let reportRel = null;
+let reportAbs = null;
+if (reportOutput) {
+  try {
+    reportRel = validateSafePath(reportOutput, ROOT, "report");
+  } catch (err) {
+    fail(err.message);
+  }
+  reportAbs = resolve(ROOT, reportRel);
+  const reportApproved = validated.normalized.evidenceOutputPaths.some((evidencePath) =>
+    isSameOrDescendant(resolve(ROOT, evidencePath), reportAbs),
+  );
+  if (!reportApproved) {
+    fail(`report 路径不在 G2 批准的 evidenceOutputPaths 内: ${reportRel}`);
+  }
+}
+
 // 4. same-run 刷新校验：bundle gate 传入构建开始时间，输入 mtime 必须晚于它，
 //    防止把旧轮 DMG 当作本轮产物转换。
 if (afterFlag) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(afterFlag)) {
+    fail(`--after 必须是 UTC ISO（以 Z 结尾），不得把本地时间冒充 UTC: ${afterFlag}`);
+  }
   const afterMs = Date.parse(afterFlag);
   if (!Number.isFinite(afterMs)) fail(`--after 不是可解析的 UTC ISO 时间: ${afterFlag}`);
   if (statSync(inputAbs).mtimeMs < afterMs) {
@@ -106,6 +133,10 @@ if (existsSync(tmpAbs)) {
 const beforeSha256 = computeFileSha256(inputAbs);
 const beforeBytes = statSync(inputAbs).size;
 const startedAt = new Date().toISOString();
+const gitBefore = readGitState();
+if (gitBefore.status.length > 0) {
+  fail("转换开始前 worktree 非 clean，拒绝修改候选产物");
+}
 
 function runHdiUtil(cmdArgs) {
   try {
@@ -204,8 +235,8 @@ function readGitState() {
   }
 }
 const gitAfter = readGitState();
-if (gitAfter.status.length > 0) {
-  fail("转换完成后 worktree 非 clean（候选目录外的仓库内容发生了变化），候选不可归因");
+if (gitAfter.head !== gitBefore.head || gitAfter.status.length > 0) {
+  fail("转换期间 source commit/worktree 发生变化，候选不可归因");
 }
 
 const finishedAt = new Date().toISOString();
@@ -223,20 +254,11 @@ const report = {
   afterBytes,
   beforeSha256,
   afterSha256,
-  formatEvidence: formatMatch[0],
+  formatEvidence: finalFormat[0],
   gitHead: gitAfter.head,
 };
 
-if (reportOutput) {
-  const reportRel = validateSafePath(reportOutput, ROOT, "report");
-  const reportAbs = resolve(ROOT, reportRel);
-  const reportApproved = validated.normalized.evidenceOutputPaths.some((evidencePath) => {
-    const approvedAbs = resolve(ROOT, evidencePath);
-    return approvedAbs === reportAbs || reportAbs.startsWith(`${approvedAbs}/`);
-  });
-  if (!reportApproved) {
-    fail(`report 路径不在 G2 批准的 evidenceOutputPaths 内: ${reportRel}`);
-  }
+if (reportAbs) {
   mkdirSync(dirname(reportAbs), { recursive: true });
   writeFileSync(reportAbs, `${JSON.stringify(report, null, 2)}\n`);
 }

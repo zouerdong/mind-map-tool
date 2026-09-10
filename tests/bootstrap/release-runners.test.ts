@@ -701,6 +701,47 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
     });
 
+    it("--after 不是明确 UTC ISO 时拒绝，不把本地时间冒充 Z", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-local-time-repo");
+      const res = runNode(REPACK_DMG, [
+        "--input",
+        REPACK_DMG_REL,
+        "--format",
+        "ULMO",
+        "--scope-from",
+        regPath,
+        "--root",
+        repoDir,
+        "--after",
+        "2026-09-10T03:14:01+08:00",
+        "--hdiutil",
+        mockHdiutil,
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("必须是 UTC ISO");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("未批准的 report 路径在转换前拒绝，原 DMG 不变", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-report-scope-repo");
+      const res = runRepack(repoDir, regPath, mockHdiutil, [
+        "--report",
+        "docs/unapproved-repack-report.json",
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("report 路径不在 G2 批准");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
+    it("转换开始前 worktree 非 clean 时拒绝，原 DMG 不变", () => {
+      const { repoDir, regPath, mockHdiutil, dmgPath } = setup("repack-pre-dirty-repo");
+      writeFileSync(join(repoDir, "untracked-before-repack.txt"), "dirty");
+      const res = runRepack(repoDir, regPath, mockHdiutil);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("转换开始前 worktree 非 clean");
+      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+    });
+
     it("临时目标预存时 fail-closed", () => {
       const { repoDir, regPath, mockHdiutil } = setup("repack-tmp-exists-repo");
       const tmpPath = join(repoDir, REPACK_DMG_REL).replace(/\.dmg$/, ".repack-ULMO.tmp.dmg");
@@ -751,7 +792,7 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
         MOCK_TOUCH_DIRTY: join(repoDir, "untracked-dirty.txt"),
       });
       expect(res.status).toBe(1);
-      expect(res.stderr).toContain("worktree 非 clean");
+      expect(res.stderr).toContain("source commit/worktree 发生变化");
       // 原 DMG 已被替换（rename 先于 git 复核），但流程报 FAIL，候选不得被采信；
       // 残留的 untracked 文件证明检测生效。
       expect(existsSync(join(repoDir, "untracked-dirty.txt"))).toBe(true);

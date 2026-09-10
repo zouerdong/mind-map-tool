@@ -225,6 +225,32 @@ if (dmgFormat) {
     console.error("bundle-gate: FAIL — repack-dmg 报告 JSON 解析失败");
     process.exit(1);
   }
+  const expectedRepackSha256 = computeFileSha256(REPACK_PATH);
+  const repackStartedMs = Date.parse(dmgRepack?.startedAt);
+  const repackFinishedMs = Date.parse(dmgRepack?.finishedAt);
+  const buildStartedMs = Date.parse(buildStartedAt);
+  const reportShapeValid =
+    dmgRepack?.runner === "repack-dmg.mjs" &&
+    dmgRepack?.runnerSha256 === expectedRepackSha256 &&
+    dmgRepack?.input === approvedDmgs[0] &&
+    dmgRepack?.dmgFormat === dmgFormat &&
+    dmgRepack?.gitHead === gitHead &&
+    /^[0-9a-f]{64}$/.test(dmgRepack?.beforeSha256 ?? "") &&
+    /^[0-9a-f]{64}$/.test(dmgRepack?.afterSha256 ?? "") &&
+    dmgRepack?.beforeSha256 !== dmgRepack?.afterSha256 &&
+    Number.isSafeInteger(dmgRepack?.beforeBytes) &&
+    dmgRepack.beforeBytes > 0 &&
+    Number.isSafeInteger(dmgRepack?.afterBytes) &&
+    dmgRepack.afterBytes > 0 &&
+    Number.isFinite(repackStartedMs) &&
+    Number.isFinite(repackFinishedMs) &&
+    repackStartedMs >= buildStartedMs &&
+    repackFinishedMs >= repackStartedMs &&
+    repackFinishedMs <= Date.now();
+  if (!reportShapeValid) {
+    console.error("bundle-gate: FAIL — repack-dmg 报告字段、runner hash 或时间拓扑无效");
+    process.exit(1);
+  }
   // 转换后 source/worktree 再复核：转换期间仓库发生变化即 fail-closed。
   const gitHeadAfterRepack = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: ROOT,
@@ -283,6 +309,20 @@ for (const relEntry of currentEntries) {
 for (const approvedPath of validated.normalized.candidateOutputPaths) {
   if (!candidateArtifacts.some((artifact) => artifact.path === approvedPath)) {
     console.error(`bundle-gate: FAIL — 本次构建缺少 G2 批准的候选产物: ${approvedPath}`);
+    process.exit(1);
+  }
+}
+
+if (dmgRepack) {
+  const finalDmg = candidateArtifacts.find((artifact) => artifact.path === dmgRepack.input);
+  if (
+    !finalDmg ||
+    finalDmg.sha256 !== dmgRepack.afterSha256 ||
+    finalDmg.sizeBytes !== dmgRepack.afterBytes
+  ) {
+    console.error(
+      "bundle-gate: FAIL — 最终 DMG 盘点结果与 repack after hash/bytes 不一致，候选不可归因",
+    );
     process.exit(1);
   }
 }
