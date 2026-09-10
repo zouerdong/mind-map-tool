@@ -1,9 +1,10 @@
 // bundle-gate.mjs — 打包 fail-closed 门（PRC-055 契约）。
 // 强制校验 G2 scope（build 动作授权与 candidate-root 边界），检测到签名配置/凭据即拒绝。
 // 构建完成后盘点批准目录内的新产物，生成 inventory 与 hash。
-// --dmg-format ULMO（PRR-069 / ADR 0013）：在盘点前把本轮唯一 DMG 原位转换为
-// 目标容器压缩格式；转换失败即整体失败，不回退 UDZO。
-// 用法：node bundle-gate.mjs --host tauri [--scope-from <register>] [--candidate-root <path>] [--dmg-format ULMO] -- <tauri-build-command>
+// --assemble-dmg（PRR-069C / ADR 0013 v1.1.0）：正式路径只做 app-only build，
+// 再由 assemble-dmg.mjs 从本轮 .app 装配 ULMO DMG；装配失败即整体失败，不回退、不复用旧 DMG。
+// 用法：node bundle-gate.mjs --host tauri [--scope-from <register>] [--candidate-root <path>]
+//           [--assemble-dmg --dmg-format ULMO --work-dir <.tmp/...>] -- <app-only-build-command>
 
 import { spawnSync, execFileSync } from "node:child_process";
 import { existsSync, readdirSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
@@ -20,7 +21,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
-const REPACK_PATH = resolve(HERE, "repack-dmg.mjs");
+const ASSEMBLER_PATH = resolve(HERE, "assemble-dmg.mjs");
 
 const args = process.argv.slice(2);
 
@@ -37,19 +38,37 @@ const host = flag("host");
 const scopeFrom = flag("scope-from") ?? "docs/decisions/decision-register.json";
 const candidateRoot = flag("candidate-root") ?? "apps/desktop/src-tauri/target/release/bundle";
 const inventoryOutput = flag("inventory");
-// PRR-069：DMG 容器格式必须由正式命令显式声明（如 --dmg-format ULMO），
-// 不读环境变量、无隐式默认；缺省时不做转换（非发布路径的旧用法保持原语义）。
-// --repack-hdiutil 是测试注入入口（透传 repack-dmg 的 --hdiutil），生产调用不传。
+// PRR-069C / ADR 0013 v1.1.0：正式 DMG 由仓库受控 assembler 从本轮 .app 装配。
+// --assemble-dmg 显式开启装配阶段，并强制声明 --dmg-format ULMO；缺省时不做 DMG 处理
+// （非发布路径的旧用法保持原语义）。--work-dir 是 assembler 的任务临时工作目录。
+const assembleDmg = args.includes("--assemble-dmg");
 const dmgFormat = flag("dmg-format");
-const repackHdiutil = flag("repack-hdiutil");
+const workDir = flag("work-dir");
 const dashdash = args.indexOf("--");
 const command = dashdash === -1 ? [] : args.slice(dashdash + 1);
 
+// 以下均为测试注入入口，生产调用不传；默认使用真实 assembler 与系统工具。
+const assemblerScript = flag("assembler-script");
+const assemblerToolDir = flag("assembler-tool-dir");
+const assemblerTimeoutMs = flag("assembler-timeout-ms");
+const assemblerDeadlineMs = flag("assembler-deadline-ms");
+
 if (!host || command.length === 0) {
   console.error(
-    "usage: bundle-gate.mjs --host <tauri|electron> [--scope-from <register>] [--candidate-root <path>] -- <command...>",
+    "usage: bundle-gate.mjs --host <tauri|electron> [--scope-from <register>] [--candidate-root <path>] " +
+      "[--assemble-dmg --dmg-format ULMO --work-dir <.tmp/...>] -- <command...>",
   );
   process.exit(2);
+}
+if (assembleDmg && dmgFormat !== "ULMO") {
+  console.error("bundle-gate: BLOCKED — --assemble-dmg 必须与 --dmg-format ULMO 同时声明");
+  process.exit(1);
+}
+if (assembleDmg && !workDir) {
+  console.error(
+    "bundle-gate: BLOCKED — --assemble-dmg 必须声明 --work-dir <repo-relative .tmp/...>",
+  );
+  process.exit(1);
 }
 
 // 1. 校验 G2 scope 与 build action 授权
@@ -168,22 +187,42 @@ if (gitHeadAfter !== gitHead || sourceStatusAfter.length > 0) {
   process.exit(1);
 }
 
-// 4b. PRR-069 / ADR 0013：在盘点（inventory hash 计算）之前，把本轮唯一
-// 批准的 DMG 原位转换为目标容器压缩格式。转换由 repack-dmg.mjs fail-closed
-// 执行；任何失败都让本轮整体失败，绝不回退 UDZO 后写 PASS。
-let dmgRepack = null;
-if (dmgFormat) {
+// 4b. PRR-069C / ADR 0013 v1.1.0：app-only build 成功后，由仓库受控 assembler
+// 从本轮刷新的 .app 装配最终 ULMO DMG（不调用 Tauri dmg target、Finder、AppleScript）。
+// assembler 的任何失败都让本轮整体失败，不回退、不复用旧 DMG。
+let dmgAssembly = null;
+if (assembleDmg) {
   const approvedDmgs = validated.normalized.candidateOutputPaths.filter((p) => p.endsWith(".dmg"));
-  if (approvedDmgs.length !== 1) {
+  const approvedApps = validated.normalized.candidateOutputPaths.filter((p) => p.endsWith(".app"));
+  if (approvedDmgs.length !== 1 || approvedApps.length !== 1) {
     console.error(
-      `bundle-gate: FAIL — G2 批准的 DMG 候选不是恰好一个（得到 ${approvedDmgs.length} 个），拒绝 glob 猜测转换目标`,
+      `bundle-gate: FAIL — G2 批准的 .app/.dmg 候选必须各恰好一个（得到 app=${approvedApps.length}, dmg=${approvedDmgs.length}），拒绝 glob 猜测装配目标`,
     );
     process.exit(1);
   }
-  const repackArgs = [
-    REPACK_PATH,
-    "--input",
+  let safeWorkDir;
+  try {
+    safeWorkDir = validateSafePath(workDir, ROOT, "work-dir");
+  } catch (err) {
+    console.error(`bundle-gate: BLOCKED — work-dir 无效: ${err.message}`);
+    process.exit(1);
+  }
+  const assemblerPath = assemblerScript ? resolve(ROOT, assemblerScript) : ASSEMBLER_PATH;
+  if (!existsSync(assemblerPath)) {
+    console.error(`bundle-gate: BLOCKED — assembler 不存在: ${relative(ROOT, assemblerPath)}`);
+    process.exit(1);
+  }
+  const assemblyReportRel = inventoryOutputRel
+    ? join(dirname(inventoryOutputRel), "dmg-assembly-report.json")
+    : null;
+  const assemblerArgs = [
+    assemblerPath,
+    "--app",
+    approvedApps[0],
+    "--output",
     approvedDmgs[0],
+    "--work-dir",
+    safeWorkDir,
     "--format",
     dmgFormat,
     "--scope-from",
@@ -193,76 +232,96 @@ if (dmgFormat) {
     "--root",
     ROOT,
   ];
-  let repackReportPath = null;
-  if (inventoryOutputRel) {
-    repackReportPath = join(dirname(inventoryOutputRel), "dmg-repack-report.json");
-    repackArgs.push("--report", repackReportPath);
-  }
-  if (repackHdiutil) repackArgs.push("--hdiutil", repackHdiutil);
-  const repackResult = spawnSync(process.execPath, repackArgs, {
+  if (assemblyReportRel) assemblerArgs.push("--report", assemblyReportRel);
+  if (assemblerToolDir) assemblerArgs.push("--tool-dir", assemblerToolDir);
+  if (assemblerTimeoutMs) assemblerArgs.push("--timeout-ms", assemblerTimeoutMs);
+  if (assemblerDeadlineMs) assemblerArgs.push("--deadline-ms", assemblerDeadlineMs);
+  const assemblerBudgetMs = Number(assemblerDeadlineMs ?? 180000);
+  const assemblerResult = spawnSync(process.execPath, assemblerArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    timeout: assemblerBudgetMs + 30000,
+    killSignal: "SIGKILL",
   });
-  if ((repackResult.status ?? 1) !== 0) {
-    console.error("bundle-gate: FAIL — DMG 容器格式转换失败，本轮候选作废（不回退原格式）");
-    console.error(repackResult.stderr || repackResult.stdout);
-    process.exit(repackResult.status ?? 1);
+  if ((assemblerResult.status ?? 1) !== 0) {
+    console.error("bundle-gate: FAIL — DMG 装配失败，本轮候选作废（不回退、不复用旧 DMG）");
+    console.error((assemblerResult.stderr || assemblerResult.stdout || "").trim());
+    process.exit(assemblerResult.status ?? 1);
   }
-  // 解析 repack stdout 的单行 JSON 报告并嵌入 inventory 证据链。
-  const reportLine = (repackResult.stdout || "")
+  const reportLine = (assemblerResult.stdout || "")
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.startsWith("{"))
     .pop();
   if (!reportLine) {
-    console.error("bundle-gate: FAIL — repack-dmg 未输出可解析的 JSON 报告");
+    console.error("bundle-gate: FAIL — assemble-dmg 未输出可解析的 JSON 报告");
     process.exit(1);
   }
   try {
-    dmgRepack = JSON.parse(reportLine);
+    dmgAssembly = JSON.parse(reportLine);
   } catch {
-    console.error("bundle-gate: FAIL — repack-dmg 报告 JSON 解析失败");
+    console.error("bundle-gate: FAIL — assemble-dmg 报告 JSON 解析失败");
     process.exit(1);
   }
-  const expectedRepackSha256 = computeFileSha256(REPACK_PATH);
-  const repackStartedMs = Date.parse(dmgRepack?.startedAt);
-  const repackFinishedMs = Date.parse(dmgRepack?.finishedAt);
+  const expectedAssemblerSha256 = computeFileSha256(assemblerPath);
+  const assemblyStartedMs = Date.parse(dmgAssembly?.startedAt);
+  const assemblyFinishedMs = Date.parse(dmgAssembly?.finishedAt);
   const buildStartedMs = Date.parse(buildStartedAt);
+  const licenseSha256 = computeFileSha256(resolve(ROOT, "LICENSE"));
   const reportShapeValid =
-    dmgRepack?.runner === "repack-dmg.mjs" &&
-    dmgRepack?.runnerSha256 === expectedRepackSha256 &&
-    dmgRepack?.input === approvedDmgs[0] &&
-    dmgRepack?.dmgFormat === dmgFormat &&
-    dmgRepack?.gitHead === gitHead &&
-    /^[0-9a-f]{64}$/.test(dmgRepack?.beforeSha256 ?? "") &&
-    /^[0-9a-f]{64}$/.test(dmgRepack?.afterSha256 ?? "") &&
-    dmgRepack?.beforeSha256 !== dmgRepack?.afterSha256 &&
-    Number.isSafeInteger(dmgRepack?.beforeBytes) &&
-    dmgRepack.beforeBytes > 0 &&
-    Number.isSafeInteger(dmgRepack?.afterBytes) &&
-    dmgRepack.afterBytes > 0 &&
-    Number.isFinite(repackStartedMs) &&
-    Number.isFinite(repackFinishedMs) &&
-    repackStartedMs >= buildStartedMs &&
-    repackFinishedMs >= repackStartedMs &&
-    repackFinishedMs <= Date.now();
+    dmgAssembly?.runner === "assemble-dmg.mjs" &&
+    dmgAssembly?.runnerSha256 === expectedAssemblerSha256 &&
+    dmgAssembly?.gitHead === gitHead &&
+    dmgAssembly?.sourceWorktree === "clean" &&
+    dmgAssembly?.dmgFormat === dmgFormat &&
+    dmgAssembly?.output?.path === approvedDmgs[0] &&
+    /^[0-9a-f]{64}$/.test(dmgAssembly?.output?.sha256 ?? "") &&
+    Number.isSafeInteger(dmgAssembly?.output?.bytes) &&
+    dmgAssembly.output.bytes > 0 &&
+    dmgAssembly?.inputs?.app?.path === approvedApps[0] &&
+    /^[0-9a-f]{64}$/.test(dmgAssembly?.inputs?.app?.sha256 ?? "") &&
+    dmgAssembly?.inputs?.license?.path === "LICENSE" &&
+    dmgAssembly?.inputs?.license?.sha256 === licenseSha256 &&
+    /^[0-9a-f]{64}$/.test(dmgAssembly?.inputs?.icon?.sha256 ?? "") &&
+    dmgAssembly?.eula?.preMountDisplayVerified === true &&
+    dmgAssembly?.eula?.imageInfoDeclaresAgreement === true &&
+    dmgAssembly?.eula?.licenseSha256 === licenseSha256 &&
+    dmgAssembly?.eula?.resourceSha256 === licenseSha256 &&
+    dmgAssembly?.checks?.format === dmgFormat &&
+    dmgAssembly?.checks?.crc32 === "VALID" &&
+    dmgAssembly?.checks?.payloadAppSha256 === dmgAssembly?.inputs?.app?.sha256 &&
+    dmgAssembly?.checks?.volumeIconSha256 === dmgAssembly?.inputs?.icon?.sha256 &&
+    Number.isSafeInteger(dmgAssembly?.timeoutMs) &&
+    Number.isSafeInteger(dmgAssembly?.deadlineMs) &&
+    Array.isArray(dmgAssembly?.commands) &&
+    dmgAssembly.commands.length > 0 &&
+    dmgAssembly.commands.every(
+      (c) => typeof c?.tool === "string" && Array.isArray(c?.args) && c?.timedOut === false,
+    ) &&
+    Number.isFinite(assemblyStartedMs) &&
+    Number.isFinite(assemblyFinishedMs) &&
+    assemblyStartedMs >= buildStartedMs &&
+    assemblyFinishedMs >= assemblyStartedMs &&
+    assemblyFinishedMs <= Date.now();
   if (!reportShapeValid) {
-    console.error("bundle-gate: FAIL — repack-dmg 报告字段、runner hash 或时间拓扑无效");
+    console.error(
+      "bundle-gate: FAIL — assemble-dmg 报告字段、runner hash、EULA/LICENSE 绑定或时间拓扑无效",
+    );
     process.exit(1);
   }
-  // 转换后 source/worktree 再复核：转换期间仓库发生变化即 fail-closed。
-  const gitHeadAfterRepack = execFileSync("git", ["rev-parse", "HEAD"], {
+  // 装配后 source/worktree 再复核：装配期间仓库发生变化即 fail-closed。
+  const gitHeadAfterAssembly = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: ROOT,
     encoding: "utf8",
   }).trim();
-  const sourceStatusAfterRepack = execFileSync(
+  const sourceStatusAfterAssembly = execFileSync(
     "git",
     ["status", "--porcelain=v1", "--untracked-files=all"],
     { cwd: ROOT, encoding: "utf8" },
   ).trim();
-  if (gitHeadAfterRepack !== gitHead || sourceStatusAfterRepack.length > 0) {
-    console.error("bundle-gate: FAIL — DMG 转换期间 source commit/worktree 发生变化，候选不可归因");
+  if (gitHeadAfterAssembly !== gitHead || sourceStatusAfterAssembly.length > 0) {
+    console.error("bundle-gate: FAIL — DMG 装配期间 source commit/worktree 发生变化，候选不可归因");
     process.exit(1);
   }
 }
@@ -313,15 +372,15 @@ for (const approvedPath of validated.normalized.candidateOutputPaths) {
   }
 }
 
-if (dmgRepack) {
-  const finalDmg = candidateArtifacts.find((artifact) => artifact.path === dmgRepack.input);
+if (dmgAssembly) {
+  const finalDmg = candidateArtifacts.find((artifact) => artifact.path === dmgAssembly.output.path);
   if (
     !finalDmg ||
-    finalDmg.sha256 !== dmgRepack.afterSha256 ||
-    finalDmg.sizeBytes !== dmgRepack.afterBytes
+    finalDmg.sha256 !== dmgAssembly.output.sha256 ||
+    finalDmg.sizeBytes !== dmgAssembly.output.bytes
   ) {
     console.error(
-      "bundle-gate: FAIL — 最终 DMG 盘点结果与 repack after hash/bytes 不一致，候选不可归因",
+      "bundle-gate: FAIL — 最终 DMG 盘点结果与 assemble-dmg 输出 hash/bytes 不一致，候选不可归因",
     );
     process.exit(1);
   }
@@ -349,7 +408,7 @@ function artifactLatestMtimeMs(path) {
 
 // 时间拓扑：inventory 的时间必须覆盖 repack 完成点（PRR-069 要求
 // bundle start <= bundle finish 对含转换的完整流程成立）。
-const inventoryFinishedAt = dmgRepack ? dmgRepack.finishedAt : buildFinishedAt;
+const inventoryFinishedAt = dmgAssembly ? dmgAssembly.finishedAt : buildFinishedAt;
 const inventory = {
   sourceCommit: gitHead,
   sourceWorktree: "clean",
@@ -361,7 +420,7 @@ const inventory = {
   generatedAt: inventoryFinishedAt,
   startedAt: buildStartedAt,
   finishedAt: inventoryFinishedAt,
-  ...(dmgFormat ? { dmgFormat, dmgRepack } : {}),
+  ...(dmgAssembly ? { dmgFormat, dmgAssembly } : {}),
   newEntries,
   artifacts: candidateArtifacts,
 };
@@ -373,9 +432,12 @@ if (inventoryOutputRel) {
 }
 
 console.log(`bundle-gate: PASS — 成功构建并盘点 ${candidateArtifacts.length} 个候选产物`);
-if (dmgFormat) {
+if (dmgAssembly) {
   console.log(
-    `  dmgFormat=${dmgFormat} (repack ${dmgRepack?.beforeBytes ?? "?"}B -> ${dmgRepack?.afterBytes ?? "?"}B)`,
+    `  dmgAssembly: dmgFormat=${dmgFormat} runner=${dmgAssembly.runner} ` +
+      `(${dmgAssembly.output.bytes}B, elapsed ${dmgAssembly.elapsedMs}ms, eula=${
+        dmgAssembly.eula.licenseSha256 === dmgAssembly.eula.resourceSha256 ? "bound" : "?"
+      })`,
   );
 }
 for (const art of candidateArtifacts) {

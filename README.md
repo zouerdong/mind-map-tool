@@ -24,7 +24,7 @@ node scripts/quality/check-boundaries.mjs --scope selected-canvas   # 架构边�
 node scripts/quality/scan-dependency-licenses.mjs                   # 依赖许可扫描
 source ~/.cargo/env && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml  # Rust 侧
 
-pnpm bundle:tauri                # 候选构建（由 bundle-gate 严格校验 G2 授权与 candidate-root 边界；检测到签名配置/凭据即 fail-closed，“unsigned”由签名提示门保证；--dmg-format ULMO 在盘点前把本轮唯一 DMG 转换为 ULMO 容器压缩，失败即整体失败不回退）
+pnpm bundle:tauri                # 候选构建（由 bundle-gate 严格校验 G2 授权与 candidate-root 边界；检测到签名配置/凭据即 fail-closed，“unsigned”由签名提示门保证；Tauri 只构建 app-only，再由 scripts/quality/assemble-dmg.mjs 用 macOS 系统工具装配 ULMO DMG（含 Applications 链接、卷图标与根 LICENSE 生成的挂载前 EULA）；正式路径不调用 Finder/AppleScript、不读不写 .DS_Store，装配失败即整体失败且不回退）
 pnpm test:install:tauri         # 安装门（默认 --plan 零写入干运行；--execute 在 G2 批准的 deletionBoundaries 内沙箱验证）
 ```
 

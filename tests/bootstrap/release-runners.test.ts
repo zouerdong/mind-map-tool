@@ -1,12 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, chmodSync } from "node:fs";
+import {
+  writeFileSync,
+  readFileSync,
+  mkdirSync,
+  rmSync,
+  existsSync,
+  chmodSync,
+  readdirSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve, join, dirname, relative } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
 const REPACK_DMG = resolve(ROOT, "scripts/quality/repack-dmg.mjs");
+const ASSEMBLE_DMG = resolve(ROOT, "scripts/quality/assemble-dmg.mjs");
+const EULA_RESOURCE = resolve(ROOT, "scripts/quality/eula-resource.mjs");
+const PACKAGE_JSON = resolve(ROOT, "package.json");
 const INSTALL_GATE = resolve(ROOT, "scripts/quality/install-gate.mjs");
 const PERF_RUNNER = resolve(ROOT, "scripts/quality/run-performance.mjs");
 const FIXTURE_DIR = resolve(ROOT, ".tmp/release-runner-fixtures");
@@ -129,11 +140,16 @@ exit 0
  * 构造一个独立的 clean git 仓库（.gitignore 忽略 .tmp/ 产物），供 bundle-gate
  * 通过 --root 复算 clean-worktree 前置；真实仓库工作树不要求 clean。
  */
-function createCleanGitRepo(name: string): string {
+function createCleanGitRepo(name: string, extraFiles: Record<string, string> = {}): string {
   const repoDir = join(FIXTURE_DIR, name);
   rmSync(repoDir, { recursive: true, force: true });
   mkdirSync(join(repoDir, ".tmp/release-runner-fixtures"), { recursive: true });
   writeFileSync(join(repoDir, ".gitignore"), ".tmp/\n");
+  for (const [rel, content] of Object.entries(extraFiles)) {
+    const target = join(repoDir, rel);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
   const gitEnv = {
     ...process.env,
     GIT_AUTHOR_NAME: "fixture",
@@ -142,7 +158,7 @@ function createCleanGitRepo(name: string): string {
     GIT_COMMITTER_EMAIL: "fixture@example.invalid",
   };
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repoDir });
-  execFileSync("git", ["add", ".gitignore"], { cwd: repoDir });
+  execFileSync("git", ["add", "-A"], { cwd: repoDir });
   execFileSync("git", ["commit", "-q", "-m", "fixture init", "--allow-empty"], {
     cwd: repoDir,
     env: gitEnv,
@@ -207,6 +223,296 @@ function createSyntheticDmg(repoDir: string, content = "synthetic udzo dmg"): st
 }
 
 const REPACK_DMG_REL = ".tmp/release-runner-fixtures/bundle/dmg/Mind Map_0.1.0_aarch64.dmg";
+
+// ==================== PRR-069C 合成工具链 ====================
+// 用仓库内合成脚本替身模拟 hdiutil/ditto/SetFile/mount/plutil/lipo/xattr，
+// 让 assemble-dmg 的编排、超时与 fail-closed 分支可以在不真实挂载的前提下被验证。
+// 真实挂载链路由三轮正式预检在真机上证明。
+const MOCK_CORE_SOURCE = `
+import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// 合成工具链：镜像是自描述的（内容即 JSON 状态文件），因此 rename/移动后仍可复核，
+// 与 "hdiutil 只认镜像本身" 的真实语义一致。挂载表另存于 state 文件。
+const DIR = dirname(fileURLToPath(import.meta.url));
+const STATE_PATH = join(DIR, "mock-state.json");
+const tool = process.argv[2];
+const args = process.argv.slice(3);
+const env = process.env;
+
+function loadState() {
+  if (!existsSync(STATE_PATH)) return { mounts: {}, calls: [] };
+  return JSON.parse(readFileSync(STATE_PATH, "utf8"));
+}
+function saveState(state) { writeFileSync(STATE_PATH, JSON.stringify(state, null, 2)); }
+function readImage(path) {
+  if (!path || !existsSync(path)) return null;
+  try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; }
+}
+function writeImage(path, image) {
+  const json = JSON.stringify(image);
+  writeFileSync(path, env.MOCK_BLOATED ? json + " ".repeat(Math.max(0, 25000001 - json.length)) : json);
+}
+function flagValue(name) { const i = args.indexOf(name); return i === -1 ? null : args[i + 1] ?? ""; }
+function last() { return args[args.length - 1]; }
+function die(code, msg) { process.stderr.write(msg + "\\n"); process.exit(code); }
+function sleepForever() { const end = Date.now() + 3600000; while (Date.now() < end) { /* hang */ } }
+function copyTree(from, to) {
+  if (!from) throw new Error("mock: image has no contents");
+  mkdirSync(to, { recursive: true });
+  cpSync(from, to, { recursive: true, verbatimSymlinks: true });
+}
+// 从 udifrez XML 中取出 TEXT 5000 正文，供 attach 的挂载前许可展示使用。
+function licenseTextFromXml(xml) {
+  const section = /<key>TEXT<\\/key>\\s*<array>([\\s\\S]*?)<\\/array>/.exec(xml);
+  if (!section) return null;
+  for (const dict of section[1].matchAll(/<dict>([\\s\\S]*?)<\\/dict>/g)) {
+    const id = /<key>ID<\\/key>\\s*<string>([^<]*)</.exec(dict[1]);
+    const data = /<data>\\s*([A-Za-z0-9+/=\\s]+?)\\s*<\\/data>/.exec(dict[1]);
+    if (id && id[1] === "5000" && data) {
+      return Buffer.from(data[1].replace(/\\s+/g, ""), "base64").toString("utf8");
+    }
+  }
+  return null;
+}
+
+const state = loadState();
+state.calls.push({ tool, args });
+
+if (tool === "hdiutil") {
+  const cmd = args[0];
+  if (cmd === "create") {
+    if (env.MOCK_CREATE_FAIL) die(3, "mock create failure");
+    if (env.MOCK_CREATE_HANG) sleepForever();
+    writeImage(last(), {
+      format: flagValue("-format"),
+      contents: resolve(flagValue("-srcfolder")),
+      eulaText: null,
+    });
+    saveState(state);
+    process.exit(0);
+  }
+  if (cmd === "attach") {
+    if (env.MOCK_ATTACH_FAIL) die(4, "mock attach failure");
+    if (env.MOCK_ATTACH_HANG) sleepForever();
+    const imagePath = resolve(last());
+    const image = readImage(imagePath);
+    if (!image) die(7, "mock attach: not a mock image");
+    const stdin = readFileSync(0, "utf8");
+    if (image.eulaText && !env.MOCK_NO_EULA_GATE && !/Y/i.test(stdin)) {
+      process.stdout.write(image.eulaText + "\\nAgree Y/N?\\n");
+      process.exit(1);
+    }
+    const mp = flagValue("-mountpoint");
+    if (env.MOCK_ATTACH_WRONG_MOUNTPOINT) {
+      process.stdout.write("/dev/disk9s1\\tApple_HFS\\t/tmp/somewhere-else\\n");
+      process.exit(0);
+    }
+    copyTree(image.contents, mp);
+    if (env.MOCK_ATTACH_EXTRA) writeFileSync(join(mp, env.MOCK_ATTACH_EXTRA), "extra");
+    if (env.MOCK_ATTACH_BAD_LINK) {
+      rmSync(join(mp, "Applications"), { force: true });
+      writeFileSync(join(mp, "Applications"), "");
+    }
+    if (env.MOCK_ATTACH_BAD_ICON) writeFileSync(join(mp, ".VolumeIcon.icns"), "tampered");
+    if (env.MOCK_ATTACH_TAMPER) {
+      writeFileSync(join(mp, "Mind Map.app/Contents/Info.plist"), '{"CFBundleIdentifier":"evil"}');
+    }
+    state.mounts[mp] = { device: "/dev/disk9s1", image: imagePath, readOnly: args.includes("-readonly") };
+    saveState(state);
+    process.stdout.write("/dev/disk9\\tGUID_partition_scheme\\t\\n");
+    process.stdout.write("/dev/disk9s1\\tApple_HFS\\t" + mp + "\\n");
+    process.exit(0);
+  }
+  if (cmd === "detach") {
+    if (env.MOCK_DETACH_FAIL) die(5, "mock detach failure");
+    const mount = state.mounts[args[1]];
+    if (mount && !mount.readOnly) {
+      // 可写卷卸载后镜像内容即挂载期间状态（含被删除的 .fseventsd）。
+      const image = readImage(mount.image);
+      if (image) writeImage(mount.image, { ...image, contents: args[1] });
+    }
+    delete state.mounts[args[1]];
+    saveState(state);
+    process.exit(0);
+  }
+  if (cmd === "convert") {
+    if (env.MOCK_CONVERT_FAIL) die(6, "mock convert failure");
+    const source = readImage(resolve(args[1]));
+    if (!source) die(6, "mock convert: not a mock image");
+    const out = resolve(flagValue("-o"));
+    writeImage(out, { ...source, format: flagValue("-format") });
+    process.exit(0);
+  }
+  if (cmd === "imageinfo") {
+    if (env.MOCK_INFO_FAIL) die(8, "mock imageinfo failure");
+    const image = readImage(resolve(last()));
+    process.stdout.write("Format: " + (env.MOCK_FORMAT || (image && image.format) || "UDZO") + "\\n");
+    process.stdout.write("Software License Agreement: " + (image && image.eulaText ? "true" : "false") + "\\n");
+    if (env.MOCK_SIGNED) process.stdout.write("Signed For: mock\\n");
+    process.exit(0);
+  }
+  if (cmd === "verify") {
+    if (env.MOCK_VERIFY_FAIL) die(9, "CRC32 mismatch");
+    if (!readImage(resolve(last()))) die(9, "mock verify: not a mock image");
+    process.stdout.write("已验证CRC32 $DEADBEEF\\n");
+    process.exit(0);
+  }
+  if (cmd === "udifrez") {
+    if (env.MOCK_UDIFREZ_FAIL) die(10, "mock udifrez failure");
+    const imagePath = resolve(last());
+    const image = readImage(imagePath);
+    if (!image) die(10, "mock udifrez: not a mock image");
+    if (!env.MOCK_UDIFREZ_NOOP) {
+      const xml = readFileSync(flagValue("-xml"), "utf8");
+      writeImage(imagePath, { ...image, eulaText: licenseTextFromXml(xml) });
+    }
+    process.exit(0);
+  }
+  if (cmd === "udifderez") {
+    const image = readImage(resolve(last()));
+    const text = (image && image.eulaText) || "";
+    const b64 = Buffer.from(env.MOCK_EULA_TAMPER ? "tampered license text" : text, "utf8").toString("base64");
+    process.stdout.write("<plist><dict><key>TEXT</key><array><dict>");
+    process.stdout.write("<key>Data</key><data>" + b64 + "</data>");
+    process.stdout.write("<key>ID</key><string>5000</string>");
+    process.stdout.write("</dict></array></dict></plist>\\n");
+    process.exit(0);
+  }
+  die(11, "mock hdiutil: unknown subcommand " + cmd);
+}
+
+if (tool === "ditto") {
+  if (env.MOCK_DITTO_FAIL) die(12, "mock ditto failure");
+  cpSync(args[0], args[1], { recursive: true, verbatimSymlinks: true });
+  process.exit(0);
+}
+if (tool === "SetFile") {
+  if (env.MOCK_SETFILE_FAIL) die(13, "mock SetFile failure");
+  process.exit(0);
+}
+if (tool === "mount") {
+  for (const mp of Object.keys(state.mounts)) {
+    process.stdout.write(state.mounts[mp].device + " on " + mp + " (hfs, local, read-only)\\n");
+  }
+  process.exit(0);
+}
+if (tool === "xattr") {
+  process.stdout.write(
+    env.MOCK_NO_ICON_FLAG
+      ? "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\\n00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\\n"
+      : "00 00 00 00 00 00 00 00 04 00 00 00 00 00 00 00\\n00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\\n",
+  );
+  process.exit(0);
+}
+if (tool === "plutil") {
+  process.stdout.write(readFileSync(last(), "utf8"));
+  process.exit(0);
+}
+if (tool === "lipo") {
+  process.stdout.write("arm64\\n");
+  process.exit(0);
+}
+die(14, "mock: unknown tool " + tool);
+`;
+
+function createMockToolchain(dir: string): string {
+  const toolDir = join(dir, "mock-tools");
+  mkdirSync(toolDir, { recursive: true });
+  writeFileSync(
+    join(toolDir, "mock-state.json"),
+    JSON.stringify({ images: {}, mounts: {}, calls: [] }),
+  );
+  writeFileSync(join(toolDir, "mock-core.mjs"), MOCK_CORE_SOURCE);
+  for (const tool of ["hdiutil", "ditto", "SetFile", "mount", "plutil", "lipo", "xattr"]) {
+    const p = join(toolDir, tool);
+    writeFileSync(
+      p,
+      `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(toolDir, "mock-core.mjs"))} ${tool} "$@"\n`,
+    );
+    chmodSync(p, 0o755);
+  }
+  return toolDir;
+}
+
+const ASSEMBLY_APP_REL = ".tmp/release-runner-fixtures/bundle/macos/Mind Map.app";
+const ASSEMBLY_DMG_REL = REPACK_DMG_REL;
+const ASSEMBLY_WORK_REL = ".tmp/release-runner-fixtures/work";
+
+/** 合成 .app：Info.plist 用 JSON 文本，供 mock plutil 直接回显后由 assembler 解析。 */
+function createAssemblyApp(appAbs: string, overrides: Record<string, string> = {}) {
+  mkdirSync(join(appAbs, "Contents/MacOS"), { recursive: true });
+  const plist = {
+    CFBundleIdentifier: "com.mindmap.desktop",
+    CFBundleExecutable: "mind-map",
+    CFBundleShortVersionString: "0.1.0",
+    CFBundleVersion: "0.1.0",
+    LSMinimumSystemVersion: "11.0",
+    ...overrides,
+  };
+  writeFileSync(join(appAbs, "Contents/Info.plist"), JSON.stringify(plist, null, 2));
+  const bin = join(appAbs, "Contents/MacOS/mind-map");
+  writeFileSync(bin, "#!/bin/sh\nexit 0\n");
+  chmodSync(bin, 0o755);
+}
+
+const ASSEMBLY_LICENSE_TEXT =
+  "Synthetic Assembly License\nCopyright (c) 2026 Example. All rights reserved.\nNo warranty of any kind is provided.\n";
+
+function createAssemblyFixture(name: string) {
+  const repoDir = createCleanGitRepo(name, {
+    LICENSE: ASSEMBLY_LICENSE_TEXT,
+    "apps/desktop/src-tauri/icons/icon.icns": "synthetic-icns-bytes",
+  });
+  const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
+  const toolDir = createMockToolchain(join(repoDir, ".tmp"));
+  createAssemblyApp(join(repoDir, ASSEMBLY_APP_REL));
+  return { repoDir, regPath, toolDir };
+}
+
+function assemblerArgs(
+  repoDir: string,
+  regPath: string,
+  toolDir: string,
+  overrides: Record<string, string | null> = {},
+) {
+  const merged: Record<string, string | null> = {
+    app: ASSEMBLY_APP_REL,
+    output: ASSEMBLY_DMG_REL,
+    "work-dir": ASSEMBLY_WORK_REL,
+    format: "ULMO",
+    after: "2020-01-01T00:00:00Z",
+    "scope-from": regPath,
+    root: repoDir,
+    "tool-dir": relative(repoDir, toolDir),
+    "timeout-ms": "5000",
+    "deadline-ms": "20000",
+    ...overrides,
+  };
+  const argv: string[] = [];
+  for (const [key, value] of Object.entries(merged)) {
+    if (value !== null) argv.push(`--${key}`, value);
+  }
+  return argv;
+}
+
+function runAssembler(
+  repoDir: string,
+  regPath: string,
+  toolDir: string,
+  overrides: Record<string, string | null> = {},
+  env: Record<string, string> = {},
+) {
+  return runNode(ASSEMBLE_DMG, assemblerArgs(repoDir, regPath, toolDir, overrides), env);
+}
+
+function readAssemblyReport(
+  repoDir: string,
+  rel = ".tmp/release-runner-fixtures/evidence/assembly-report.json",
+) {
+  return JSON.parse(readFileSync(join(repoDir, rel), "utf8"));
+}
 
 /** PRR-010 协议 mock：按 env 输出带 runId/generation 的 perf JSON 行。 */
 const PERF_PROTOCOL_BIN = `#!/bin/sh
@@ -450,20 +756,13 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
       expect(res.stderr).toContain("并非本次构建产生或刷新");
     });
 
-    it("PRR-069：--dmg-format ULMO 全链成功，inventory 绑定转换后 hash 与 repack 元数据", () => {
-      const repoDir = createCleanGitRepo("bundle-ulmo-ok-repo");
-      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
-      const mockHdiutil = createMockHdiutil(join(repoDir, ".tmp"));
-      const dmgPath = join(repoDir, REPACK_DMG_REL);
-      const dmgBeforeSha = (() => {
-        createSyntheticDmg(repoDir, "synthetic udzo dmg for ulmo");
-        return fileSha256(dmgPath);
-      })();
-      const bundleDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos");
+    it("PRR-069C：--assemble-dmg 全链成功，inventory 绑定 assembler 报告与 ULMO 输出", () => {
+      const { repoDir, regPath } = createAssemblyFixture("bundle-assemble-ok-repo");
       const inventoryPath = join(
         repoDir,
         ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
       );
+      const dmgPath = join(repoDir, ASSEMBLY_DMG_REL);
 
       const res = runNode(BUNDLE_GATE, [
         "--host",
@@ -474,48 +773,40 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
         regPath,
         "--candidate-root",
         ".tmp/release-runner-fixtures/bundle",
+        "--assemble-dmg",
         "--dmg-format",
         "ULMO",
-        "--repack-hdiutil",
-        mockHdiutil,
+        "--work-dir",
+        ASSEMBLY_WORK_REL,
+        "--assembler-tool-dir",
+        ".tmp/mock-tools",
         "--inventory",
         ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
         "--",
         process.execPath,
         "-e",
-        `const fs = require('fs');
-           fs.mkdirSync('${bundleDir}', { recursive: true });
-           fs.mkdirSync('${join(dmgPath, "..")}', { recursive: true });
-           fs.mkdirSync('${join(bundleDir, "Mind Map.app/Contents/MacOS")}', { recursive: true });
-           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/Info.plist")}', '<plist></plist>');
-           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/MacOS/mind-map")}', '#!/bin/sh\\nexit 0\\n');
-           fs.writeFileSync('${dmgPath}', 'synthetic udzo dmg for ulmo');`,
+        appBuildScript(repoDir),
       ]);
 
       expect(res.status).toBe(0);
-      expect(res.stdout).toContain("dmgFormat=ULMO");
+      expect(res.stdout).toContain("dmgAssembly");
       const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
       expect(inventory.dmgFormat).toBe("ULMO");
-      expect(inventory.dmgRepack.runner).toBe("repack-dmg.mjs");
-      expect(inventory.dmgRepack.afterSha256).not.toBe(dmgBeforeSha);
-      // inventory 的 artifact hash 必须是转换后文件（含 ULMO-CONVERTED 标记）
+      expect(inventory.dmgAssembly.runner).toBe("assemble-dmg.mjs");
+      expect(inventory.dmgAssembly.output.path).toBe(ASSEMBLY_DMG_REL);
+      expect(inventory.dmgAssembly.output.sha256).toBe(fileSha256(dmgPath));
+      expect(inventory.dmgAssembly.inputs.app.path).toBe(ASSEMBLY_APP_REL);
+      expect(inventory.dmgAssembly.inputs.license.path).toBe("LICENSE");
+      expect(inventory.dmgAssembly.checks.format).toBe("ULMO");
       const dmgArtifact = inventory.artifacts.find((a: any) => a.path.endsWith(".dmg"));
-      expect(dmgArtifact.sha256).toBe(fileSha256(dmgPath));
-      expect(dmgArtifact.sha256).not.toBe(dmgBeforeSha);
-      expect(dmgArtifact.sha256).toBe(inventory.dmgRepack.afterSha256);
-      expect(readFileSync(dmgPath, "utf8")).toContain("ULMO-CONVERTED");
-      expect(existsSync(dmgPath.replace(/\.dmg$/, ".repack-ULMO.tmp.dmg"))).toBe(false);
+      expect(dmgArtifact.sha256).toBe(inventory.dmgAssembly.output.sha256);
       expect(
-        existsSync(join(repoDir, ".tmp/release-runner-fixtures/evidence/dmg-repack-report.json")),
+        existsSync(join(repoDir, ".tmp/release-runner-fixtures/evidence/dmg-assembly-report.json")),
       ).toBe(true);
     });
 
-    it("PRR-069：repack 失败时 bundle gate 整体失败且不写 inventory（不回退 UDZO）", () => {
-      const repoDir = createCleanGitRepo("bundle-ulmo-fail-repo");
-      const regPath = createSyntheticRegister("approved", {}, join(repoDir, ".tmp"));
-      const mockHdiutil = createMockHdiutil(join(repoDir, ".tmp"));
-      const dmgPath = join(repoDir, REPACK_DMG_REL);
-      const bundleDir = join(repoDir, ".tmp/release-runner-fixtures/bundle/macos");
+    it("PRR-069C：assembler 失败时 bundle gate 整体失败且不写 inventory", () => {
+      const { repoDir, regPath } = createAssemblyFixture("bundle-assemble-fail-repo");
       const inventoryPath = join(
         repoDir,
         ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
@@ -532,31 +823,98 @@ describe("release-runners (PRC-055 CLI & 安全门契约)", () => {
           regPath,
           "--candidate-root",
           ".tmp/release-runner-fixtures/bundle",
+          "--assemble-dmg",
           "--dmg-format",
           "ULMO",
-          "--repack-hdiutil",
-          mockHdiutil,
+          "--work-dir",
+          ASSEMBLY_WORK_REL,
+          "--assembler-tool-dir",
+          ".tmp/mock-tools",
           "--inventory",
           ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
           "--",
           process.execPath,
           "-e",
-          `const fs = require('fs');
-           fs.mkdirSync('${bundleDir}', { recursive: true });
-           fs.mkdirSync('${join(dmgPath, "..")}', { recursive: true });
-           fs.mkdirSync('${join(bundleDir, "Mind Map.app/Contents/MacOS")}', { recursive: true });
-           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/Info.plist")}', '<plist></plist>');
-           fs.writeFileSync('${join(bundleDir, "Mind Map.app/Contents/MacOS/mind-map")}', '#!/bin/sh\\nexit 0\\n');
-           fs.writeFileSync('${dmgPath}', 'synthetic udzo dmg');`,
+          appBuildScript(repoDir),
         ],
         { MOCK_CONVERT_FAIL: "1" },
       );
 
       expect(res.status).not.toBe(0);
-      expect(res.stderr).toContain("DMG 容器格式转换失败");
+      expect(res.stderr).toContain("DMG 装配失败");
       expect(existsSync(inventoryPath)).toBe(false);
-      // 转换失败后原 DMG 内容保持原样（未被破坏、未被替换）
-      expect(readFileSync(dmgPath, "utf8")).toBe("synthetic udzo dmg");
+      expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+    });
+
+    it("PRR-069C：assembler 报告形状无效时 gate fail-closed，不写 inventory", () => {
+      const { repoDir, regPath } = createAssemblyFixture("bundle-assemble-bad-report-repo");
+      const inventoryPath = join(
+        repoDir,
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+      );
+      const fakeAssembler = join(repoDir, ".tmp/fake-assembler.mjs");
+      writeFileSync(
+        fakeAssembler,
+        `import { mkdirSync, writeFileSync } from "node:fs";
+         import { dirname } from "node:path";
+         const out = process.argv[process.argv.indexOf("--output") + 1];
+         mkdirSync(dirname(out), { recursive: true });
+         writeFileSync(out, "fake dmg");
+         console.log(JSON.stringify({ runner: "assemble-dmg.mjs", dmgFormat: "UDZO" }));\n`,
+      );
+
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--root",
+        repoDir,
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        ASSEMBLY_WORK_REL,
+        "--assembler-script",
+        ".tmp/fake-assembler.mjs",
+        "--inventory",
+        ".tmp/release-runner-fixtures/evidence/bundle-inventory.json",
+        "--",
+        process.execPath,
+        "-e",
+        appBuildScript(repoDir),
+      ]);
+
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("assemble-dmg 报告");
+      expect(existsSync(inventoryPath)).toBe(false);
+    });
+
+    it("PRR-069C：--assemble-dmg 缺 --dmg-format ULMO 或 --work-dir 时拒绝", () => {
+      const { repoDir, regPath } = createAssemblyFixture("bundle-assemble-args-repo");
+      for (const extra of [
+        ["--assemble-dmg", "--work-dir", ASSEMBLY_WORK_REL],
+        ["--assemble-dmg", "--dmg-format", "ULMO"],
+      ]) {
+        const res = runNode(BUNDLE_GATE, [
+          "--host",
+          "tauri",
+          "--root",
+          repoDir,
+          "--scope-from",
+          regPath,
+          "--candidate-root",
+          ".tmp/release-runner-fixtures/bundle",
+          ...extra,
+          "--",
+          process.execPath,
+          "-e",
+          "process.exit(0)",
+        ]);
+        expect(res.status).toBe(1);
+      }
     });
   });
 
@@ -1640,5 +1998,412 @@ exit 0
       expect(report.traceFailureCount).toBe(2);
       expect(report.samplingComplete).toBe(true);
     });
+  });
+});
+
+/** PRR-069C：合成 app-only build —— 只写 .app，不产生 DMG（DMG 由 assembler 装配）。 */
+function appBuildScript(repoDir: string, extra = "") {
+  const app = join(repoDir, ASSEMBLY_APP_REL);
+  const plist = JSON.stringify(
+    {
+      CFBundleIdentifier: "com.mindmap.desktop",
+      CFBundleExecutable: "mind-map",
+      CFBundleShortVersionString: "0.1.0",
+      CFBundleVersion: "0.1.0",
+      LSMinimumSystemVersion: "11.0",
+    },
+    null,
+    2,
+  );
+  return `const fs = require('fs');
+    fs.mkdirSync('${join(app, "Contents/MacOS")}', { recursive: true });
+    fs.writeFileSync('${join(app, "Contents/Info.plist")}', ${JSON.stringify(plist)});
+    fs.writeFileSync('${join(app, "Contents/MacOS/mind-map")}', '#!/bin/sh\\nexit 0\\n');
+    ${extra}`;
+}
+
+// ==================== 1c. assemble-dmg 测试（PRR-069C） ====================
+describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
+  beforeEach(() => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(FIXTURE_DIR, { recursive: true, force: true });
+    } catch {}
+  });
+
+  function setup(name: string) {
+    const fixture = createAssemblyFixture(name);
+    return fixture;
+  }
+
+  const REPORT_REL = ".tmp/release-runner-fixtures/evidence/assembly-report.json";
+
+  it("参数契约：缺 --app/--output/--work-dir/--after/--format 时 fail-closed", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-args-repo");
+    const base = [
+      "--root",
+      repoDir,
+      "--scope-from",
+      regPath,
+      "--tool-dir",
+      relative(repoDir, toolDir),
+    ];
+    const cases: Array<[string[], RegExp]> = [
+      [
+        [
+          "--output",
+          ASSEMBLY_DMG_REL,
+          "--work-dir",
+          ASSEMBLY_WORK_REL,
+          "--after",
+          "2020-01-01T00:00:00Z",
+          "--format",
+          "ULMO",
+        ],
+        /缺少 --app/,
+      ],
+      [
+        [
+          "--app",
+          ASSEMBLY_APP_REL,
+          "--work-dir",
+          ASSEMBLY_WORK_REL,
+          "--after",
+          "2020-01-01T00:00:00Z",
+          "--format",
+          "ULMO",
+        ],
+        /缺少 --output/,
+      ],
+      [
+        [
+          "--app",
+          ASSEMBLY_APP_REL,
+          "--output",
+          ASSEMBLY_DMG_REL,
+          "--after",
+          "2020-01-01T00:00:00Z",
+          "--format",
+          "ULMO",
+        ],
+        /缺少 --work-dir/,
+      ],
+      [
+        [
+          "--app",
+          ASSEMBLY_APP_REL,
+          "--output",
+          ASSEMBLY_DMG_REL,
+          "--work-dir",
+          ASSEMBLY_WORK_REL,
+          "--format",
+          "ULMO",
+        ],
+        /缺少 --after/,
+      ],
+      [
+        [
+          "--app",
+          ASSEMBLY_APP_REL,
+          "--output",
+          ASSEMBLY_DMG_REL,
+          "--work-dir",
+          ASSEMBLY_WORK_REL,
+          "--after",
+          "2020-01-01T00:00:00Z",
+        ],
+        /缺少 --format/,
+      ],
+    ];
+    for (const [extra, pattern] of cases) {
+      const res = runNode(ASSEMBLE_DMG, [...extra, ...base]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(pattern);
+    }
+  });
+
+  it("非 ULMO 目标格式与本地时间冒充 UTC 的 --after 都被拒绝", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-format-repo");
+    for (const format of ["UDZO", "udmo", "ulmo"]) {
+      const res = runAssembler(repoDir, regPath, toolDir, { format });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("不允许的 DMG 目标格式");
+    }
+    const res = runAssembler(repoDir, regPath, toolDir, { after: "2026-09-10 12:00:00" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("必须是 UTC ISO");
+  });
+
+  it("路径逃逸、work-dir 不在 .tmp/、work-dir 落入候选目录都被拒绝", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-path-repo");
+    const escaping = runAssembler(repoDir, regPath, toolDir, { app: "../../evil.app" });
+    expect(escaping.status).toBe(1);
+    expect(escaping.stderr).toMatch(/路径穿越|越界 repo root/);
+    const notTmp = runAssembler(repoDir, regPath, toolDir, { "work-dir": "docs/work" });
+    expect(notTmp.status).toBe(1);
+    expect(notTmp.stderr).toContain("必须位于仓库内被忽略的 .tmp/ 下");
+    const insideCandidate = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/bundle/dmg/work",
+    });
+    expect(insideCandidate.status).toBe(1);
+    expect(insideCandidate.stderr).toContain("不得位于候选产物目录内");
+  });
+
+  it("--output/--app 不在 G2 candidateOutputPaths 内时拒绝", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-scope-repo");
+    const outOfScope = runAssembler(repoDir, regPath, toolDir, {
+      output: ".tmp/release-runner-fixtures/bundle/dmg/Other.dmg",
+    });
+    expect(outOfScope.status).toBe(1);
+    expect(outOfScope.stderr).toMatch(/candidateOutputPaths/);
+  });
+
+  it("app 是符号链接 / 内含 .DS_Store / 早于 --after 时 fail-closed", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-app-repo");
+    const appAbs = join(repoDir, ASSEMBLY_APP_REL);
+
+    // symlink
+    const realApp = join(repoDir, ".tmp/real-app");
+    rmSync(appAbs, { recursive: true, force: true });
+    createAssemblyApp(realApp);
+    mkdirSync(dirname(appAbs), { recursive: true });
+    execFileSync("ln", ["-s", realApp, appAbs]);
+    const symlinkRes = runAssembler(repoDir, regPath, toolDir);
+    expect(symlinkRes.status).toBe(1);
+    expect(symlinkRes.stderr).toContain("不能是符号链接");
+    rmSync(appAbs, { force: true });
+
+    // .DS_Store inside app
+    createAssemblyApp(appAbs);
+    writeFileSync(join(appAbs, "Contents/.DS_Store"), "junk");
+    const dsRes = runAssembler(repoDir, regPath, toolDir);
+    expect(dsRes.status).toBe(1);
+    expect(dsRes.stderr).toContain(".DS_Store");
+    rmSync(join(appAbs, "Contents/.DS_Store"), { force: true });
+
+    // stale mtime
+    const stale = runAssembler(repoDir, regPath, toolDir, { after: "2099-01-01T00:00:00Z" });
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toContain("不是本轮构建刷新");
+  });
+
+  it("成功路径：输出 ULMO DMG，报告绑定 app/LICENSE/ICNS 与装配命令链", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-ok-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, { report: REPORT_REL });
+    if (res.status !== 0) console.log("DEBUG-OK>>>", res.stderr.slice(0, 900));
+    expect(res.status).toBe(0);
+    const report = readAssemblyReport(repoDir);
+    expect(report.runner).toBe("assemble-dmg.mjs");
+    expect(report.dmgFormat).toBe("ULMO");
+    expect(report.output.path).toBe(ASSEMBLY_DMG_REL);
+    expect(report.output.sha256).toBe(fileSha256(join(repoDir, ASSEMBLY_DMG_REL)));
+    expect(report.inputs.app.path).toBe(ASSEMBLY_APP_REL);
+    expect(report.inputs.license.path).toBe("LICENSE");
+    expect(report.inputs.license.sha256).toBe(fileSha256(join(repoDir, "LICENSE")));
+    expect(report.inputs.icon.path).toBe("apps/desktop/src-tauri/icons/icon.icns");
+    expect(report.eula.resourceSha256).toBe(report.eula.licenseSha256);
+    expect(report.eula.preMountDisplayVerified).toBe(true);
+    expect(report.checks.applicationsTarget).toBe("/Applications");
+    expect(report.checks.payloadAppSha256).toBe(report.inputs.app.sha256);
+    expect(report.checks.volumeIconSha256).toBe(report.inputs.icon.sha256);
+    // 每个命令都有参数数组与显式超时；没有 shell 拼接痕迹
+    expect(report.commands.length).toBeGreaterThan(5);
+    for (const c of report.commands) {
+      expect(Array.isArray(c.args)).toBe(true);
+      expect(c.timedOut).toBe(false);
+      expect(Number.isSafeInteger(c.timeoutMs)).toBe(true);
+    }
+    expect(report.commands.some((c: any) => c.tool === "hdiutil" && c.args[0] === "udifrez")).toBe(
+      true,
+    );
+    expect(report.commands.some((c: any) => c.args.includes("Journaled HFS+"))).toBe(true);
+    expect(Date.parse(report.finishedAt)).toBeGreaterThanOrEqual(Date.parse(report.startedAt));
+    // 成功路径清理掉本轮 staging
+    expect(res.stdout).toContain("assemble-dmg.mjs");
+    const workRoot = join(repoDir, ASSEMBLY_WORK_REL);
+    expect(!existsSync(workRoot) || readdirSync(workRoot).length === 0).toBe(true);
+  });
+
+  it("EULA：未同意时不得挂载；内容 hash 与根 LICENSE 不一致时失败", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-eula-repo");
+    const noGate = runAssembler(repoDir, regPath, toolDir, [], { MOCK_NO_EULA_GATE: "1" });
+    expect(noGate.status).toBe(1);
+    expect(noGate.stderr).toContain("挂载前 EULA 未生效");
+
+    const tampered = runAssembler(repoDir, regPath, toolDir, [], { MOCK_EULA_TAMPER: "1" });
+    expect(tampered.status).toBe(1);
+    expect(tampered.stderr).toContain("EULA 内容 hash");
+
+    const noEula = runAssembler(repoDir, regPath, toolDir, [], { MOCK_UDIFREZ_NOOP: "1" });
+    expect(noEula.status).toBe(1);
+    expect(noEula.stderr).toMatch(/未声明挂载前 EULA|挂载前 EULA 未生效/);
+  });
+
+  it("卷内容红灯：多余条目 / Applications 非链接 / 卷图标 hash / app payload / 身份字段", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-payload-repo");
+    const cases: Array<[Record<string, string>, RegExp]> = [
+      [{ MOCK_ATTACH_EXTRA: ".DS_Store" }, /卷根条目与预期不符/],
+      [{ MOCK_ATTACH_BAD_LINK: "1" }, /Applications (不是符号链接|链接目标不是)/],
+      [{ MOCK_ATTACH_BAD_ICON: "1" }, /卷图标 hash 与仓库固定 ICNS 不一致/],
+      [{ MOCK_NO_ICON_FLAG: "1" }, /卷图标属性未设置/],
+      [
+        { MOCK_ATTACH_TAMPER: "1" },
+        /身份字段与 app-only build 不一致|目录级 hash 与 app-only build 不一致/,
+      ],
+    ];
+    for (const [env, pattern] of cases) {
+      const res = runAssembler(repoDir, regPath, toolDir, [], env);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(pattern);
+      // 失败不得把半成品落到批准输出路径
+      expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+    }
+  });
+
+  it("工具红灯：create/convert/verify/imageinfo/Format/签名 都 fail-closed", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-tool-repo");
+    const cases: Array<[Record<string, string>, RegExp]> = [
+      [{ MOCK_CREATE_FAIL: "1" }, /退出码非零/],
+      [{ MOCK_CONVERT_FAIL: "1" }, /退出码非零/],
+      [{ MOCK_VERIFY_FAIL: "1" }, /CRC32/],
+      [{ MOCK_INFO_FAIL: "1" }, /退出码非零/],
+      [{ MOCK_FORMAT: "UDZO" }, /imageinfo 声明 Format=UDZO/],
+      [{ MOCK_SIGNED: "1" }, /签名或加密/],
+      [{ MOCK_UDIFREZ_FAIL: "1" }, /退出码非零/],
+    ];
+    for (const [env, pattern] of cases) {
+      const res = runAssembler(repoDir, regPath, toolDir, [], env);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(pattern);
+    }
+  });
+
+  it("detach 失败留下残留挂载时返回非零并保留现场", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-residual-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_DETACH_FAIL: "1" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/挂载未安全解除|退出码非零|STOP/);
+    expect(res.stderr).toContain("assemble-dmg: FAILURE");
+  });
+
+  it("体积超预算（>25,000,000B）时 fail-closed", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-budget-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_BLOATED: "1" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("超过 installer 预算 25000000");
+  });
+
+  it("合成 hanging tool 在约定超时内被终止，并输出可复算失败证据", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-timeout-repo");
+    const startedMs = Date.now();
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1500" },
+      {
+        MOCK_CREATE_HANG: "1",
+      },
+    );
+    const elapsedMs = Date.now() - startedMs;
+    expect(res.status).toBe(1);
+    expect(elapsedMs).toBeLessThan(30_000);
+    expect(res.stderr).toContain("子进程超时");
+    const failure = JSON.parse(res.stderr.split("assemble-dmg: FAILURE ")[1].split("\n")[0]);
+    expect(failure.status).toBe("failed");
+    expect(failure.commands.some((c: any) => c.timedOut === true)).toBe(true);
+    expect(failure.commands.find((c: any) => c.timedOut === true).args).toContain("-srcfolder");
+    expect(failure.preservedWorkDir).toBe(true);
+  });
+
+  it("report 已存在时拒绝覆盖既有证据；report 越出 evidenceOutputPaths 被拒绝", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-report-repo");
+    const first = runAssembler(repoDir, regPath, toolDir, { report: REPORT_REL });
+    expect(first.status).toBe(0);
+    const second = runAssembler(repoDir, regPath, toolDir, { report: REPORT_REL });
+    expect(second.status).toBe(1);
+    expect(second.stderr).toContain("拒绝覆盖既有证据");
+
+    const outside = runAssembler(repoDir, regPath, toolDir, {
+      report: "docs/assembly-report.json",
+    });
+    expect(outside.status).toBe(1);
+    expect(outside.stderr).toContain("不在 G2 批准的 evidenceOutputPaths 内");
+  });
+
+  it("worktree 非 clean 时拒绝装配", () => {
+    const { repoDir, regPath, toolDir } = setup("assemble-dirty-repo");
+    writeFileSync(join(repoDir, "zz-dirty-marker.txt"), "dirty");
+    const res = runAssembler(repoDir, regPath, toolDir);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("worktree 非 clean");
+  });
+});
+
+// ==================== 1d. PRR-069C 正式发布路径禁区 ====================
+describe("PRR-069C 正式发布路径命令禁区", () => {
+  const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+  const bundleCommand: string = pkg.scripts["bundle:tauri"];
+
+  /** 去掉注释后扫描，避免把“禁止 Finder”这类说明文字当成真实调用。 */
+  function stripComments(source: string) {
+    return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  }
+
+  it("bundle:tauri 显式 app-only，并使用受控 assembler 而非 Tauri dmg target", () => {
+    expect(bundleCommand).toContain("--bundles app");
+    expect(bundleCommand).toContain("--assemble-dmg");
+    expect(bundleCommand).toContain("--dmg-format ULMO");
+    expect(bundleCommand).toContain("--work-dir");
+    expect(bundleCommand).not.toContain("repack");
+    const tauriSegment = bundleCommand.split(" -- ").pop() ?? "";
+    expect(tauriSegment).toContain("tauri build --bundles app");
+    expect(tauriSegment).not.toMatch(/--bundles[= ]+\S*dmg/);
+    expect(tauriSegment).not.toMatch(/(^|\s)dmg(\s|$)/);
+  });
+
+  it("正式 bundle 命令不含 Finder/AppleScript/CI 绕过与 .DS_Store", () => {
+    for (const forbidden of [
+      "osascript",
+      "AppleScript",
+      "--skip-jenkins",
+      "--ci",
+      ".DS_Store",
+      "Finder",
+      "skip-jenkins",
+    ]) {
+      expect(bundleCommand).not.toContain(forbidden);
+    }
+  });
+
+  it("装配与打包 runner 的代码中不出现 Finder/AppleScript/osascript/CI 绕过调用", () => {
+    for (const file of [ASSEMBLE_DMG, BUNDLE_GATE]) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      for (const forbidden of ["osascript", "AppleScript", "--skip-jenkins", "--ci"]) {
+        expect(code).not.toContain(forbidden);
+      }
+      // Finder 只允许作为 FinderInfo（kHasCustomIcon）出现，不允许作为应用程序被调用。
+      expect(code).not.toMatch(/(^|[^A-Za-z])Finder([^A-Za-z]|$)/);
+      // 不调用 Tauri 的 DMG 美化脚本或 dmg target
+      expect(code).not.toContain("bundle_dmg");
+      expect(code).not.toMatch(/tauri[^\n]*--bundles[^\n]*dmg/);
+    }
+  });
+
+  it("禁止读取/复制 .DS_Store：字面量只作为 fail-closed 守卫常量存在", () => {
+    const assembler = readFileSync(ASSEMBLE_DMG, "utf8");
+    expect(assembler.split('".DS_Store"').length - 1).toBe(1);
+    expect(assembler).toContain('const DS_STORE = ".DS_Store"');
+    const gate = readFileSync(BUNDLE_GATE, "utf8");
+    expect(gate).not.toContain(".DS_Store");
+  });
+
+  it("repack-dmg.mjs 保留但标记 superseded，且不再被正式 gate 引用", () => {
+    const repack = readFileSync(REPACK_DMG, "utf8");
+    expect(repack).toContain("SUPERSEDED");
+    expect(readFileSync(BUNDLE_GATE, "utf8")).not.toContain("repack-dmg.mjs");
   });
 });

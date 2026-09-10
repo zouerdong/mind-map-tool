@@ -1,4 +1,10 @@
 // repack-dmg.mjs — 发布 DMG 容器压缩转换（PRR-069 / ADR 0013）。
+//
+// SUPERSEDED（PRR-069C，2026-09-10）：正式发布路径已改为 app-only build + assemble-dmg.mjs
+// 受控装配（ADR 0013 v1.1.0）。本脚本不再被 bundle-gate 引用，仅作为历史兼容代码保留，
+// 不得用于 PRR-069C 之后的正式候选；其转换语义建立在“Tauri 已经生成过 DMG”之上，
+// 而该前置在无 Finder 装配路径中不再存在。
+
 // 在 same-run bundle 流程内把本轮唯一 unsigned DMG 转换为受支持的目标格式（ULMO），
 // 验证格式/CRC32/非签名加密后原子替换最终路径。任一步失败 fail-closed，
 // 不回退原格式、不产出可被当作成功的痕迹。
