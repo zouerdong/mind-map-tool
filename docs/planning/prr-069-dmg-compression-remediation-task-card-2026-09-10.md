@@ -1,9 +1,13 @@
 # PRR-069：macOS DMG ULMO 压缩与证据时间拓扑整改
 
-状态：`READY_FOR_DISPATCH`  
-类型：发布 runner 根因整改  
-优先级：P0  
-依赖：PRR-068 已通过独立审阅；PRR-070 source `58003c0` 的失败证据只读冻结；[ADR 0013](../decisions/0013-macos-dmg-compression.md) 已 Accepted  
+状态：`READY_FOR_DISPATCH`
+
+类型：发布 runner 根因整改
+
+优先级：P0
+
+依赖：PRR-068 已通过独立审阅；PRR-070 source `58003c0` 的失败证据只读冻结；[ADR 0013](../decisions/0013-macos-dmg-compression.md) 已 Accepted
+
 后继：独立审阅通过后，才可从新 clean HEAD 完整重跑 PRR-070
 
 ## 背景与目标
