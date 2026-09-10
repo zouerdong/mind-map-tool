@@ -18,7 +18,8 @@
 - [PRR-066 性能整改卡](../planning/prr-066-performance-remediation-task-card-2026-09-08.md)与[独立代码及原生预检审阅](./prr-066-independent-review-2026-09-08.md)：五项根因已在 `f5f8872` 修复并接受；诊断证据隔离 P2 已在 `6302866` 修复。PRR-066 结论仍有效，但后继 PRR-070 因新的 cold start 失败再次阻塞。
 - [PRR-070 cold start 失败审阅](./prr-070-stage-a-cold-start-review-2026-09-08.md)：source `ea047e8` 的首个 cold 样本1685.4ms导致固定 p95超过1500ms；报告与 hash 闭合，但缺少启动分段，退回 [PRR-067 归因卡](../planning/prr-067-cold-start-attribution-task-card-2026-09-08.md)，不得删样或重跑挑绿。
 - [PRR-070 DMG 体积失败审阅](./prr-070-stage-a-dmg-size-review-2026-09-10.md)：source `58003c0` 在步骤 5 因 DMG 25153239B 超过 25000000B 正确 STOP；独立复算确认双份 ICNS 增量与 UTC 时间拓扑缺口，退回 [PRR-069](../planning/prr-069-dmg-compression-remediation-task-card-2026-09-10.md)。
-- [PRR-069 独立审阅](./prr-069-independent-review-2026-09-10.md)：ULMO same-run 转换、最终 artifact 绑定和 UTC/clean fail-closed 已接受；审阅补齐 3 项代码门并记录一次 Tauri 上游 Finder `.DS_Store` 挂起风险。PRR-070 可从新 clean HEAD 重做。
+- [PRR-069 独立审阅](./prr-069-independent-review-2026-09-10.md)：ULMO same-run 转换、最终 artifact 绑定和 UTC/clean fail-closed 已接受；其后第二次独立 bundle 再次复现 Finder `.DS_Store` 挂起，故该代码结论保留但派发关系已由 PRR-069C 取代。
+- [PRR-070 `.DS_Store` STOP 独立审阅](./prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)：source `b45dc0c` 的第二次独立 clean build 再次进入 Finder 无上限等待；虽然后来自然完成且 DMG 字节有效，仍因预先 STOP 规则作废，退回 [PRR-069C](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）

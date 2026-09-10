@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-069_COMPLETE / PRR-070_READY`。PRR-067 双指标协议、负责人选定的 C 方案、PRR-068 图标集成和 [PRR-069 ULMO/证据绑定整改](../quality/prr-069-independent-review-2026-09-10.md)均已通过独立审阅。source `58003c0` 的超预算候选及全部历史证据继续只读作废；下一步只从包含 `198710d` 审阅修复与本状态同步的最新 clean HEAD 完整重做 PRR-070。若 Tauri 上游 Finder `.DS_Store` 美化再次挂起，按 STOP 返回，不得伪造文件或混用诊断产物。PRR-080/090 与 G-FINAL 保持阻塞。
+当前整改批次状态为 `IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED`。PRR-067 双指标协议、负责人选定的 C 方案、PRR-068 图标集成和 [PRR-069 ULMO/证据绑定整改](../quality/prr-069-independent-review-2026-09-10.md)均已通过独立审阅。source `b45dc0c` 的 PRR-070 构建再次命中 Tauri Finder `.DS_Store` 无上限等待并按预先规则 STOP；[独立审阅](../quality/prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)拒绝事后接受自然完成的候选。下一步只执行 [PRR-069C 确定性 DMG 装配](./prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)，审阅通过后从新 clean HEAD 重做 PRR-070。PRR-070/080/090 与 G-FINAL 保持阻塞。
 
 ## 2026-09-07 发布前收口批次（历史）
 

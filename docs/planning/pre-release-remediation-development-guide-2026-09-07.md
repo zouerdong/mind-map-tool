@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-068_COMPLETE / PRR-070_READY`（PRR-067 双指标协议与 PRR-068 确定性桌面图标均已实施并通过独立审阅；下一步只从包含全部审阅修复与状态同步的 clean HEAD 重做 PRR-070）
+状态：`IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED`（PRR-070 source `b45dc0c` 再次命中 Tauri Finder `.DS_Store` 无上限等待并按 STOP 作废；先执行确定性 DMG 装配整改）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -47,6 +47,8 @@ PRR-067 冷启动首次执行归因 + 条件式收口
                 ↓
 PRR-068 固定图标母版 + 确定性桌面集成
                 ↓
+PRR-069C app-only build + 无 Finder DMG 装配
+                ↓
        clean source commit
                 ↓
 PRR-070 新候选 + 原生矩阵 + G-FINAL
@@ -60,11 +62,11 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-10，PRR-000～068 已集成并完成独立审阅；source `ea047e8` 的 PRR-070 阶段 A 失败候选继续作废。重新派发 PRR-070 时，仍以**包含 PRR-068 审阅修复、指南和任务卡状态同步的当前 clean HEAD**为唯一 source，不把历史 hash 当构建基线。因此：
+截至 2026-09-10，PRR-000～069 已集成并完成独立审阅；source `b45dc0c` 的 PRR-070 阶段 A 因 Tauri Finder `.DS_Store` 无上限等待命中预先声明的 STOP。原进程之后自然完成的 candidate 仍只读作废；先执行 PRR-069C，独立审阅通过后才重新派发 PRR-070。因此：
 
-1. PRR-070 起点必须满足 `git status --short` 为空，并记录完整 `git rev-parse HEAD`；不得退回 `541d38c`、`caf1c20`、`808959b` 或 `79f099c`，也不得复用其候选/证据。
+1. PRR-069C 从包含本卡的最新 clean HEAD 开始；PRR-070 随后从包含 PRR-069C 独立审阅修复与状态同步的新 clean HEAD 开始。不得退回历史 source，也不得复用 `b45dc0c` 或更早候选/证据。
 2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。
-3. PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回对应整改卡，修复后换新 source hash 从头重做。
+3. PRR-069C 只整改发布 runner 和对应文档/测试，不执行 PRR-070。PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回对应整改卡，修复后换新 source hash 从头重做。
 4. 执行 Agent 不得自行批准 G-FINAL、MM-110 或 handoff，也不得开始 PRR-080；自动化与 Agent 只能整理一份绑定候选 hash 的负责人验收请求。
 5. 不授权 push/rebase；签名、公证、凭据、系统信任修改、上传和公开发布仍明确禁止。
 

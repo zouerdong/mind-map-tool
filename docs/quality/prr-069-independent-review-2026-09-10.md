@@ -8,6 +8,8 @@
 
 审阅修复提交：`198710d5b1a5598874e06bbf26af21eebf62d94e`
 
+后继更新：本报告对 PRR-069 代码的接受结论仍有效；随后 source `b45dc0c` 的第二次 clean bundle 再次命中 Finder `.DS_Store` 无上限等待，PRR-070 已退回 [PRR-069C](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)，不得依据本报告旧时点直接派发 PRR-070。
+
 ## 结论
 
 PRR-069 已完成。正式 `bundle:tauri` 显式要求 ULMO；转换发生在最终 inventory 之前，目标路径、G2、same-run mtime、格式、CRC32、签名/加密状态、source/worktree 与最终 artifact hash 全部 fail-closed。已批准图标、app 生产逻辑、预算、最低 macOS 版本和 `tauri.conf.json` 均未修改。

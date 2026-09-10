@@ -1,6 +1,6 @@
-# 发布前检查清单（PRR-070 DMG 体积失败后）
+# 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-状态：**IN_PROGRESS / PRR-070_READY / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；source `58003c0` 的超预算候选继续作废。下一步从包含 PRR-069 审阅修复与状态同步的最新 clean source 完整重做 PRR-070。
+状态：**IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；source `b45dc0c` 的构建再次命中 Tauri Finder `.DS_Store` STOP，之后自然完成的 candidate 仍只读作废。下一步先完成 PRR-069C 确定性 DMG 装配。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -8,21 +8,22 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS ON INVALIDATED `58003c0` CANDIDATE | 17 项源码门全部 exit 0；PRR-069 修改 runner 后，PRR-070 仍须从 clean source 全部重跑 |
-| 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `58003c0` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | RUNNER FIX ACCEPTED / NEW CANDIDATE REQUIRED | PRR-069 实施预检 ULMO 为 `24,288,684B`，最终 runner 独立复算为 `24,288,652B`；均不是 PRR-070 正式候选，下一轮仍须同源实测 |
+| TypeScript / Rust 常规检查 | PASS ON INVALIDATED `b45dc0c` CANDIDATE | 17 项源码门全部 exit 0；PRR-069C 将修改 runner，PRR-070 仍须从新 clean source 全部重跑 |
+| 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
+| `.dmg` ≤ 25,000,000B | BYTES PASS ON INVALIDATED `b45dc0c` / ASSEMBLY BLOCKED | 作废 DMG 为 ULMO、`24,288,680B`、CRC32 VALID；但构建依赖 Finder 无上限等待，不具备候选资格。PRR-069C 后须新候选同源实测 |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
 | 最低 macOS 版本一致性 | PASS AT DIAGNOSTIC BUNDLE | Info.plist 与 Mach-O 均为 macOS 11.0；PRR-070 同源复算 |
-| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON `58003c0` | DMG 步骤先失败，执行 Agent按 STOP 未进入性能矩阵；PRR-067 已修订协议，待新 PRR-070 同源重测 |
+| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON `b45dc0c` | DMG 装配命中 STOP，执行 Agent未进入性能矩阵；PRR-067 协议保持有效，待 PRR-069C 后新 PRR-070 同源重测 |
 | 原生安装、打开 `.mindmap` 与应用身份 | NOT YET RUN ON NEW CANDIDATE | G2 已授权受控安装和 LaunchServices；由 PRR-070 在唯一候选上执行并恢复状态 |
 | 字体切换几何事务 | PASS AT SOURCE REVIEW | PRR-040/066 已覆盖原子重测、并发 join、失败回队和保存屏障；PRR-070 原生矩阵复核 |
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
-| 依赖漏洞数据库检查 | PASS ON INVALIDATED `58003c0` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| source/evidence 时间拓扑 | RUNNER FIX ACCEPTED / NEW EVIDENCE REQUIRED | PRR-069 已强制 repack UTC、runner hash、HEAD/clean、before/after hash 与 bundle 时间窗；PRR-070 仍须从步骤 1 机器生成 UTC 并复算完整链 |
-| G-FINAL | MISSING / EXPECTED | 本轮在步骤 5 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
+| 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
+| DMG 装配可重复性 | FAIL / PRR-069C READY | 两次独立 clean build 均长时间等待 Finder `.DS_Store`；禁止延长等待、伪造文件、CI 绕过或重跑挑结果，改为 app-only + 系统工具受控装配 |
+| source/evidence 时间拓扑 | NEW EVIDENCE REQUIRED | `b45dc0c` STOP 后自然完成记录含非法 UTC `04:20:39.3NZ`，整轮已作废；PRR-069C/070 必须只接受机器生成可解析 UTC |
+| G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |
 

@@ -8,7 +8,7 @@
 
 依赖：PRR-068 已通过独立审阅；PRR-070 source `58003c0` 的失败证据只读冻结；[ADR 0013](../decisions/0013-macos-dmg-compression.md) 已 Accepted
 
-后继：独立审阅通过后，才可从新 clean HEAD 完整重跑 PRR-070
+后继更新：本卡独立审阅已通过；后继 PRR-070 在 `b45dc0c` 再次命中 Finder `.DS_Store` STOP，因此先执行 PRR-069C，不能直接重跑或续跑 PRR-070
 
 ## 背景与目标
 
