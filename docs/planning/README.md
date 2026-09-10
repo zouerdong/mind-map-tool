@@ -11,7 +11,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-068_COMPLETE / PRR-070_READY`。PRR-067 双指标协议已实施并通过独立审阅；负责人选定的 C 方案也已完成[产品图标规格](../product/app-icon-spec-2026-09-09.md)、确定性桌面集成及[PRR-068 独立审阅](../quality/prr-068-independent-review-2026-09-10.md)。审阅修复后，图标配置必须精确引用受管完整集合，目录外同名文件、缺项和子目录混入均 fail-closed。source `ea047e8` 的旧 PRR-070 失败候选及证据继续只读保留，不得复用；下一步从包含全部审阅修复与本状态同步的 clean HEAD 完整执行 PRR-070。PRR-080/090 与 G-FINAL 仍保持阻塞。
+当前整改批次状态为 `IN_PROGRESS / PRR-069_READY / PRR-070_BLOCKED`。PRR-067 双指标协议、负责人选定的 C 方案和 PRR-068 图标集成均已通过独立审阅。source `58003c0` 的新 PRR-070 候选在步骤 5 因 DMG 25153239B 超过 25000000B 而正确停止；[独立审阅](../quality/prr-070-stage-a-dmg-size-review-2026-09-10.md)确认图标在 app 与卷中双份携带是直接增量，并发现 source freeze 的 UTC 标注错误。下一步只派发 [PRR-069 DMG 压缩与时间拓扑整改](./prr-069-dmg-compression-remediation-task-card-2026-09-10.md)；其独立审阅通过后才从新 clean HEAD 完整重做 PRR-070。全部历史候选继续只读保留，不得复用；PRR-080/090 与 G-FINAL 保持阻塞。
 
 ## 2026-09-07 发布前收口批次（历史）
 

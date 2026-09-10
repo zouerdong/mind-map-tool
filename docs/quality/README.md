@@ -17,6 +17,7 @@
 - [PRR-070 阶段 A 性能审阅](./prr-070-stage-a-performance-review-2026-09-08.md)：`0c8a93b` 候选因 PNG/CSP、eager loading、RSS 协议和 warm 预算退回 PRR-066；canvas 实际18ms但旧报告口径不一致。
 - [PRR-066 性能整改卡](../planning/prr-066-performance-remediation-task-card-2026-09-08.md)与[独立代码及原生预检审阅](./prr-066-independent-review-2026-09-08.md)：五项根因已在 `f5f8872` 修复并接受；诊断证据隔离 P2 已在 `6302866` 修复。PRR-066 结论仍有效，但后继 PRR-070 因新的 cold start 失败再次阻塞。
 - [PRR-070 cold start 失败审阅](./prr-070-stage-a-cold-start-review-2026-09-08.md)：source `ea047e8` 的首个 cold 样本1685.4ms导致固定 p95超过1500ms；报告与 hash 闭合，但缺少启动分段，退回 [PRR-067 归因卡](../planning/prr-067-cold-start-attribution-task-card-2026-09-08.md)，不得删样或重跑挑绿。
+- [PRR-070 DMG 体积失败审阅](./prr-070-stage-a-dmg-size-review-2026-09-10.md)：source `58003c0` 在步骤 5 因 DMG 25153239B 超过 25000000B 正确 STOP；独立复算确认双份 ICNS 增量与 UTC 时间拓扑缺口，退回 [PRR-069](../planning/prr-069-dmg-compression-remediation-task-card-2026-09-10.md)。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）

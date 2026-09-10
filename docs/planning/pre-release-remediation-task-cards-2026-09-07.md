@@ -505,8 +505,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`READY_FOR_DISPATCH`（PRR-000～068 已完成并通过独立审阅；source `ea047e8` 旧候选与证据只读作废；只从包含全部审阅修复和状态同步的当前 clean HEAD 开始）
-依赖：PRR-000～068 已集成并经独立审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`BLOCKED_BY_PRR-069`（source `58003c0` 的本轮候选因 DMG 25153239B 超过 25000000B 而在步骤 5 正确停止；不得继续该候选）
+依赖：PRR-000～069 已集成并经独立审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标
@@ -526,11 +526,11 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 ### 实施顺序
 
-1. **冻结 source**：记录 `git rev-parse HEAD`、`git status --short`、OS build、arch、CPU/RAM、Node/pnpm/Rust/Tauri 版本；worktree 非空立即停止。证据目录名使用完整 source commit，不使用短 hash 猜测归属。
+1. **冻结 source**：记录 `git rev-parse HEAD`、`git status --short`、OS build、arch、CPU/RAM、Node/pnpm/Rust/Tauri 版本；worktree 非空立即停止。证据目录名使用完整 source commit，不使用短 hash 猜测归属。UTC 只可由 `new Date().toISOString()` 或 `date -u` 生成；禁止手工把本地时间标为 `Z`。
 2. **源码门**：逐项记录开始/结束时间和 exit code，至少运行 `pnpm format:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`pnpm test:integration`、`pnpm test:a11y`、`pnpm test:visual`、`pnpm test:export`、`pnpm build`、`pnpm icon:verify`、`pnpm net:scan`、`pnpm license:scan`、`pnpm boundaries`、`node scripts/runtime-spike/verify-decision.mjs --phase packaging docs/decisions/decision-register.json`、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets --locked -- -D warnings`。其中 decision gate 必须复算 PRR-067 G-PERF-PROTOCOL 对 ADR 0006 v1.1.0 的 hash 与固定参数绑定；icon gate 必须复算 PRR-068 固定 SVG 母版、完整桌面 7 件、manifest 与 Tauri 引用。复算 initial entry `≤ 500,000B`。此阶段不要运行缺 manifest 必然 fail-closed 的最终 `pnpm quality -- --release-evidence`，它属于 PRR-080。
 3. **依赖 advisory**：记录 JS advisory 命令/数据库时间与结果；运行已有 `cargo audit`，不存在时按本卡局部安装。不得把工具缺失、网络失败或旧数据库写成 PASS；无法完成则 `BLOCKED`。
-4. **唯一 bundle**：用 `scripts/quality/bundle-gate.mjs` 从该 clean HEAD 运行 unsigned Tauri build，把 inventory 写进本 source 的新 evidence 目录。inventory 必须证明 `.app` 与 `.dmg` 都由本轮刷新，记录 path/SHA-256/bytes/mtime/source/runner hash。构建前后 source HEAD 和 worktree 必须不变。
-5. **产物身份与 DMG 实测**：从 `.app/Contents/Info.plist` 与可执行文件复算 product/version/bundle id/arm64/`LSMinimumSystemVersion=11.0`、`.mindmap` document type、UTI/MIME、category、LICENSE/THIRD_PARTY_NOTICES 携带和 CSP/capability；验证 candidate 未签名。只读挂载 `.dmg`，核对能打开、包含的 `.app` hash/身份与 inventory 关系以及 `.dmg ≤ 25MB`，随后正常 detach；不得签名、调用公证或改变系统信任。
+4. **唯一 bundle**：用 PRR-069 审阅通过后的正式 `bundle:tauri` / `scripts/quality/bundle-gate.mjs` 从该 clean HEAD 运行 unsigned Tauri build，并在 inventory 前将本轮 DMG 转换为 ADR 0013 规定的 ULMO，把 inventory 写进本 source 的新 evidence 目录。inventory 必须证明 `.app` 与最终 ULMO `.dmg` 都由本轮刷新，记录 path/SHA-256/bytes/mtime/source/runner hash/转换时间与 `dmgFormat=ULMO`。构建前后 source HEAD 和 worktree 必须不变。
+5. **产物身份与 DMG 实测**：从 `.app/Contents/Info.plist` 与可执行文件复算 product/version/bundle id/arm64/`LSMinimumSystemVersion=11.0`、`.mindmap` document type、UTI/MIME、category、LICENSE/THIRD_PARTY_NOTICES 携带和 CSP/capability；验证 candidate 未签名。用 `hdiutil imageinfo` 复算最终 `Format=ULMO`，只读挂载 `.dmg`，核对 EULA、能打开、包含的 `.app` hash/身份与 inventory 关系、卷图标 hash 以及 `.dmg ≤ 25000000B`，随后正常 detach；不得签名、调用公证或改变系统信任。
 6. **真机性能**：对同一 `.app` 用 `run-performance.mjs --scope release --platform macos --samples 20` 在全新的 attempt evidence 子目录生成 `cold-conditioning.json`、raw 与 summary；先执行恰好一次 conditioning，成功后再采 20 个 conditioned cold 与 20 个 warm 样本。`sessionFirstLaunchMs` 必须在 conditioning artifact 与 summary 一致展示，`conditionedColdStartP95Ms≤1500ms`；另含 renderer-ready、stable RSS、300/450 pan/zoom/drag、create/move/connect/undo、save、2x PNG。每项记录失败数、p50/p95/max、fixture hash、`measurementSource=native-candidate`、candidate/source/runner hash；conditioning artifact 必须由 summary 的 SHA-256 绑定。conditioning 或任一样本失败即整轮 INCOMPLETE；同目录已有本轮性能产物必须拒绝覆盖，重试使用新 attempt 子目录并保留旧轮，不得复用、复制、改写或混合旧 raw data。
 7. **受控安装与文件关联**：先 `install-gate --plan`，再对同一 candidate 执行 `--execute`；按 receipt/hash 证明复制、身份校验和只清理本轮安装。临时注册 LaunchServices 后验证 Finder/`open` 的冷启动与运行中 `.mindmap` 路由、已有 `.json` 兼容、默认 Save As `.mindmap`，结束时注销/恢复并记录前后状态。发现外来安装或无法可靠恢复时停止，不得覆盖或强删。
 8. **完整原生功能矩阵**：只操作真实 candidate，不以 jsdom、dev server、web harness 或 Rust 单测替代。每项必须记录操作方式（鼠标/accelerator/VoiceOver）、预期、实际、时间、截图/日志路径和 candidate hash：
@@ -547,7 +547,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
    | 导出 | 同一合成中文脑图导出语义 SVG、2x PNG、PDF；三者内容/字体/主题一致，SVG 无编辑控件/`foreignObject`，PNG 尺寸正确，PDF 至少两种 viewer 可打开 |
 
 9. **原生报告**：生成 `.tmp/release-candidate/<source>/macos-native-candidate-report.json`，`evidenceKind=native-candidate`、`platform=macos`、`overall=PASS`；包含 source commit、candidate/dmg hash、环境、逐项命令窗口、结果、artifact path/hash、NotRun（必须为空或只含 Windows deferred 决策）和红线确认。另须包含 `performance.summaryArtifact`、`performance.summarySha256`、`performance.sessionFirstLaunchMs` 与 `performance.conditionedColdStartP95Ms`，并与同轮 performance summary 完全一致。报告不能只引用 `.app` 路径，也不能把 web harness 标成 native。
-10. **一致性复算**：确认全部 artifact 都属于同一 source/candidate，runner hash 未漂移，报告时间晚于其输入；再次确认 worktree clean。任一 mismatch、失败、遗漏或 source/candidate 变化都作废本轮，停止并返回，不得拼接旧证据。
+10. **一致性复算**：确认全部 artifact 都属于同一 source/candidate，runner hash 未漂移，最终 DMG 为 ULMO，报告时间晚于其输入；至少断言 `source freeze <= first source gate start <= last source gate finish <= bundle start <= bundle finish <= downstream reports`，并再次确认 worktree clean。任一解析失败、未来时间、逆序、mismatch、失败、遗漏或 source/candidate 变化都作废本轮，停止并返回，不得拼接旧证据。
 11. **交回并等待**：输出绑定精确 source/candidate hash 的 `g-final-request.md/json`（仅请求，不含伪造批准），同时逐值展示 `sessionFirstLaunchMs`、`conditionedColdStartP95Ms` 及其 summary artifact/hash，告诉负责人候选路径、hash、最小人工检查动作和结论格式；状态返回 `WAITING_FOR_OWNER_G_FINAL`。不得自行写 `APPROVED`，不得生成 readiness manifest，不得开始 PRR-080。
 
 负责人 G-FINAL 最小人工检查：从本卡候选启动，确认首次为全干净画布；用系统菜单完成新建/保存/导出、主题/布局切换和开始引导；打开第二窗口确认命令目标；查看一份 `.mindmap` 和三格式导出；确认是否接受该**精确 hash**作为 0.1.0 unsigned 发布候选。
