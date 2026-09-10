@@ -1,7 +1,7 @@
 # 发布前终审整改开发指南（PRR 批次）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-068_READY / PRE-PRR-070_ICON_HOLD`（PRR-067 双指标协议已实施并通过独立审阅；负责人选定的 C 方案已形成 SVG 母版，先完成 PRR-068 图标生产集成与独立审阅，再从新 clean commit 重做 PRR-070）
+状态：`IN_PROGRESS / PRR-068_COMPLETE / PRR-070_READY`（PRR-067 双指标协议与 PRR-068 确定性桌面图标均已实施并通过独立审阅；下一步只从包含全部审阅修复与状态同步的 clean HEAD 重做 PRR-070）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -45,6 +45,8 @@ PRR-066 PNG/CSP + 真正按需加载 + 性能协议整改
                 ↓
 PRR-067 冷启动首次执行归因 + 条件式收口
                 ↓
+PRR-068 固定图标母版 + 确定性桌面集成
+                ↓
        clean source commit
                 ↓
 PRR-070 新候选 + 原生矩阵 + G-FINAL
@@ -58,7 +60,7 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-08，PRR-000～066 已集成并完成独立审阅；source `ea047e8` 的 PRR-070 阶段 A 因 cold p95 预算失败作废。先按独立审阅派发 PRR-067；只有 PRR-067 形成新 clean commit 并通过独立审阅后，才能重新派发 PRR-070。届时仍以**包含指南和任务卡状态同步的当前 clean HEAD**为唯一 source，不把历史 hash 当构建基线。因此：
+截至 2026-09-10，PRR-000～068 已集成并完成独立审阅；source `ea047e8` 的 PRR-070 阶段 A 失败候选继续作废。重新派发 PRR-070 时，仍以**包含 PRR-068 审阅修复、指南和任务卡状态同步的当前 clean HEAD**为唯一 source，不把历史 hash 当构建基线。因此：
 
 1. PRR-070 起点必须满足 `git status --short` 为空，并记录完整 `git rev-parse HEAD`；不得退回 `541d38c`、`caf1c20`、`808959b` 或 `79f099c`，也不得复用其候选/证据。
 2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。

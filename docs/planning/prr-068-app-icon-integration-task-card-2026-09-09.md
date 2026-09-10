@@ -3,8 +3,8 @@
 日期：2026-09-09  
 类型：产品视觉资产 / Tauri 打包集成 / 原生验证  
 优先级：P0  
-状态：`AWAITING_INDEPENDENT_REVIEW`（实施完成 2026-09-09；验证证据 `.tmp/prr-068-app-icon/verify-summary.md`；下一步骤：独立审阅 → PRR-070）
-前置：PRR-067 已完成并通过独立审阅；负责人选定的 C 方案已完成矢量母版与尺寸检查；PRR-070 继续保持阻塞
+状态：`COMPLETE / INDEPENDENT_REVIEW_ACCEPTED`（实现 `26e1bea`；审阅修复 `51bff86`；确定性生成、24 项图标红灯、完整单测与 clean source 原生 app/Finder 检查通过；见 [独立审阅](../quality/prr-068-independent-review-2026-09-10.md)）
+前置：PRR-067 已完成并通过独立审阅；负责人选定的 C 方案已完成矢量母版与尺寸检查；本卡实施与审阅期间 PRR-070 保持阻塞，现已随本卡验收通过而解除
 
 ## 派发文本
 

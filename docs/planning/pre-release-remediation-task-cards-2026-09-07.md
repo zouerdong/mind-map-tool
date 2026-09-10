@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-068_READY / PRE-PRR-070_ICON_HOLD`
+状态：`IN_PROGRESS / PRR-068_COMPLETE / PRR-070_READY`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -50,9 +50,10 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 4 | PRR-065 | 不可并行 | PRR-000～060 已集成；负责人要求打开即零菜单画布 | 零画布顶栏与原生命令承载 |
 | 5 | PRR-066 | 不可并行 | PRR-070 阶段 A 性能回卡 | PNG/CSP、按需加载与性能协议整改 |
 | 6 | PRR-067 | 不可并行 | PRR-070 source `ea047e8` cold 预算失败 | 首次执行归因与条件式收口 |
-| 7 | PRR-070 | 不可并行 | PRR-067 独立审阅通过、负责人选定的产品图标已生产化集成、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
-| 8 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
-| 9 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
+| 7 | PRR-068 | 不可并行 | PRR-067 独立审阅通过、负责人已选定产品图标 | 确定性桌面图标与原生验证 |
+| 8 | PRR-070 | 不可并行 | PRR-068 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
+| 9 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
+| 10 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
 
 并行只表示逻辑上可并行；若多个 Agent 直接共享同一 checkout，则必须改为串行，避免未提交文件相互覆盖。
 
@@ -70,6 +71,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | PRR-065 | 产品/架构文档、desktop command surface、原生菜单、关联测试 | 不改 core/schema/export/quality budget；完成后作废此前 PRR-070 试跑证据 | desktop/keyboard/menu/a11y/visual 专项 + 全量源码门 |
 | PRR-066 | PNG/CSP、按需字体/导出加载、perf probe/runner/verifier 与对应测试 | 不改预算/样本/percentile/字体范围；旧 PRR-070 证据只读 | production PNG、30秒 RSS、20样本 native preflight + 全量源码门 |
 | PRR-067 | perf-only 启动 milestone、cold 对照诊断、条件式应用优化或协议决策包 | 不改预算/20样本/percentile；无批准不改 Accepted ADR | 分段正反测试、B0～B3 对照、全量相关源码门 |
+| PRR-068 | 固定 SVG 母版、Tauri 桌面图标集、生成器/manifest/verifier | 不重设计，不改性能协议或发布证据 | 两轮确定性、图标红灯、app/ICNS/Finder 与尺寸矩阵 |
 | PRR-070 | 新 candidate/evidence 目录；原则上不再改 source/runner | 任一 source/runner 变化即作废重来 | 全量源码门、bundle/install/native/perf/visual 矩阵 |
 | PRR-080 | readiness manifest、acceptance request、验收索引 | 冻结后只读；不得修代码 | `pnpm quality -- --release-evidence <manifest>`、完整 Rust/审计门 |
 | PRR-090 | 独立 MM-110 与新 handoff | 只读冻结输入；发现问题退回对应 PRR | 独立 hash/预算/样本复算与高风险抽测 |
@@ -503,8 +505,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`HOLD_FOR_APP_ICON`（PRR-067 已完成并通过独立审阅；source `ea047e8` 旧候选与证据只读作废；须先完成负责人选定图标的生产化集成）
-依赖：PRR-000～067 已集成并经独立审阅；产品图标生产化集成通过审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`READY_FOR_DISPATCH`（PRR-000～068 已完成并通过独立审阅；source `ea047e8` 旧候选与证据只读作废；只从包含全部审阅修复和状态同步的当前 clean HEAD 开始）
+依赖：PRR-000～068 已集成并经独立审阅；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标
