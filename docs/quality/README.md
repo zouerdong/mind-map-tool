@@ -1,6 +1,6 @@
 # Quality
 
-2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+2026-09-11 当前派发更新：`PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 已关闭 R1 独立审阅的 R2-01～04（attach 异常接管、fixture 工具注入闭合、work-dir 路径隔离、DMG 常量模块归位），从同一 clean source `885d877b660a608604c8dc5921aeabd49fd4131e` 连续三轮正式预检全部通过，详情见 [R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)；执行侧自述不构成独立验收，当前唯一待办是 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md) 的交回与独立审阅。下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告。R2 独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
 
 记录可测量的非功能标准，包括启动耗时、空闲内存、安装包体积、大型脑图响应、崩溃恢复、可访问性和 macOS/Windows 兼容矩阵。
 
@@ -22,6 +22,7 @@
 - [PRR-070 DMG 体积失败审阅](./prr-070-stage-a-dmg-size-review-2026-09-10.md)：source `58003c0` 在步骤 5 因 DMG 25153239B 超过 25000000B 正确 STOP；独立复算确认双份 ICNS 增量与 UTC 时间拓扑缺口，退回 [PRR-069](../planning/prr-069-dmg-compression-remediation-task-card-2026-09-10.md)。
 - [PRR-069 独立审阅](./prr-069-independent-review-2026-09-10.md)：ULMO same-run 转换、最终 artifact 绑定和 UTC/clean fail-closed 已接受；其后第二次独立 bundle 再次复现 Finder `.DS_Store` 挂起，故该代码结论保留但派发关系已由 PRR-069C 取代。
 - [PRR-070 `.DS_Store` STOP 独立审阅](./prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)：source `b45dc0c` 的第二次独立 clean build 再次进入 Finder 无上限等待；虽然后来自然完成且 DMG 字节有效，仍因预先 STOP 规则作废，退回 [PRR-069C](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)。
+- [PRR-069C-R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)：R2-01～04 处置、红/绿矩阵与三轮正式预检证据（source `885d877`，DMG 24284033/24284017/24284025B）；执行侧自述，等待 [独立审阅](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）

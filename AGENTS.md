@@ -1,10 +1,10 @@
 # Mind Map Tool 工程规则
 
-2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](docs/quality/prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](docs/planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+2026-09-11 当前派发更新：`PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 已关闭 R1 独立审阅的 R2-01～04（attach 异常接管、fixture 工具注入闭合、work-dir 路径隔离、DMG 常量模块归位），从同一 clean source `885d877b660a608604c8dc5921aeabd49fd4131e` 连续三轮正式预检全部通过，详情见 [R2 实施报告](docs/quality/prr-069c-r2-implementation-report-2026-09-11.md)；执行侧自述不构成独立验收，当前唯一待办是 [R2 完整任务卡](docs/planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md) 的交回与独立审阅。下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告。R2 独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
 
 ## 项目阶段
 
-当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选、source `b45dc0c` 命中 `.DS_Store` STOP 后自然完成的候选及全部历史证据继续只读作废。PRR-069C-R1 独立审阅为 REVISE，当前只派发 PRR-069C-R2（见页首）；R1 三轮预检保留历史事实，不作为新 source 的发布输入。R2 经独立审阅通过后，才可从新 clean HEAD 重做 PRR-070。PRR-070/080/090 与 G-FINAL 保持阻塞。
+当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选、source `b45dc0c` 命中 `.DS_Store` STOP 后自然完成的候选及全部历史证据继续只读作废。PRR-069C-R1 独立审阅为 REVISE，其返修卡 PRR-069C-R2 已执行完成并停在 STOP_FOR_INDEPENDENT_REVIEW（见页首）；source `885d877` 连续三轮正式预检全部通过，R1 三轮预检保留历史事实、不作为新 source 的发布输入。R2 经独立审阅通过后，才可从新 clean HEAD 重做 PRR-070。PRR-070/080/090 与 G-FINAL 保持阻塞。
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 

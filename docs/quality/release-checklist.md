@@ -1,8 +1,8 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+2026-09-11 当前派发更新：`PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 已关闭 R1 独立审阅的 R2-01～04（attach 异常接管、fixture 工具注入闭合、work-dir 路径隔离、DMG 常量模块归位），从同一 clean source `885d877b660a608604c8dc5921aeabd49fd4131e` 连续三轮正式预检全部通过，详情见 [R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)；执行侧自述不构成独立验收，当前唯一待办是 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md) 的交回与独立审阅。下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告。R2 独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
 
-状态：**IN_PROGRESS / PRR-069C-R2_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。R1 审阅为 REVISE，当前按页首 R2 卡返修。
+状态：**IN_PROGRESS / PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。R2 已按页首任务卡完成实现与三轮预检，等待独立审阅；本清单仍未放行。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -10,9 +10,9 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R1 IMPLEMENTATION / HISTORICAL / R2 REQUIRED | R1 实现门（format/typecheck/lint/unit 611/integration/icon/build/cargo 210/clippy）已通过；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
+| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R2 SOURCE `885d877` / PENDING INDEPENDENT REVIEW | R2 全量门通过：format/typecheck/lint/unit 635/integration 94/icon/build/cargo test 210/clippy -D warnings/diff --check；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
 | 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R1 ATTEMPTS / HISTORICAL / R2 REQUIRED | R1 三轮 DMG 为 24,284,017/021/037B（预算内），执行侧复核 37/37；独立审阅 REVISE |
+| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R2 SOURCE `885d877` / PENDING INDEPENDENT REVIEW | R2 三轮 DMG 为 24,284,033/017/025B（预算内，ULMO + CRC32 VALID）；R1 attempts 仅作历史事实 |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |

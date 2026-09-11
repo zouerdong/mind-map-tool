@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](../quality/prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](./prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+2026-09-11 当前派发更新：`PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 已关闭 R1 独立审阅的 R2-01～04（attach 异常接管、fixture 工具注入闭合、work-dir 路径隔离、DMG 常量模块归位），从同一 clean source `885d877b660a608604c8dc5921aeabd49fd4131e` 连续三轮正式预检全部通过，详情见 [R2 实施报告](../quality/prr-069c-r2-implementation-report-2026-09-11.md)；执行侧自述不构成独立验收，当前唯一待办是 [R2 完整任务卡](./prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md) 的交回与独立审阅。下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告。R2 独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
@@ -13,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-069C-R2_READY / PRR-070_BLOCKED`。当前返修、审阅依据及唯一派发入口见页首。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
+当前整改批次状态为 `IN_PROGRESS / PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 实现与三轮预检已完成，等待独立审阅；返修与审阅依据见页首。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 
