@@ -1,6 +1,8 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-状态：**IN_PROGRESS / PRR-069C-R1_IMPLEMENTED_AWAITING_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；PRR-069C-R1 已实现并通过三轮正式预检（[实施报告](./prr-069c-r1-implementation-report-2026-09-11.md)），等待独立审阅；通过并形成新 clean HEAD 后才可重做 PRR-070。
+2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+
+状态：**IN_PROGRESS / PRR-069C-R2_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。R1 审阅为 REVISE，当前按页首 R2 卡返修。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -8,21 +10,21 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R1 IMPLEMENTATION / REVIEW PENDING | R1 实现门（format/typecheck/lint/unit 611/integration/icon/build/cargo 210/clippy）已通过；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
+| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R1 IMPLEMENTATION / HISTORICAL / R2 REQUIRED | R1 实现门（format/typecheck/lint/unit 611/integration/icon/build/cargo 210/clippy）已通过；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
 | 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R1 ATTEMPTS / REVIEW PENDING | R1 三轮 DMG 为 24,284,017/021/037B（预算内），独立复核 37/37；待独立审阅接受 |
+| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R1 ATTEMPTS / HISTORICAL / R2 REQUIRED | R1 三轮 DMG 为 24,284,017/021/037B（预算内），执行侧复核 37/37；独立审阅 REVISE |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
 | 最低 macOS 版本一致性 | PASS AT DIAGNOSTIC BUNDLE | Info.plist 与 Mach-O 均为 macOS 11.0；PRR-070 同源复算 |
-| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON VALID CANDIDATE | PRR-067 协议保持有效；待 PRR-069C-R1 独立审阅通过后由新 PRR-070 同源重测 |
+| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON VALID CANDIDATE | PRR-067 协议保持有效；待 PRR-069C-R2 独立审阅通过后由新 PRR-070 同源重测 |
 | 原生安装、打开 `.mindmap` 与应用身份 | NOT YET RUN ON NEW CANDIDATE | G2 已授权受控安装和 LaunchServices；由 PRR-070 在唯一候选上执行并恢复状态 |
 | 字体切换几何事务 | PASS AT SOURCE REVIEW | PRR-040/066 已覆盖原子重测、并发 join、失败回队和保存屏障；PRR-070 原生矩阵复核 |
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| DMG 装配可重复性 | PRR-069C-R1 IMPLEMENTED / REVIEW PENDING | 四项审阅缺口（正式注入、attach 生命周期、时间上限、work-dir 边界）已全部修复并以负向测试证明 CLOSED；R1 三轮预检（同源 app-only build + 固定阈值 + 独立复核）通过，见[实施报告](./prr-069c-r1-implementation-report-2026-09-11.md) |
-| source/evidence 时间拓扑 | PASS ON PRR-069C-R1 ATTEMPTS / REVIEW PENDING | R1 三轮证据为机器生成 UTC 且阈值未放宽（120000/180000 精确）；`b45dc0c` 与原 PRR-069C attempts 仍只读作废；PRR-070 从新 clean HEAD 重新取证 |
+| DMG 装配可重复性 | REVISE / R2 REQUIRED | R1 正常路径成立，但 attach 异常、工具注入与中间 symlink 边界未闭合；须 R2 修复、三轮新预检并独立审阅 |
+| source/evidence 时间拓扑 | PASS ON PRR-069C-R1 ATTEMPTS / HISTORICAL / R2 REQUIRED | R1 三轮证据为机器生成 UTC 且阈值未放宽（120000/180000 精确）；`b45dc0c` 与原 PRR-069C attempts 仍只读作废；PRR-070 从新 clean HEAD 重新取证 |
 | G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |

@@ -1,5 +1,7 @@
 # Planning
 
+2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](../quality/prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](./prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
 ## 2026-09-07 发布前终审整改批次
@@ -11,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-069C-R1_IMPLEMENTED_AWAITING_REVIEW / PRR-070_BLOCKED`。PRR-067 双指标协议、负责人选定的 C 方案、PRR-068 图标集成和 [PRR-069 ULMO/证据绑定整改](../quality/prr-069-independent-review-2026-09-10.md)均已通过独立审阅。source `b45dc0c` 的 PRR-070 构建再次命中 Tauri Finder `.DS_Store` 无上限等待并按预先规则 STOP；[独立审阅](../quality/prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)拒绝事后接受自然完成的候选。[PRR-069C 确定性 DMG 装配](./prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)已实现并完成三轮正常路径预检，但 [2026-09-11 独立审阅](../quality/prr-069c-independent-review-2026-09-11.md)结论为 `REVISE`；[PRR-069C-R1](./prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md) 已实现（commit `77f8ca9`，四项审阅发现全部 CLOSED，三轮正式预检与独立复核 37/37 通过，见[实施报告](../quality/prr-069c-r1-implementation-report-2026-09-11.md)），当前停在 `STOP_FOR_INDEPENDENT_REVIEW`；再次独立审阅通过并形成新 clean HEAD 后才能重做 PRR-070。PRR-070/080/090 与 G-FINAL 保持阻塞。
+当前整改批次状态为 `IN_PROGRESS / PRR-069C-R2_READY / PRR-070_BLOCKED`。当前返修、审阅依据及唯一派发入口见页首。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 

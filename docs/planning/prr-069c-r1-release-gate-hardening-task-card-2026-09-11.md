@@ -1,6 +1,8 @@
 # PRR-069C-R1：DMG 发布门边界与挂载清理加固
 
-状态：`IMPLEMENTED / STOP_FOR_INDEPENDENT_REVIEW`（2026-09-11，实现 commit `77f8ca9`，四项审阅发现全部 CLOSED，三轮正式预检通过；见[实施报告](../quality/prr-069c-r1-implementation-report-2026-09-11.md)）
+2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](../quality/prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](./prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+
+状态：`REVISE / SUPERSEDED_BY_PRR-069C-R2`（实现报告保留；当前按页首 R2 任务卡执行）
 
 类型：独立审阅返卡 / 发布证据与系统状态加固
 

@@ -1,5 +1,7 @@
 # PRR-069C-R1 实施报告：DMG 发布门边界与挂载清理加固
 
+2026-09-11 当前派发更新：`PRR-069C-R1_REVISE / PRR-069C-R2_READY / PRR-070_BLOCKED`。[R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)确认异常接管、工具注入和中间路径 symlink 缺口仍未闭合。当前唯一执行入口为 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)；下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告，不表示独立验收通过。R2 完成并独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+
 日期：2026-09-11
 状态：`STOP_FOR_INDEPENDENT_REVIEW`
 派发基线：`9862be17a5138fcbececa7ebe355e2b9a78e92d4`（clean worktree）
