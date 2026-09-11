@@ -116,7 +116,7 @@ attachVolume(intent)
 | Rust Lint | `cargo clippy --all-targets -- -D warnings` | 0 | 无警告 | `final-cargo_clippy.txt` |
 | 空白 | `git diff --check` | 0 | 无空白错误 | 见 shell 输出 |
 
-证据目录：`.tmp/prr-069c-r2-f1-dev-20260911T130621Z/`（红/绿、门禁输出、`evidence-sha256-manifest.txt` 共 40 条）。
+证据目录：`.tmp/prr-069c-r2-f1-dev-20260911T130621Z/`（红/绿、门禁输出、`evidence-sha256-manifest.txt`：7 个变更文件 + 29 个证据文件，共 36 条 SHA-256）。
 变更文件 SHA-256（source 冻结树，见 manifest）：`dmg-budget.mjs` `89a76de5…`、`dmg-assembly-contract.mjs` `a1c97904…`、
 `assemble-dmg.mjs` `acf8b33c…`、`bundle-gate.mjs` `350313ce…`、`release-runners.test.ts` `6fcac68e…`、
 `package.json` `75ed587a…`、`README.md` `44f07016…`。
