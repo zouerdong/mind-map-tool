@@ -1,7 +1,7 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-069C_READY / PRR-070_BLOCKED`
+状态：`IN_PROGRESS / PRR-069C-R1_READY / PRR-070_BLOCKED`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -11,6 +11,8 @@
 图标集成回卡：[PRR-068 应用图标生产集成与原生验证](./prr-068-app-icon-integration-task-card-2026-09-09.md)
 
 DMG 确定性装配回卡：[PRR-069C 无 Finder 依赖的确定性 macOS DMG 装配](./prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)
+
+DMG 发布门审阅返卡：[PRR-069C-R1 发布门边界与挂载清理加固](./prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md)
 
 ## 共同执行合同
 
@@ -53,8 +55,9 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | 5 | PRR-066 | 不可并行 | PRR-070 阶段 A 性能回卡 | PNG/CSP、按需加载与性能协议整改 |
 | 6 | PRR-067 | 不可并行 | PRR-070 source `ea047e8` cold 预算失败 | 首次执行归因与条件式收口 |
 | 7 | PRR-068 | 不可并行 | PRR-067 独立审阅通过、负责人已选定产品图标 | 确定性桌面图标与原生验证 |
-| 8A | PRR-069C | 不可并行 | `b45dc0c` 候选命中 `.DS_Store` STOP；ADR 0013 v1.1.0 | `STOP_FOR_INDEPENDENT_REVIEW`：确定性无 Finder DMG 装配与三轮预检已交回 |
-| 8B | PRR-070 | 不可并行 | PRR-069C 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
+| 8A | PRR-069C | 不可并行 | `b45dc0c` 候选命中 `.DS_Store` STOP；ADR 0013 v1.1.0 | `REVISE`：正常路径成立，发布门边界未通过独立审阅 |
+| 8B | PRR-069C-R1 | 不可并行 | PRR-069C 独立审阅返卡 | 正式模式、时间/目录与挂载清理加固；三轮新预检 |
+| 8C | PRR-070 | 不可并行 | PRR-069C-R1 独立审阅通过、新 clean commit、精确 G2 | 唯一新候选与原生证据 |
 | 9 | PRR-080 | 不可并行 | PRR-070/G-FINAL 完成 | 冻结验收包 |
 | 10 | PRR-090 | 不可并行；保留给独立验收者 | 用户把 PRR-080 交回当前审阅任务 | MM-110 与发布交接结论 |
 
@@ -76,6 +79,7 @@ Redlines: <确认未执行，或列出负责人原始授权>
 | PRR-067 | perf-only 启动 milestone、cold 对照诊断、条件式应用优化或协议决策包 | 不改预算/20样本/percentile；无批准不改 Accepted ADR | 分段正反测试、B0～B3 对照、全量相关源码门 |
 | PRR-068 | 固定 SVG 母版、Tauri 桌面图标集、生成器/manifest/verifier | 不重设计，不改性能协议或发布证据 | 两轮确定性、图标红灯、app/ICNS/Finder 与尺寸矩阵 |
 | PRR-069C | app-only bundle、DMG assembler、bundle gate 与 runner tests | 不改 Tauri 生产配置/app/图标/预算；保留旧候选只读 | 无 Finder/AppleScript/`.DS_Store` 红灯、超时/挂载恢复、三轮真实 DMG 预检 |
+| PRR-069C-R1 | bundle gate/assembler 正式边界、mount 状态机、runner tests | 不改装配产品语义；原 PRR-069C attempts 只读作废 | 注入/app-only/阈值/目录红灯、挂载异常矩阵、三轮新预检 |
 | PRR-070 | 新 candidate/evidence 目录；原则上不再改 source/runner | 任一 source/runner 变化即作废重来 | 全量源码门、bundle/install/native/perf/visual 矩阵 |
 | PRR-080 | readiness manifest、acceptance request、验收索引 | 冻结后只读；不得修代码 | `pnpm quality -- --release-evidence <manifest>`、完整 Rust/审计门 |
 | PRR-090 | 独立 MM-110 与新 handoff | 只读冻结输入；发现问题退回对应 PRR | 独立 hash/预算/样本复算与高风险抽测 |
@@ -511,15 +515,31 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 优先级：P0
 
-状态：`STOP_FOR_INDEPENDENT_REVIEW`（实现完成并三轮预检通过；source `cf392e6`）
+状态：`REVISE / SUPERSEDED_BY_PRR-069C-R1`（正常路径三轮预检通过；2026-09-11 独立审阅发现发布门边界与挂载清理缺口）
 
 任务卡：[prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md](./prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)
 实施报告：[prr-069c-implementation-report-2026-09-10.md](../quality/prr-069c-implementation-report-2026-09-10.md)
 
 依赖：source `b45dc0c` 的 PRR-070 STOP 现场只读冻结；ADR 0013 v1.1.0 已记录替代路线
-后继：实现交回独立审阅；审阅通过并形成新 clean source 后，从步骤 1 完整重做 PRR-070
+后继：执行 [PRR-069C-R1](./prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md)；再次独立审阅通过并形成新 clean source 后，从步骤 1 完整重做 PRR-070
 
 本卡移除 Tauri Finder AppleScript/`.DS_Store` 的无上限构建依赖：Tauri 仅构建 `.app`，仓库受控 runner 使用 macOS 系统工具生成带 EULA、Applications 链接、卷图标的 ULMO DMG。禁止延长等待、人工/自动生成 `.DS_Store`、CI 绕过和重跑挑结果。完整允许范围、红灯、三轮真实预检与 STOP 见独立任务卡。
+
+---
+
+## PRR-069C-R1：DMG 发布门边界与挂载清理加固
+
+类型：独立审阅返卡 / 发布证据与系统状态加固
+
+优先级：P0
+
+状态：`READY_FOR_IMPLEMENTATION`
+
+任务卡：[prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md](./prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md)
+
+审阅输入：[prr-069c-independent-review-2026-09-11.md](../quality/prr-069c-independent-review-2026-09-11.md)
+
+本卡封闭正式测试注入、app-only 命令、时间/目录边界和 attach/detach 生命周期四类缺口。只允许修改 DMG release runner、专项测试和状态文档；必须从修复后的同一 clean source 重做三轮正式预检，并停在独立审阅。完整合同、红灯、STOP 和交回格式见独立任务卡。
 
 ---
 
@@ -527,8 +547,8 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-069C`（source `b45dc0c` 的本轮构建已命中预先声明的 `.DS_Store` STOP；即使随后自然完成也只读作废，不得从步骤 5 续跑）
-依赖：PRR-000～069 已集成并经独立审阅；PRR-069C 实现与独立审阅通过；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+状态：`BLOCKED_BY_PRR-069C-R1`（PRR-069C 独立审阅结论为 `REVISE`；原三轮预检不得作为 PRR-070 输入）
+依赖：PRR-000～069 已集成并经独立审阅；PRR-069C-R1 实现与再次独立审阅通过；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标
@@ -551,7 +571,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 1. **冻结 source**：记录 `git rev-parse HEAD`、`git status --short`、OS build、arch、CPU/RAM、Node/pnpm/Rust/Tauri 版本；worktree 非空立即停止。证据目录名使用完整 source commit，不使用短 hash 猜测归属。UTC 只可由 `new Date().toISOString()` 或 `date -u` 生成；禁止手工把本地时间标为 `Z`。
 2. **源码门**：逐项记录开始/结束时间和 exit code，至少运行 `pnpm format:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`pnpm test:integration`、`pnpm test:a11y`、`pnpm test:visual`、`pnpm test:export`、`pnpm build`、`pnpm icon:verify`、`pnpm net:scan`、`pnpm license:scan`、`pnpm boundaries`、`node scripts/runtime-spike/verify-decision.mjs --phase packaging docs/decisions/decision-register.json`、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --all-targets --locked -- -D warnings`。其中 decision gate 必须复算 PRR-067 G-PERF-PROTOCOL 对 ADR 0006 v1.1.0 的 hash 与固定参数绑定；icon gate 必须复算 PRR-068 固定 SVG 母版、完整桌面 7 件、manifest 与 Tauri 引用。复算 initial entry `≤ 500,000B`。此阶段不要运行缺 manifest 必然 fail-closed 的最终 `pnpm quality -- --release-evidence`，它属于 PRR-080。
 3. **依赖 advisory**：记录 JS advisory 命令/数据库时间与结果；运行已有 `cargo audit`，不存在时按本卡局部安装。不得把工具缺失、网络失败或旧数据库写成 PASS；无法完成则 `BLOCKED`。
-4. **唯一 bundle**：用 PRR-069C 独立审阅通过后的正式 `bundle:tauri` / `scripts/quality/bundle-gate.mjs` 从该 clean HEAD 运行 unsigned app-only Tauri build，并由受控 assembler 装配 ADR 0013 v1.1.0 规定的 ULMO DMG，把 inventory 写进本 source 的新 evidence 目录。正式路径不得调用 Finder/AppleScript、Tauri `dmg` target、CI 绕过或 `.DS_Store`。inventory 必须证明 `.app` 与最终 ULMO `.dmg` 都由本轮刷新，记录 path/SHA-256/bytes/mtime/source、bundle/assembler runner hash、LICENSE/ICNS 输入 hash、装配时间与 `dmgFormat=ULMO`。构建前后 source HEAD 和 worktree 必须不变。
+4. **唯一 bundle**：用 PRR-069C-R1 独立审阅通过后的正式 `bundle:tauri` / `scripts/quality/bundle-gate.mjs` 从该 clean HEAD 运行 unsigned app-only Tauri build，并由受控 assembler 装配 ADR 0013 v1.1.0 规定的 ULMO DMG，把 inventory 写进本 source 的新 evidence 目录。正式路径不得调用 Finder/AppleScript、Tauri `dmg` target、CI 绕过或 `.DS_Store`。inventory 必须证明 `.app` 与最终 ULMO `.dmg` 都由本轮刷新，记录 path/SHA-256/bytes/mtime/source、bundle/assembler runner hash、LICENSE/ICNS 输入 hash、装配时间与 `dmgFormat=ULMO`。构建前后 source HEAD 和 worktree 必须不变。
 5. **产物身份与 DMG 实测**：从 `.app/Contents/Info.plist` 与可执行文件复算 product/version/bundle id/arm64/`LSMinimumSystemVersion=11.0`、`.mindmap` document type、UTI/MIME、category、LICENSE/THIRD_PARTY_NOTICES 携带和 CSP/capability；验证 candidate 未签名。用 `hdiutil imageinfo` 复算最终 `Format=ULMO`，只读挂载 `.dmg`，核对 EULA、能打开、包含的 `.app` hash/身份与 inventory 关系、卷图标 hash 以及 `.dmg ≤ 25000000B`，随后正常 detach；不得签名、调用公证或改变系统信任。
 6. **真机性能**：对同一 `.app` 用 `run-performance.mjs --scope release --platform macos --samples 20` 在全新的 attempt evidence 子目录生成 `cold-conditioning.json`、raw 与 summary；先执行恰好一次 conditioning，成功后再采 20 个 conditioned cold 与 20 个 warm 样本。`sessionFirstLaunchMs` 必须在 conditioning artifact 与 summary 一致展示，`conditionedColdStartP95Ms≤1500ms`；另含 renderer-ready、stable RSS、300/450 pan/zoom/drag、create/move/connect/undo、save、2x PNG。每项记录失败数、p50/p95/max、fixture hash、`measurementSource=native-candidate`、candidate/source/runner hash；conditioning artifact 必须由 summary 的 SHA-256 绑定。conditioning 或任一样本失败即整轮 INCOMPLETE；同目录已有本轮性能产物必须拒绝覆盖，重试使用新 attempt 子目录并保留旧轮，不得复用、复制、改写或混合旧 raw data。
 7. **受控安装与文件关联**：先 `install-gate --plan`，再对同一 candidate 执行 `--execute`；按 receipt/hash 证明复制、身份校验和只清理本轮安装。临时注册 LaunchServices 后验证 Finder/`open` 的冷启动与运行中 `.mindmap` 路由、已有 `.json` 兼容、默认 Save As `.mindmap`，结束时注销/恢复并记录前后状态。发现外来安装或无法可靠恢复时停止，不得覆盖或强删。
@@ -678,6 +698,6 @@ worktree 非 clean；任一源码/测试/runner/tracked 文档在候选构建前
 1. 负责人先提供四组输入，并处理 PRR-000、PRR-030 授权项与 PRR-060 法律输入。
 2. 先独占执行 PRR-000，再按派发矩阵执行 PRR-010/020/040/050/030/060。
 3. 000～060 集成后执行 PRR-065；PRR-065 形成新的 clean source commit，旧 PRR-070 试跑证据全部作废。
-4. 由于 `b45dc0c` 已复现 Finder `.DS_Store` 无上限等待，先执行 PRR-069C 并交回独立审阅；本轮作废候选只读保留。
-5. 从包含 PRR-069C 审阅修复与状态同步的新 clean commit 串行执行 PRR-070 → G-FINAL → PRR-080，在 `READY_FOR_INDEPENDENT_REVIEW` 停止。
+4. 由于 `b45dc0c` 已复现 Finder `.DS_Store` 无上限等待，PRR-069C 已完成替代路线；其独立审阅结论为 `REVISE`，下一步只执行 PRR-069C-R1，原候选与 attempts 只读保留。
+5. 从包含 PRR-069C-R1 实现、独立审阅接受记录与状态同步的新 clean commit 串行执行 PRR-070 → G-FINAL → PRR-080，在 `READY_FOR_INDEPENDENT_REVIEW` 停止。
 6. 用户把冻结验收包交回当前审阅任务，由我执行 PRR-090；发布执行仍需另开任务和明确授权。

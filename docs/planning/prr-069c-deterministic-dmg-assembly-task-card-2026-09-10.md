@@ -1,6 +1,6 @@
 # PRR-069C：无 Finder 依赖的确定性 macOS DMG 装配
 
-状态：`STOP_FOR_INDEPENDENT_REVIEW`（实现完成，三轮正式预检通过；见[实施报告](../quality/prr-069c-implementation-report-2026-09-10.md)）
+状态：`REVISE / SUPERSEDED_BY_PRR-069C-R1`（正常路径三轮预检通过；[独立审阅](../quality/prr-069c-independent-review-2026-09-11.md)发现发布门边界与挂载清理缺口）
 
 类型：发布 runner 根因整改
 
@@ -8,7 +8,7 @@
 
 依赖：PRR-069 已独立验收；[ADR 0013 v1.1.0](../decisions/0013-macos-dmg-compression.md) 已明确替代路径；source `b45dc0c` 的 PRR-070 STOP evidence 只读冻结
 
-后继：实现交回独立审阅；只有审阅接受并形成新 clean HEAD 后，才能从步骤 1 完整重做 PRR-070
+后继：执行 [PRR-069C-R1](./prr-069c-r1-release-gate-hardening-task-card-2026-09-11.md)；再次独立审阅接受并形成新 clean HEAD 后，才能从步骤 1 完整重做 PRR-070
 
 实施摘要（2026-09-10）：正式命令改为 `tauri build --bundles app` + `scripts/quality/assemble-dmg.mjs` 受控装配（UDRW → `SetFile -a C` → 受控清除 `.fseventsd` → ULMO → `udifrez` 注入根 LICENSE 生成的挂载前 EULA → 只读挂载复核 → rename）。`bundle-gate` 在 app-only build 与 source/worktree 复核后调用 assembler，全部验证通过才写 inventory；`repack-dmg.mjs` 解除正式引用并标注 superseded。三轮独立预检（`.tmp/prr-069c-attempt-01..03/`）全部通过，装配阶段 11.8s / 10.7s / 9.7s，DMG 均 ULMO、CRC32 VALID、24,286,381 / 24,286,333 / 24,286,341B。source commit `cf392e6`。
 

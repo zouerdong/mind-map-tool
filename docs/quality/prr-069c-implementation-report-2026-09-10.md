@@ -1,7 +1,7 @@
 # PRR-069C 实施报告：无 Finder 依赖的确定性 macOS DMG 装配
 
 日期：2026-09-10
-状态：`STOP_FOR_INDEPENDENT_REVIEW`
+状态：`REVISE / SUPERSEDED_BY_PRR-069C-R1`（正常路径记录保留；见[2026-09-11 独立审阅](./prr-069c-independent-review-2026-09-11.md)）
 派发基线：`b14b78a900854c397247e3a43cd42f67db599c1f`（clean worktree）
 source commit：`cf392e6044d8df1a467a6f6b6fabfb5309bb59c0`（三轮预检时冻结的 HEAD）
 任务卡：[prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)
