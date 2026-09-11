@@ -1,6 +1,6 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-状态：**IN_PROGRESS / PRR-069C-R1_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；PRR-069C 正常装配路径成立，但 2026-09-11 独立审阅发现正式注入、时间/目录边界与失败挂载清理缺口。下一步只执行 PRR-069C-R1。
+状态：**IN_PROGRESS / PRR-069C-R1_IMPLEMENTED_AWAITING_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。PRR-067 双指标协议、PRR-068 图标和 PRR-069 ULMO/证据绑定均已通过独立审阅；PRR-069C-R1 已实现并通过三轮正式预检（[实施报告](./prr-069c-r1-implementation-report-2026-09-11.md)），等待独立审阅；通过并形成新 clean HEAD 后才可重做 PRR-070。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -8,9 +8,9 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS ON PRR-069C IMPLEMENTATION / NEW R1 RUN REQUIRED | PRR-069C 实现门已通过，但 R1 将继续修改 runner；PRR-070 仍须从最终新 clean source 全部重跑 |
+| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R1 IMPLEMENTATION / REVIEW PENDING | R1 实现门（format/typecheck/lint/unit 611/integration/icon/build/cargo 210/clippy）已通过；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
 | 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | PASS ON INVALIDATED PRR-069C ATTEMPTS / R1 REQUIRED | PRR-069C 三轮 DMG 均在预算内，但审阅返卡后只读作废；R1 必须重新生成三轮同源候选 |
+| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R1 ATTEMPTS / REVIEW PENDING | R1 三轮 DMG 为 24,284,017/021/037B（预算内），独立复核 37/37；待独立审阅接受 |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
@@ -21,8 +21,8 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| DMG 装配可重复性 | REVISE / PRR-069C-R1 REQUIRED | PRR-069C 正常路径三轮预检通过，但[独立审阅](./prr-069c-independent-review-2026-09-11.md)发现正式测试注入、时间/目录边界和失败挂载清理缺口；旧 attempts 只读作废，R1 必须三轮重做 |
-| source/evidence 时间拓扑 | NEW EVIDENCE REQUIRED | `b45dc0c` 与原 PRR-069C attempts 均不得复用；PRR-069C-R1/070 必须只接受本轮机器生成、可解析且阈值未放宽的 UTC 证据 |
+| DMG 装配可重复性 | PRR-069C-R1 IMPLEMENTED / REVIEW PENDING | 四项审阅缺口（正式注入、attach 生命周期、时间上限、work-dir 边界）已全部修复并以负向测试证明 CLOSED；R1 三轮预检（同源 app-only build + 固定阈值 + 独立复核）通过，见[实施报告](./prr-069c-r1-implementation-report-2026-09-11.md) |
+| source/evidence 时间拓扑 | PASS ON PRR-069C-R1 ATTEMPTS / REVIEW PENDING | R1 三轮证据为机器生成 UTC 且阈值未放宽（120000/180000 精确）；`b45dc0c` 与原 PRR-069C attempts 仍只读作废；PRR-070 从新 clean HEAD 重新取证 |
 | G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |
