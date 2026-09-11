@@ -321,19 +321,31 @@ if (tool === "hdiutil") {
     }
     state.mounts[mp] = { device: "/dev/disk9s1", image: imagePath, readOnly: args.includes("-readonly") };
     saveState(state);
+    // MOCK_ATTACH_UNPARSABLE：挂载真实登记后输出不含 mountpoint 的内容（登记恢复红灯）。
+    if (env.MOCK_ATTACH_UNPARSABLE) {
+      process.stdout.write("attach: handle allocated, details omitted\\n");
+      process.exit(0);
+    }
     process.stdout.write("/dev/disk9\\tGUID_partition_scheme\\t\\n");
     process.stdout.write("/dev/disk9s1\\tApple_HFS\\t" + mp + "\\n");
     process.exit(0);
   }
   if (cmd === "detach") {
     if (env.MOCK_DETACH_FAIL) die(5, "mock detach failure");
+    // MOCK_DETACH_FAIL_ON：第 N 次 detach 起失败（区分 rw 与只读卷的清理路径）。
+    state.detachCount = (state.detachCount || 0) + 1;
+    if (env.MOCK_DETACH_FAIL_ON && state.detachCount >= Number(env.MOCK_DETACH_FAIL_ON)) {
+      saveState(state);
+      die(5, "mock detach failure (on #" + state.detachCount + ")");
+    }
     const mount = state.mounts[args[1]];
     if (mount && !mount.readOnly) {
       // 可写卷卸载后镜像内容即挂载期间状态（含被删除的 .fseventsd）。
       const image = readImage(mount.image);
       if (image) writeImage(mount.image, { ...image, contents: args[1] });
     }
-    delete state.mounts[args[1]];
+    // MOCK_DETACH_LIE：detach 返回 0 但 mount table 条目保留（复核红灯）。
+    if (!env.MOCK_DETACH_LIE) delete state.mounts[args[1]];
     saveState(state);
     process.exit(0);
   }
@@ -394,6 +406,9 @@ if (tool === "SetFile") {
   process.exit(0);
 }
 if (tool === "mount") {
+  // MOCK_MOUNT_FAIL/HANG：mount table 不可用（fail-closed 红灯）。
+  if (env.MOCK_MOUNT_FAIL) die(15, "mock mount failure");
+  if (env.MOCK_MOUNT_HANG) sleepForever();
   for (const mp of Object.keys(state.mounts)) {
     process.stdout.write(state.mounts[mp].device + " on " + mp + " (hfs, local, read-only)\\n");
   }
@@ -2230,15 +2245,34 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
 
   it("EULA：未同意时不得挂载；内容 hash 与根 LICENSE 不一致时失败", () => {
     const { repoDir, regPath, toolDir } = setup("assemble-eula-repo");
-    const noGate = runAssembler(repoDir, regPath, toolDir, [], { MOCK_NO_EULA_GATE: "1" });
+    // 失败轮会保留 runDir 现场，后续 case 使用独立 work-dir（不复用失败现场目录）。
+    const noGate = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "work-dir": `${ASSEMBLY_WORK_REL}-a` },
+      { MOCK_NO_EULA_GATE: "1" },
+    );
     expect(noGate.status).toBe(1);
     expect(noGate.stderr).toContain("挂载前 EULA 未生效");
 
-    const tampered = runAssembler(repoDir, regPath, toolDir, [], { MOCK_EULA_TAMPER: "1" });
+    const tampered = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "work-dir": `${ASSEMBLY_WORK_REL}-b` },
+      { MOCK_EULA_TAMPER: "1" },
+    );
     expect(tampered.status).toBe(1);
     expect(tampered.stderr).toContain("EULA 内容 hash");
 
-    const noEula = runAssembler(repoDir, regPath, toolDir, [], { MOCK_UDIFREZ_NOOP: "1" });
+    const noEula = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "work-dir": `${ASSEMBLY_WORK_REL}-c` },
+      { MOCK_UDIFREZ_NOOP: "1" },
+    );
     expect(noEula.status).toBe(1);
     expect(noEula.stderr).toMatch(/未声明挂载前 EULA|挂载前 EULA 未生效/);
   });
@@ -2255,8 +2289,14 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
         /身份字段与 app-only build 不一致|目录级 hash 与 app-only build 不一致/,
       ],
     ];
-    for (const [env, pattern] of cases) {
-      const res = runAssembler(repoDir, regPath, toolDir, [], env);
+    for (const [idx, [env, pattern]] of cases.entries()) {
+      const res = runAssembler(
+        repoDir,
+        regPath,
+        toolDir,
+        { "work-dir": `${ASSEMBLY_WORK_REL}-p${idx}` },
+        env,
+      );
       expect(res.status).toBe(1);
       expect(res.stderr).toMatch(pattern);
       // 失败不得把半成品落到批准输出路径
@@ -2275,8 +2315,14 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
       [{ MOCK_SIGNED: "1" }, /签名或加密/],
       [{ MOCK_UDIFREZ_FAIL: "1" }, /退出码非零/],
     ];
-    for (const [env, pattern] of cases) {
-      const res = runAssembler(repoDir, regPath, toolDir, [], env);
+    for (const [idx, [env, pattern]] of cases.entries()) {
+      const res = runAssembler(
+        repoDir,
+        regPath,
+        toolDir,
+        { "work-dir": `${ASSEMBLY_WORK_REL}-t${idx}` },
+        env,
+      );
       expect(res.status).toBe(1);
       expect(res.stderr).toMatch(pattern);
     }
@@ -2286,8 +2332,12 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
     const { repoDir, regPath, toolDir } = setup("assemble-residual-repo");
     const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_DETACH_FAIL: "1" });
     expect(res.status).toBe(1);
-    expect(res.stderr).toMatch(/挂载未安全解除|退出码非零|STOP/);
+    expect(res.stderr).toMatch(/RESIDUAL_MOUNT|挂载未安全解除|退出码|STOP/);
     expect(res.stderr).toContain("assemble-dmg: FAILURE");
+    // PRR-069C-R1：detach 非零时登记不被静默清空，mock mount table 保持非空供复算
+    expect(
+      Object.keys(JSON.parse(readFileSync(join(toolDir, "mock-state.json"), "utf8")).mounts).length,
+    ).toBeGreaterThan(0);
   });
 
   it("体积超预算（>25,000,000B）时 fail-closed", () => {
@@ -2407,4 +2457,425 @@ describe("PRR-069C 正式发布路径命令禁区", () => {
     expect(repack).toContain("SUPERSEDED");
     expect(readFileSync(BUNDLE_GATE, "utf8")).not.toContain("repack-dmg.mjs");
   });
+});
+
+// ==================== 1e. PRR-069C-R1 发布门边界与挂载清理 ====================
+// 独立审阅（2026-09-11）四项阻断：测试注入未与正式模式隔离、attach 后未登记/未卸载
+// 路径、时间预算可被参数放大、work-dir 越过任务授权范围。以下红灯先于实现建立。
+const R1_REPORT_REL = ".tmp/release-runner-fixtures/evidence/assembly-report.json";
+
+describe("PRR-069C-R1 发布门边界与挂载清理加固", () => {
+  beforeEach(() => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(FIXTURE_DIR, { recursive: true, force: true });
+    } catch {}
+  });
+
+  /** canonical root（真实仓库）下的 gate 调用：参数契约检查必须先于 G2/git/build。 */
+  function runCanonicalGate(extra: string[], command: string[]) {
+    return runNode(BUNDLE_GATE, [
+      "--host",
+      "tauri",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ".tmp/prr-069c-r1-canary",
+      ...extra,
+      "--",
+      ...command,
+    ]);
+  }
+
+  const APP_ONLY_COMMAND = [
+    "pnpm",
+    "--filter",
+    "@mindmap/desktop",
+    "tauri",
+    "build",
+    "--bundles",
+    "app",
+  ];
+
+  it("R1-1 canonical root 传 --assembler-script/--assembler-tool-dir 被拒绝（测试注入不得进入正式模式）", () => {
+    for (const extra of [
+      ["--assembler-script", ".tmp/fake-assembler.mjs"],
+      ["--assembler-tool-dir", ".tmp/mock-tools"],
+    ]) {
+      const res = runCanonicalGate(extra, APP_ONLY_COMMAND);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("测试注入");
+    }
+  });
+
+  it("R1-2 canonical root 覆盖 timeout/deadline 被拒绝，即使值更小", () => {
+    for (const extra of [
+      ["--assembler-timeout-ms", "60000"],
+      ["--assembler-deadline-ms", "90000"],
+    ]) {
+      const res = runCanonicalGate(extra, APP_ONLY_COMMAND);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("测试注入");
+    }
+  });
+
+  it("R1-3 超过 120000/180000 上限在任何模式都被拒绝（gate 与 assembler 双侧）", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-cap-repo");
+    // fixture gate 注入超上限
+    for (const extra of [
+      ["--assembler-timeout-ms", "200000"],
+      ["--assembler-deadline-ms", "200000"],
+    ]) {
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--root",
+        repoDir,
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        ASSEMBLY_WORK_REL,
+        "--assembler-tool-dir",
+        ".tmp/mock-tools",
+        ...extra,
+        "--",
+        process.execPath,
+        "-e",
+        appBuildScript(repoDir),
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/120000|180000/);
+    }
+    // assembler 直接超上限 / 非正数
+    for (const overrides of [
+      { "timeout-ms": "200000" },
+      { "deadline-ms": "999000" },
+      { "timeout-ms": "0" },
+      { "timeout-ms": "-5" },
+      { "timeout-ms": "abc" },
+    ]) {
+      const res = runAssembler(repoDir, regPath, toolDir, overrides);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/120000|正整数/);
+    }
+  }, 30000);
+
+  it("R1-4 fixture 注入路径逃逸、绝对路径或指向 canonical 仓库被拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-inject-repo");
+    const gateArgs = (inject: string[]) => [
+      "--host",
+      "tauri",
+      "--root",
+      repoDir,
+      "--scope-from",
+      regPath,
+      "--candidate-root",
+      ".tmp/release-runner-fixtures/bundle",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ASSEMBLY_WORK_REL,
+      ...inject,
+      "--",
+      process.execPath,
+      "-e",
+      appBuildScript(repoDir),
+    ];
+    // 绝对路径（即使位于 canonical 仓库内）
+    const absolute = runNode(
+      BUNDLE_GATE,
+      gateArgs(["--assembler-tool-dir", join(ROOT, ".tmp/release-runner-fixtures")]),
+    );
+    expect(absolute.status).toBe(1);
+    expect(absolute.stderr).toContain("绝对路径");
+    // 路径逃逸
+    const escape = runNode(BUNDLE_GATE, gateArgs(["--assembler-tool-dir", "../../evil-tools"]));
+    expect(escape.status).toBe(1);
+    expect(escape.stderr).toMatch(/路径穿越|越界 repo root/);
+    // 指向 canonical 仓库的 tracked source（相对 fixture root 穿越到真实仓库）
+    const canonicalRel = relative(repoDir, ROOT);
+    const intoCanonical = runNode(
+      BUNDLE_GATE,
+      gateArgs(["--assembler-tool-dir", `${canonicalRel}/scripts/quality`.split("/").join("/")]),
+    );
+    expect(intoCanonical.status).toBe(1);
+    expect(intoCanonical.stderr).toMatch(/路径穿越|越界 repo root|canonical/);
+  });
+
+  it("R1-5 正式 build command 必须精确为 Tauri app-only：fake/默认/dmg/app,dmg/--ci/--skip-jenkins 逐项拒绝", () => {
+    for (const command of [
+      ["node", "-e", "process.exit(0)"],
+      ["sh", "-c", "pnpm --filter @mindmap/desktop tauri build --bundles app"],
+      ["pnpm", "--filter", "@mindmap/desktop", "tauri", "build"],
+      ["pnpm", "--filter", "@mindmap/desktop", "tauri", "build", "--bundles", "dmg"],
+      ["pnpm", "--filter", "@mindmap/desktop", "tauri", "build", "--bundles", "app,dmg"],
+      ["pnpm", "--filter", "@mindmap/desktop", "tauri", "build", "--bundles", "app", "--ci"],
+      [
+        "pnpm",
+        "--filter",
+        "@mindmap/desktop",
+        "tauri",
+        "build",
+        "--bundles",
+        "app",
+        "--skip-jenkins",
+      ],
+    ]) {
+      const res = runCanonicalGate([], command);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("app-only");
+    }
+  });
+
+  it("R1-6 work-dir 白名单：.tmp 根、普通 .tmp/work、release-candidate、空后缀、evidence 子树、symlink、预存非空逐项拒绝", () => {
+    // canonical（正式白名单）
+    for (const bad of [
+      ".tmp/work",
+      ".tmp/release-candidate/prr-069c-r1-x",
+      ".tmp/prr-069c-",
+      ".tmp",
+    ]) {
+      const res = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        bad,
+        "--",
+        ...APP_ONLY_COMMAND,
+      ]);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("prr-069c");
+    }
+    // fixture（通用规则：evidence 子树 / symlink / 预存非空）
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-workdir-repo");
+    const inEvidence = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/evidence/work",
+    });
+    expect(inEvidence.status).toBe(1);
+    expect(inEvidence.stderr).toContain("evidence");
+
+    const realDir = join(repoDir, ".tmp/real-work-target");
+    mkdirSync(realDir, { recursive: true });
+    const linkPath = join(repoDir, ".tmp/release-runner-fixtures/work-link");
+    execFileSync("ln", ["-s", realDir, linkPath]);
+    const symlink = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/work-link",
+    });
+    expect(symlink.status).toBe(1);
+    expect(symlink.stderr).toMatch(/symlink|符号链接|不是常规空目录/);
+
+    const presetDir = join(repoDir, ".tmp/release-runner-fixtures/work-preset");
+    mkdirSync(presetDir, { recursive: true });
+    writeFileSync(join(presetDir, "foreign.txt"), "pre-existing alien content");
+    const preset = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/work-preset",
+    });
+    expect(preset.status).toBe(1);
+    expect(preset.stderr).toMatch(/非空|预存外来目标/);
+    expect(readFileSync(join(presetDir, "foreign.txt"), "utf8")).toBe("pre-existing alien content");
+  });
+
+  it("R1-7 EULA 拒绝探针意外挂载成功：先登记、受控卸载、复核表空，然后整体失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-eula-mount-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_NO_EULA_GATE: "1" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("挂载前 EULA 未生效");
+    expect(res.stderr).toContain("已受控卸载");
+    expect(readMockMounts(toolDir)).toEqual({});
+  });
+
+  it("R1-8 attach 返回 0 但 stdout 不可解析：从 mount table 恢复登记并完成整轮清理", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-unparsable-repo");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { report: R1_REPORT_REL },
+      {
+        MOCK_ATTACH_UNPARSABLE: "1",
+      },
+    );
+    expect(res.status).toBe(0);
+    const report = readAssemblyReport(repoDir, R1_REPORT_REL);
+    // 恢复事实进入命令日志（可审计），最终 mount table 为空
+    expect(report.commands.some((c: any) => c.recoveredFromMountTable === true)).toBe(true);
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(true);
+  });
+
+  it("R1-9 attach 不可解析且 mount table 查询失败：STOP，不得报告已清理", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-unparsable-stop-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_ATTACH_UNPARSABLE: "1",
+      MOCK_MOUNT_FAIL: "1",
+    });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("mount table 不可用");
+    expect(res.stderr).toContain("STOP");
+    // 未登记也未清理，mock 表保留真实状态供复算
+    expect(Object.keys(readMockMounts(toolDir) ?? {}).length).toBeGreaterThan(0);
+  });
+
+  it("R1-10 cleanup detach 非零：RESIDUAL_MOUNT，登记不被静默清空，mock 表保持非空供复算", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-residual-repo");
+    // 第 2 次 detach 起失败：rw 卸载正常完成，只读复核卷在 payload 失败后的
+    // 清理 detach 中失败（覆盖"成功 attach 后失败清理"路径）。
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_ATTACH_BAD_ICON: "1",
+      MOCK_DETACH_FAIL_ON: "2",
+    });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("RESIDUAL_MOUNT");
+    const failure = JSON.parse(res.stderr.split("assemble-dmg: FAILURE ")[1].split("\n")[0]);
+    expect(failure.residualMount).toBeTruthy();
+    expect(failure.activeMount?.mountpoint).toContain("mnt-final");
+    expect(Object.keys(readMockMounts(toolDir)).length).toBeGreaterThan(0);
+  });
+
+  it("R1-11 detach 返回 0 但 mount table 仍有条目：失败并保留残留证据", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-detach-lie-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_DETACH_LIE: "1" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("RESIDUAL_MOUNT");
+    const failure = JSON.parse(res.stderr.split("assemble-dmg: FAILURE ")[1].split("\n")[0]);
+    expect(failure.residualMount).toBeTruthy();
+    expect(Object.keys(readMockMounts(toolDir)).length).toBeGreaterThan(0);
+  });
+
+  it("R1-12 mount 查询非零/超时：不得把空 stdout 解释为无残留", () => {
+    const failRepo = createAssemblyFixture("r1-mount-fail-repo");
+    const failed = runAssembler(failRepo.repoDir, failRepo.regPath, failRepo.toolDir, [], {
+      MOCK_MOUNT_FAIL: "1",
+    });
+    expect(failed.status).toBe(1);
+    expect(failed.stderr).toContain("mount table 不可用");
+
+    const hangRepo = createAssemblyFixture("r1-mount-hang-repo");
+    const startedMs = Date.now();
+    const hung = runAssembler(
+      hangRepo.repoDir,
+      hangRepo.regPath,
+      hangRepo.toolDir,
+      { "timeout-ms": "1500" },
+      { MOCK_MOUNT_HANG: "1" },
+    );
+    expect(hung.status).toBe(1);
+    expect(Date.now() - startedMs).toBeLessThan(20_000);
+    expect(hung.stderr).toContain("mount table 不可用");
+  }, 30000);
+
+  it("R1-13 正常路径 detach 后 mount table 为空，报告绑定固定工具清单与阈值", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r1-normal-tools-repo");
+    const res = runAssembler(repoDir, regPath, toolDir, { report: R1_REPORT_REL });
+    expect(res.status).toBe(0);
+    expect(readMockMounts(toolDir)).toEqual({});
+    const report = readAssemblyReport(repoDir);
+    expect(Object.keys(report.tools).sort()).toEqual(
+      ["SetFile", "ditto", "hdiutil", "lipo", "mount", "plutil", "xattr"].sort(),
+    );
+    for (const entry of Object.values<any>(report.tools)) {
+      expect(typeof entry.path).toBe("string");
+      expect(entry.path).toContain("mock-tools");
+      expect(/^[a-f0-9]{64}$/.test(entry.sha256)).toBe(true);
+    }
+    expect(report.timeoutMs).toBeLessThanOrEqual(120000);
+    expect(report.deadlineMs).toBeLessThanOrEqual(180000);
+  });
+
+  it("R1-14 canonical assembler：--tool-dir、显式阈值覆盖与非白名单 work-dir 被拒绝", () => {
+    const base = [
+      "--app",
+      ASSEMBLY_APP_REL,
+      "--output",
+      ASSEMBLY_DMG_REL,
+      "--after",
+      "2020-01-01T00:00:00Z",
+      "--format",
+      "ULMO",
+    ];
+    const toolDirRes = runNode(ASSEMBLE_DMG, [
+      ...base,
+      "--work-dir",
+      ".tmp/prr-069c-r1-canary",
+      "--tool-dir",
+      ".tmp/x",
+    ]);
+    expect(toolDirRes.status).toBe(1);
+    expect(toolDirRes.stderr).toContain("测试注入");
+
+    const timeoutRes = runNode(ASSEMBLE_DMG, [
+      ...base,
+      "--work-dir",
+      ".tmp/prr-069c-r1-canary",
+      "--timeout-ms",
+      "60000",
+    ]);
+    expect(timeoutRes.status).toBe(1);
+    expect(timeoutRes.stderr).toMatch(/禁止覆盖|固定/);
+
+    const workDirRes = runNode(ASSEMBLE_DMG, [...base, "--work-dir", ".tmp/work"]);
+    expect(workDirRes.status).toBe(1);
+    expect(workDirRes.stderr).toContain(".tmp/prr-069c-");
+  });
+
+  it("R1-15 gate 拒绝报告中超上限的时间阈值（fixture 伪造报告也拦下）", () => {
+    const { repoDir, regPath } = createAssemblyFixture("r1-fake-threshold-repo");
+    const fakeAssembler = join(repoDir, ".tmp/fake-threshold-assembler.mjs");
+    writeFileSync(
+      fakeAssembler,
+      `import { mkdirSync, writeFileSync } from "node:fs";
+       console.log(JSON.stringify({
+         runner: "assemble-dmg.mjs",
+         runnerSha256: "${"a".repeat(64)}",
+         startedAt: new Date().toISOString(),
+         finishedAt: new Date().toISOString(),
+         timeoutMs: 200000,
+         deadlineMs: 200000,
+         commands: [{ tool: "hdiutil", args: [], timedOut: false }],
+       }));\n`,
+    );
+    const res = runNode(BUNDLE_GATE, [
+      "--host",
+      "tauri",
+      "--root",
+      repoDir,
+      "--scope-from",
+      regPath,
+      "--candidate-root",
+      ".tmp/release-runner-fixtures/bundle",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ASSEMBLY_WORK_REL,
+      "--assembler-script",
+      ".tmp/fake-threshold-assembler.mjs",
+      "--",
+      process.execPath,
+      "-e",
+      appBuildScript(repoDir),
+    ]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/120000|时间阈值/);
+  });
+
+  /** 读取 mock 工具链的 mount table 状态（残留断言用）。 */
+  function readMockMounts(toolDir: string): Record<string, any> | null {
+    const p = join(toolDir, "mock-state.json");
+    if (!existsSync(p)) return null;
+    return JSON.parse(readFileSync(p, "utf8")).mounts ?? {};
+  }
 });

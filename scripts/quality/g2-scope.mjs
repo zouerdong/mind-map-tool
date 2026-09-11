@@ -38,6 +38,22 @@ export const SIGNING_FILES = [
   "apps/desktop/build/entitlements.mac.plist",
 ];
 
+/**
+ * PRR-069C-R1：DMG 装配固定系统工具清单（macOS 自带绝对路径）。
+ * assemble-dmg 按它解析工具并把每个工具的 path+sha256 写进装配报告；
+ * bundle-gate 在正式模式下复核报告工具与该清单逐项一致（path 与重算 hash），
+ * 使正式证据绑定冻结的系统工具，而不是被注入目录里的替身。
+ */
+export const SYSTEM_TOOL_PATHS = Object.freeze({
+  hdiutil: "/usr/bin/hdiutil",
+  ditto: "/usr/bin/ditto",
+  SetFile: "/usr/bin/SetFile",
+  mount: "/sbin/mount",
+  plutil: "/usr/bin/plutil",
+  lipo: "/usr/bin/lipo",
+  xattr: "/usr/bin/xattr",
+});
+
 export function checkSigningHints(host, repoRoot) {
   const hits = [];
   // 环境变量检测：仅报告变量名，绝不输出凭据值

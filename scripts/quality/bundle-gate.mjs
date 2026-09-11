@@ -3,12 +3,27 @@
 // 构建完成后盘点批准目录内的新产物，生成 inventory 与 hash。
 // --assemble-dmg（PRR-069C / ADR 0013 v1.1.0）：正式路径只做 app-only build，
 // 再由 assemble-dmg.mjs 从本轮 .app 装配 ULMO DMG；装配失败即整体失败，不回退、不复用旧 DMG。
+// PRR-069C-R1 加固：
+//   - 正式模式（--root 即 runner 所在 canonical 仓库）拒绝全部测试注入参数
+//     （--assembler-script/--assembler-tool-dir/--assembler-timeout-ms/--assembler-deadline-ms），
+//     并由 gate 自身强制 build command 为精确的 Tauri app-only 合同；
+//   - 正式 work-dir 只允许 .tmp/prr-069c-<非空>；任何模式都拒绝 evidence 子树、
+//     符号链接与预存外来目标；注入阈值不得超过 120000/180000ms；
+//   - 正式报告必须精确 timeoutMs=120000/deadlineMs=180000，且工具清单与
+//     SYSTEM_TOOL_PATHS 逐项一致（path + 重算 hash），不采信被注入文件的自身 hash。
 // 用法：node bundle-gate.mjs --host tauri [--scope-from <register>] [--candidate-root <path>]
 //           [--assemble-dmg --dmg-format ULMO --work-dir <.tmp/...>] -- <app-only-build-command>
 
 import { spawnSync, execFileSync } from "node:child_process";
-import { existsSync, readdirSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
-import { resolve, dirname, relative, join } from "node:path";
+import {
+  existsSync,
+  readdirSync,
+  lstatSync,
+  mkdirSync,
+  writeFileSync,
+  realpathSync,
+} from "node:fs";
+import { resolve, dirname, relative, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   loadAndValidateG2Scope,
@@ -17,6 +32,7 @@ import {
   computeArtifactSha256,
   validateSafePath,
   isSameOrDescendant,
+  SYSTEM_TOOL_PATHS,
 } from "./g2-scope.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -30,9 +46,22 @@ function flag(name) {
   return i === -1 ? null : args[i + 1];
 }
 
+/** 规范化到真实路径（无符号链接别名），用于正式/fixture 模式判定。 */
+function toRealPath(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
 // --root 可把 gate 指向另一仓库根（与 verify-decision.mjs 相同的复算/测试入口）；
 // 生产调用不传该参数，默认本仓库根，clean-worktree 与 G2 scope 检查口径不变。
 const ROOT = flag("root") ? resolve(flag("root")) : resolve(HERE, "../..");
+// PRR-069C-R1：canonical source root 由 runner 文件自身位置决定（与 --root 无关），
+// 调用者无法通过环境变量或参数伪造“正式”判定。
+const CANONICAL_ROOT = resolve(HERE, "../..");
+const IS_PRODUCTION = toRealPath(ROOT) === toRealPath(CANONICAL_ROOT);
 
 const host = flag("host");
 const scopeFrom = flag("scope-from") ?? "docs/decisions/decision-register.json";
@@ -47,11 +76,32 @@ const workDir = flag("work-dir");
 const dashdash = args.indexOf("--");
 const command = dashdash === -1 ? [] : args.slice(dashdash + 1);
 
-// 以下均为测试注入入口，生产调用不传；默认使用真实 assembler 与系统工具。
+// 以下均为测试注入入口，只在非 canonical 的合成 fixture root 内合法；默认使用
+// 真实 assembler 与系统工具。
 const assemblerScript = flag("assembler-script");
 const assemblerToolDir = flag("assembler-tool-dir");
 const assemblerTimeoutMs = flag("assembler-timeout-ms");
 const assemblerDeadlineMs = flag("assembler-deadline-ms");
+
+// PRR-069C-R1：正式装配的固定时间预算（单命令 120s / 整轮 180s），不得放宽。
+const PROD_ASSEMBLER_TIMEOUT_MS = 120000;
+const PROD_ASSEMBLER_DEADLINE_MS = 180000;
+// 正式 build command 的窄允许合同：与 package.json 的 bundle:tauri 完全一致
+// （pnpm --filter @mindmap/desktop tauri build --bundles app），拒绝 wrapper、
+// fake command、默认全 bundle、dmg target 与 CI 绕过。
+const PRODUCTION_BUILD_COMMANDS = [
+  ["pnpm", "--filter", "@mindmap/desktop", "tauri", "build", "--bundles", "app"],
+  ["pnpm", "tauri", "build", "--bundles", "app"],
+];
+
+function gateBlocked(message) {
+  console.error(`bundle-gate: BLOCKED — ${message}`);
+  process.exit(1);
+}
+
+function commandMatches(candidate, allowed) {
+  return candidate.length === allowed.length && allowed.every((token, i) => token === candidate[i]);
+}
 
 if (!host || command.length === 0) {
   console.error(
@@ -69,6 +119,87 @@ if (assembleDmg && !workDir) {
     "bundle-gate: BLOCKED — --assemble-dmg 必须声明 --work-dir <repo-relative .tmp/...>",
   );
   process.exit(1);
+}
+
+// ---------------- PRR-069C-R1：模式边界与注入隔离（先于 G2/git/build，无副作用） ----------------
+if (IS_PRODUCTION) {
+  for (const injectFlag of [
+    "assembler-script",
+    "assembler-tool-dir",
+    "assembler-timeout-ms",
+    "assembler-deadline-ms",
+  ]) {
+    if (flag(injectFlag) !== null) {
+      gateBlocked(
+        `正式仓库（canonical source root）禁止测试注入参数 --${injectFlag}；` +
+          "正式装配只能使用 tracked assembler 与固定系统工具",
+      );
+    }
+  }
+  if (assembleDmg) {
+    const normalizedWorkDir = workDir.split(/[\\/]+/).join("/");
+    if (!/^\.tmp\/prr-069c-.+/.test(normalizedWorkDir)) {
+      gateBlocked(
+        `正式 work-dir 必须位于 .tmp/prr-069c-<非空> 任务目录内（不得使用 .tmp 根、` +
+          `普通工作目录或历史 candidate/evidence 目录）: ${workDir}`,
+      );
+    }
+    const commandAllowed = PRODUCTION_BUILD_COMMANDS.some((allowed) =>
+      commandMatches(command, allowed),
+    );
+    if (!commandAllowed) {
+      gateBlocked(
+        `正式 build command 必须精确为 Tauri app-only（pnpm ... tauri build --bundles app），` +
+          `拒绝: ${command.join(" ")}（不允许 dmg target、默认全 bundle、CI 绕过、wrapper 或 fake command）`,
+      );
+    }
+  }
+} else {
+  // fixture 模式：注入参数本身要做路径与阈值安全检查。
+  for (const [injectFlag, value] of [
+    ["assembler-script", assemblerScript],
+    ["assembler-tool-dir", assemblerToolDir],
+  ]) {
+    if (value === null) continue;
+    if (isAbsolute(value)) {
+      gateBlocked(
+        `--${injectFlag} 是测试注入参数，只接受 fixture root 内的相对路径（拒绝绝对路径）: ${value}`,
+      );
+    }
+    let safeRel;
+    try {
+      safeRel = validateSafePath(value, ROOT, injectFlag);
+    } catch (err) {
+      gateBlocked(`--${injectFlag} 注入路径无效: ${err.message}`);
+    }
+    const injectedAbs = resolve(ROOT, safeRel);
+    if (isSameOrDescendant(injectedAbs, toRealPath(CANONICAL_ROOT))) {
+      gateBlocked(`--${injectFlag} 不得指向 canonical 仓库或其祖先目录: ${value}`);
+    }
+  }
+  const injectedTimeout = assemblerTimeoutMs === null ? null : Number(assemblerTimeoutMs);
+  const injectedDeadline = assemblerDeadlineMs === null ? null : Number(assemblerDeadlineMs);
+  if (injectedTimeout !== null) {
+    if (
+      !Number.isSafeInteger(injectedTimeout) ||
+      injectedTimeout <= 0 ||
+      injectedTimeout > PROD_ASSEMBLER_TIMEOUT_MS
+    ) {
+      gateBlocked(`--assembler-timeout-ms 必须是不超过 ${PROD_ASSEMBLER_TIMEOUT_MS} 的正整数`);
+    }
+  }
+  if (injectedDeadline !== null) {
+    if (
+      !Number.isSafeInteger(injectedDeadline) ||
+      injectedDeadline <= 0 ||
+      injectedDeadline > PROD_ASSEMBLER_DEADLINE_MS
+    ) {
+      gateBlocked(`--assembler-deadline-ms 必须是不超过 ${PROD_ASSEMBLER_DEADLINE_MS} 的正整数`);
+    }
+  }
+  if (injectedTimeout !== null && injectedDeadline !== null && injectedDeadline < injectedTimeout) {
+    gateBlocked("--assembler-deadline-ms 不得小于 --assembler-timeout-ms");
+  }
 }
 
 // 1. 校验 G2 scope 与 build action 授权
@@ -110,6 +241,47 @@ if (hits.length) {
   console.error(`bundle-gate: FAIL — 检测到签名配置/凭据迹象（${hits.join(", ")}）。`);
   console.error("签名/公证是独立授权门槛，不能由打包脚本顺带执行（MM-100/G2 规则）。");
   process.exit(1);
+}
+
+// 2b. PRR-069C-R1：--assemble-dmg 的 work-dir 通用边界（正式白名单已在参数阶段
+// 拒绝；此处为两模式共用的结构性检查，全部先于 build 执行）。
+if (assembleDmg) {
+  let safeWorkDirEarly;
+  try {
+    safeWorkDirEarly = validateSafePath(workDir, ROOT, "work-dir");
+  } catch (err) {
+    gateBlocked(`work-dir 无效: ${err.message}`);
+  }
+  if (!safeWorkDirEarly.startsWith(".tmp/")) {
+    gateBlocked(`work-dir 必须位于仓库内被忽略的 .tmp/ 下: ${safeWorkDirEarly}`);
+  }
+  const workDirEarlyAbs = resolve(ROOT, safeWorkDirEarly);
+  if (
+    validated.normalized.evidenceOutputPaths.some((evidencePath) =>
+      isSameOrDescendant(resolve(ROOT, evidencePath), workDirEarlyAbs),
+    )
+  ) {
+    gateBlocked(`work-dir 不得位于 G2 evidence 输出目录内（证据目录只读）: ${safeWorkDirEarly}`);
+  }
+  const approvedDmgEarly = validated.normalized.candidateOutputPaths.filter((p) =>
+    p.endsWith(".dmg"),
+  );
+  if (
+    approvedDmgEarly.some((dmgPath) =>
+      isSameOrDescendant(dirname(resolve(ROOT, dmgPath)), workDirEarlyAbs),
+    )
+  ) {
+    gateBlocked(`work-dir 不得位于候选产物目录内: ${safeWorkDirEarly}`);
+  }
+  if (existsSync(workDirEarlyAbs)) {
+    const workDirStat = lstatSync(workDirEarlyAbs);
+    if (workDirStat.isSymbolicLink() || !workDirStat.isDirectory()) {
+      gateBlocked(`work-dir 已存在且不是常规目录（拒绝符号链接）: ${safeWorkDirEarly}`);
+    }
+    if (readdirSync(workDirEarlyAbs).length > 0) {
+      gateBlocked(`work-dir 已存在且非空（拒绝预存外来目标）: ${safeWorkDirEarly}`);
+    }
+  }
 }
 
 // 3. 记录构建前 candidateRoot 状态（若存在）
@@ -212,6 +384,22 @@ if (assembleDmg) {
     console.error(`bundle-gate: BLOCKED — assembler 不存在: ${relative(ROOT, assemblerPath)}`);
     process.exit(1);
   }
+  // PRR-069C-R1：正式模式必须使用 tracked scripts/quality/assemble-dmg.mjs；
+  // fixture 注入已在参数阶段做过路径安全检查。正式 inventory 的 source 归因
+  // 绑定 canonical tracked 文件，而不是“被注入文件的 hash 与自身一致”。
+  if (IS_PRODUCTION && assemblerPath !== ASSEMBLER_PATH) {
+    gateBlocked(`正式装配必须使用 tracked assembler: ${relative(ROOT, ASSEMBLER_PATH)}`);
+  }
+  if (IS_PRODUCTION) {
+    const trackedAssembler = execFileSync(
+      "git",
+      ["ls-files", "--", relative(CANONICAL_ROOT, ASSEMBLER_PATH)],
+      { cwd: ROOT, encoding: "utf8" },
+    ).trim();
+    if (trackedAssembler !== relative(CANONICAL_ROOT, ASSEMBLER_PATH)) {
+      gateBlocked("正式 assembler 必须是 git tracked 文件（未被跟踪的实现不可归因）");
+    }
+  }
   const assemblyReportRel = inventoryOutputRel
     ? join(dirname(inventoryOutputRel), "dmg-assembly-report.json")
     : null;
@@ -236,7 +424,7 @@ if (assembleDmg) {
   if (assemblerToolDir) assemblerArgs.push("--tool-dir", assemblerToolDir);
   if (assemblerTimeoutMs) assemblerArgs.push("--timeout-ms", assemblerTimeoutMs);
   if (assemblerDeadlineMs) assemblerArgs.push("--deadline-ms", assemblerDeadlineMs);
-  const assemblerBudgetMs = Number(assemblerDeadlineMs ?? 180000);
+  const assemblerBudgetMs = Number(assemblerDeadlineMs ?? PROD_ASSEMBLER_DEADLINE_MS);
   const assemblerResult = spawnSync(process.execPath, assemblerArgs, {
     cwd: ROOT,
     encoding: "utf8",
@@ -263,6 +451,76 @@ if (assembleDmg) {
   } catch {
     console.error("bundle-gate: FAIL — assemble-dmg 报告 JSON 解析失败");
     process.exit(1);
+  }
+  // PRR-069C-R1：时间预算先于其他形状检查——任何模式都不得超过固定上限；
+  // 正式模式必须精确等于 120000/180000（防止放宽阈值后继续产出 PASS 证据）。
+  if (
+    !Number.isSafeInteger(dmgAssembly?.timeoutMs) ||
+    !Number.isSafeInteger(dmgAssembly?.deadlineMs) ||
+    dmgAssembly.timeoutMs > PROD_ASSEMBLER_TIMEOUT_MS ||
+    dmgAssembly.deadlineMs > PROD_ASSEMBLER_DEADLINE_MS ||
+    dmgAssembly.deadlineMs < dmgAssembly.timeoutMs
+  ) {
+    console.error(
+      `bundle-gate: FAIL — assemble-dmg 报告时间阈值超出固定预算（timeoutMs/deadlineMs 必须 ≤` +
+        `${PROD_ASSEMBLER_TIMEOUT_MS}/${PROD_ASSEMBLER_DEADLINE_MS}，正式必须精确等于这两个值），` +
+        `实际 timeoutMs=${dmgAssembly?.timeoutMs}, deadlineMs=${dmgAssembly?.deadlineMs}`,
+    );
+    process.exit(1);
+  }
+  if (
+    IS_PRODUCTION &&
+    (dmgAssembly?.timeoutMs !== PROD_ASSEMBLER_TIMEOUT_MS ||
+      dmgAssembly?.deadlineMs !== PROD_ASSEMBLER_DEADLINE_MS)
+  ) {
+    console.error(
+      `bundle-gate: FAIL — 正式装配报告必须精确 timeoutMs=${PROD_ASSEMBLER_TIMEOUT_MS}/deadlineMs=${PROD_ASSEMBLER_DEADLINE_MS}，` +
+        `实际 timeoutMs=${dmgAssembly?.timeoutMs}, deadlineMs=${dmgAssembly?.deadlineMs}`,
+    );
+    process.exit(1);
+  }
+  // PRR-069C-R1：工具清单绑定。fixture 模式只验形状；正式模式逐项核对
+  // SYSTEM_TOOL_PATHS 的路径与 gate 自行重算的文件 hash，不采信报告自述。
+  const reportedTools = dmgAssembly?.tools;
+  const toolNames = Object.keys(SYSTEM_TOOL_PATHS).sort().join(",");
+  const toolsShapeValid =
+    reportedTools &&
+    typeof reportedTools === "object" &&
+    Object.keys(reportedTools).sort().join(",") === toolNames &&
+    Object.values(reportedTools).every(
+      (entry) => typeof entry?.path === "string" && /^[0-9a-f]{64}$/.test(entry?.sha256 ?? ""),
+    );
+  if (!toolsShapeValid) {
+    console.error(
+      `bundle-gate: FAIL — assemble-dmg 报告缺少固定工具清单（预期工具: ${toolNames}）`,
+    );
+    process.exit(1);
+  }
+  if (IS_PRODUCTION) {
+    for (const [toolName, expectedPath] of Object.entries(SYSTEM_TOOL_PATHS)) {
+      const entry = reportedTools[toolName];
+      if (entry.path !== expectedPath) {
+        console.error(
+          `bundle-gate: FAIL — 正式装配工具路径与固定清单不符: ${toolName} 报告 ${entry.path}，预期 ${expectedPath}`,
+        );
+        process.exit(1);
+      }
+      let recomputedSha;
+      try {
+        recomputedSha = computeFileSha256(expectedPath);
+      } catch (err) {
+        console.error(
+          `bundle-gate: FAIL — 无法重算系统工具 hash（工具缺失即 fail-closed）: ${expectedPath}: ${err.message}`,
+        );
+        process.exit(1);
+      }
+      if (entry.sha256 !== recomputedSha) {
+        console.error(
+          `bundle-gate: FAIL — 正式装配工具 hash 与 gate 重算不一致: ${toolName} (${expectedPath})`,
+        );
+        process.exit(1);
+      }
+    }
   }
   const expectedAssemblerSha256 = computeFileSha256(assemblerPath);
   const assemblyStartedMs = Date.parse(dmgAssembly?.startedAt);
