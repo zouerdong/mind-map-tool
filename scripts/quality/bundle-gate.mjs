@@ -23,7 +23,7 @@ import {
   writeFileSync,
   realpathSync,
 } from "node:fs";
-import { resolve, dirname, relative, join, isAbsolute } from "node:path";
+import { resolve, dirname, relative, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   loadAndValidateG2Scope,
@@ -32,8 +32,17 @@ import {
   computeArtifactSha256,
   validateSafePath,
   isSameOrDescendant,
-  SYSTEM_TOOL_PATHS,
 } from "./g2-scope.mjs";
+import {
+  SYSTEM_TOOL_PATHS,
+  DMG_TOOL_NAMES,
+  DMG_CLEANUP_GRACE_MS,
+  validateInjectionPath,
+  validateInjectedToolSet,
+  validateDmgWorkDir,
+  assertWorkDirLandingOutside,
+  assertWorkDirNotPreExisting,
+} from "./dmg-assembly-contract.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
@@ -137,12 +146,16 @@ if (IS_PRODUCTION) {
     }
   }
   if (assembleDmg) {
-    const normalizedWorkDir = workDir.split(/[\\/]+/).join("/");
-    if (!/^\.tmp\/prr-069c-.+/.test(normalizedWorkDir)) {
-      gateBlocked(
-        `正式 work-dir 必须位于 .tmp/prr-069c-<非空> 任务目录内（不得使用 .tmp 根、` +
-          `普通工作目录或历史 candidate/evidence 目录）: ${workDir}`,
-      );
+    let safeWorkDirEarly;
+    try {
+      safeWorkDirEarly = validateDmgWorkDir({
+        workDir,
+        root: ROOT,
+        isProduction: IS_PRODUCTION,
+      });
+      assertWorkDirNotPreExisting(safeWorkDirEarly.abs, safeWorkDirEarly.rel);
+    } catch (err) {
+      gateBlocked(`work-dir 无效: ${err.message}`);
     }
     const commandAllowed = PRODUCTION_BUILD_COMMANDS.some((allowed) =>
       commandMatches(command, allowed),
@@ -154,27 +167,36 @@ if (IS_PRODUCTION) {
       );
     }
   }
+  // PRR-069C-R2：正式模式同样校验注入路径（此分支下注入参数已被上面拒绝，此处仅防御）。
 } else {
-  // fixture 模式：注入参数本身要做路径与阈值安全检查。
+  // fixture 模式：注入参数本身要做路径、symlink、canonical 与阈值安全检查。
   for (const [injectFlag, value] of [
     ["assembler-script", assemblerScript],
     ["assembler-tool-dir", assemblerToolDir],
   ]) {
     if (value === null) continue;
-    if (isAbsolute(value)) {
-      gateBlocked(
-        `--${injectFlag} 是测试注入参数，只接受 fixture root 内的相对路径（拒绝绝对路径）: ${value}`,
-      );
-    }
-    let safeRel;
     try {
-      safeRel = validateSafePath(value, ROOT, injectFlag);
+      validateInjectionPath({
+        value,
+        fieldName: `--${injectFlag}`,
+        root: ROOT,
+        canonicalRoot: CANONICAL_ROOT,
+      });
     } catch (err) {
       gateBlocked(`--${injectFlag} 注入路径无效: ${err.message}`);
     }
-    const injectedAbs = resolve(ROOT, safeRel);
-    if (isSameOrDescendant(injectedAbs, toRealPath(CANONICAL_ROOT))) {
-      gateBlocked(`--${injectFlag} 不得指向 canonical 仓库或其祖先目录: ${value}`);
+  }
+  // 提供 tool-dir 时，必须在 build 之前验证七项工具完整、合法可执行且位于 fixture 内；
+  // 缺项或非法一律 BLOCKED，绝不回退真实系统工具。
+  if (assemblerToolDir !== null) {
+    try {
+      validateInjectedToolSet({
+        toolDirAbs: resolve(ROOT, assemblerToolDir),
+        root: ROOT,
+        canonicalRoot: CANONICAL_ROOT,
+      });
+    } catch (err) {
+      gateBlocked(`--assembler-tool-dir 工具注入校验未通过: ${err.message}`);
     }
   }
   const injectedTimeout = assemblerTimeoutMs === null ? null : Number(assemblerTimeoutMs);
@@ -243,44 +265,34 @@ if (hits.length) {
   process.exit(1);
 }
 
-// 2b. PRR-069C-R1：--assemble-dmg 的 work-dir 通用边界（正式白名单已在参数阶段
-// 拒绝；此处为两模式共用的结构性检查，全部先于 build 执行）。
+// 2b. PRR-069C-R2：--assemble-dmg 的 work-dir 通用边界（正式白名单与 attempt 新鲜度合同
+// 已在参数阶段拒绝；此处为两模式共用的结构性检查，全部先于 build 执行）。
+// 拒绝中间层/末级/悬空 symlink、越界落点、候选产物与 G2 evidence 树，以及预存 work-dir。
 if (assembleDmg) {
-  let safeWorkDirEarly;
+  let workDirEarly;
   try {
-    safeWorkDirEarly = validateSafePath(workDir, ROOT, "work-dir");
+    workDirEarly = validateDmgWorkDir({ workDir, root: ROOT, isProduction: IS_PRODUCTION });
+    assertWorkDirNotPreExisting(workDirEarly.abs, workDirEarly.rel);
   } catch (err) {
     gateBlocked(`work-dir 无效: ${err.message}`);
   }
-  if (!safeWorkDirEarly.startsWith(".tmp/")) {
-    gateBlocked(`work-dir 必须位于仓库内被忽略的 .tmp/ 下: ${safeWorkDirEarly}`);
-  }
-  const workDirEarlyAbs = resolve(ROOT, safeWorkDirEarly);
-  if (
-    validated.normalized.evidenceOutputPaths.some((evidencePath) =>
-      isSameOrDescendant(resolve(ROOT, evidencePath), workDirEarlyAbs),
-    )
-  ) {
-    gateBlocked(`work-dir 不得位于 G2 evidence 输出目录内（证据目录只读）: ${safeWorkDirEarly}`);
-  }
-  const approvedDmgEarly = validated.normalized.candidateOutputPaths.filter((p) =>
-    p.endsWith(".dmg"),
-  );
-  if (
-    approvedDmgEarly.some((dmgPath) =>
-      isSameOrDescendant(dirname(resolve(ROOT, dmgPath)), workDirEarlyAbs),
-    )
-  ) {
-    gateBlocked(`work-dir 不得位于候选产物目录内: ${safeWorkDirEarly}`);
-  }
-  if (existsSync(workDirEarlyAbs)) {
-    const workDirStat = lstatSync(workDirEarlyAbs);
-    if (workDirStat.isSymbolicLink() || !workDirStat.isDirectory()) {
-      gateBlocked(`work-dir 已存在且不是常规目录（拒绝符号链接）: ${safeWorkDirEarly}`);
-    }
-    if (readdirSync(workDirEarlyAbs).length > 0) {
-      gateBlocked(`work-dir 已存在且非空（拒绝预存外来目标）: ${safeWorkDirEarly}`);
-    }
+  try {
+    assertWorkDirLandingOutside({
+      workDirAbs: workDirEarly.abs,
+      landing: workDirEarly.landing,
+      label: "G2 evidence 输出目录",
+      forbiddenAbsPaths: validated.normalized.evidenceOutputPaths.map((p) => resolve(ROOT, p)),
+    });
+    assertWorkDirLandingOutside({
+      workDirAbs: workDirEarly.abs,
+      landing: workDirEarly.landing,
+      label: "候选产物目录",
+      forbiddenAbsPaths: validated.normalized.candidateOutputPaths
+        .filter((p) => p.endsWith(".dmg"))
+        .map((p) => dirname(resolve(ROOT, p))),
+    });
+  } catch (err) {
+    gateBlocked(err.message);
   }
 }
 
@@ -425,11 +437,13 @@ if (assembleDmg) {
   if (assemblerTimeoutMs) assemblerArgs.push("--timeout-ms", assemblerTimeoutMs);
   if (assemblerDeadlineMs) assemblerArgs.push("--deadline-ms", assemblerDeadlineMs);
   const assemblerBudgetMs = Number(assemblerDeadlineMs ?? PROD_ASSEMBLER_DEADLINE_MS);
+  // PRR-069C-R2：父进程终止策略必须容纳 assembler 声明的有界清理宽限，否则会在
+  // 失败回收挂载的过程中把子进程杀掉，留下无人接管的挂载。
   const assemblerResult = spawnSync(process.execPath, assemblerArgs, {
     cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: assemblerBudgetMs + 30000,
+    timeout: assemblerBudgetMs + DMG_CLEANUP_GRACE_MS + 30000,
     killSignal: "SIGKILL",
   });
   if ((assemblerResult.status ?? 1) !== 0) {
@@ -482,7 +496,7 @@ if (assembleDmg) {
   // PRR-069C-R1：工具清单绑定。fixture 模式只验形状；正式模式逐项核对
   // SYSTEM_TOOL_PATHS 的路径与 gate 自行重算的文件 hash，不采信报告自述。
   const reportedTools = dmgAssembly?.tools;
-  const toolNames = Object.keys(SYSTEM_TOOL_PATHS).sort().join(",");
+  const toolNames = [...DMG_TOOL_NAMES].sort().join(",");
   const toolsShapeValid =
     reportedTools &&
     typeof reportedTools === "object" &&

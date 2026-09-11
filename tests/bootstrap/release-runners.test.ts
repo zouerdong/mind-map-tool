@@ -279,6 +279,8 @@ function licenseTextFromXml(xml) {
 
 const state = loadState();
 state.calls.push({ tool, args });
+// PRR-069C-R2：调用轨迹必须落盘，否则“没有真实系统工具调用”无法从证据侧复核。
+saveState(state);
 
 if (tool === "hdiutil") {
   const cmd = args[0];
@@ -291,6 +293,9 @@ if (tool === "hdiutil") {
       eulaText: null,
     });
     saveState(state);
+    // PRR-069C-R2：create 成功后撤掉 hdiutil 替身，模拟系统工具在下次调用时不可用
+    // （spawn error / ENOENT）。只作用于本次运行的替身副本，不触碰真实系统工具。
+    if (env.MOCK_HIDE_TOOL_AFTER_CREATE) rmSync(join(DIR, "hdiutil"), { force: true });
     process.exit(0);
   }
   if (cmd === "attach") {
@@ -305,6 +310,12 @@ if (tool === "hdiutil") {
       process.exit(1);
     }
     const mp = flagValue("-mountpoint");
+    const earlyStage = !args.includes("-readonly") ? "rw" : (/Y/i.test(stdin) ? "final" : "probe");
+    const earlyHits = (name) => {
+      const v = env[name];
+      return Boolean(v) && (v === "all" || v === earlyStage);
+    };
+    if (earlyHits("MOCK_ATTACH_FAKE_SUCCESS")) process.exit(0);
     if (env.MOCK_ATTACH_WRONG_MOUNTPOINT) {
       process.stdout.write("/dev/disk9s1\\tApple_HFS\\t/tmp/somewhere-else\\n");
       process.exit(0);
@@ -321,6 +332,21 @@ if (tool === "hdiutil") {
     }
     state.mounts[mp] = { device: "/dev/disk9s1", image: imagePath, readOnly: args.includes("-readonly") };
     saveState(state);
+    // PRR-069C-R2：挂载已真实登记之后的阶段化异常注入（三个 attach 阶段各可命中）。
+    // 阶段判定：无 -readonly 为可写卷 rw；只读时 stdin 带 Y 为最终复核卷 final，
+    // 否则为挂载前 EULA 拒绝探针 probe。取值 "all" 命全部阶段。
+    const attachStage = !args.includes("-readonly") ? "rw" : (/Y/i.test(stdin) ? "final" : "probe");
+    const hitsStage = (name) => {
+      const v = env[name];
+      return Boolean(v) && (v === "all" || v === attachStage);
+    };
+    if (hitsStage("MOCK_ATTACH_HANG_AFTER_MOUNT")) sleepForever();
+    if (hitsStage("MOCK_ATTACH_FAIL_AFTER_MOUNT")) {
+      die(21, "mock attach failure after mount (" + attachStage + ")");
+    }
+    if (hitsStage("MOCK_ATTACH_SILENT_AFTER_MOUNT")) process.exit(0);
+    // MOCK_ATTACH_FAKE_SUCCESS：未建立挂载却返回 0（状态矛盾，不得被当成没有挂载）。
+    if (hitsStage("MOCK_ATTACH_FAKE_SUCCESS")) process.exit(0);
     // MOCK_ATTACH_UNPARSABLE：挂载真实登记后输出不含 mountpoint 的内容（登记恢复红灯）。
     if (env.MOCK_ATTACH_UNPARSABLE) {
       process.stdout.write("attach: handle allocated, details omitted\\n");
@@ -403,6 +429,9 @@ if (tool === "ditto") {
 }
 if (tool === "SetFile") {
   if (env.MOCK_SETFILE_FAIL) die(13, "mock SetFile failure");
+  // MOCK_SETFILE_SWAP_DEVICE：可写卷挂载之后，让 mount table 报告成另一个设备，
+  // 供“卸载前置身份核对”红灯使用（SetFile 恰好位于 rw attach 与 rw detach 之间）。
+  if (env.MOCK_SETFILE_SWAP_DEVICE) { state.deviceSwapped = true; saveState(state); }
   process.exit(0);
 }
 if (tool === "mount") {
@@ -410,7 +439,8 @@ if (tool === "mount") {
   if (env.MOCK_MOUNT_FAIL) die(15, "mock mount failure");
   if (env.MOCK_MOUNT_HANG) sleepForever();
   for (const mp of Object.keys(state.mounts)) {
-    process.stdout.write(state.mounts[mp].device + " on " + mp + " (hfs, local, read-only)\\n");
+    const dev = state.deviceSwapped ? "/dev/disk7s1" : state.mounts[mp].device;
+    process.stdout.write(dev + " on " + mp + " (hfs, local, read-only)\\n");
   }
   process.exit(0);
 }
@@ -2878,4 +2908,528 @@ describe("PRR-069C-R1 发布门边界与挂载清理加固", () => {
     if (!existsSync(p)) return null;
     return JSON.parse(readFileSync(p, "utf8")).mounts ?? {};
   }
+});
+
+// ==================== 1f. PRR-069C-R2 attach 接管与路径隔离 ====================
+// R1 独立审阅（2026-09-11）四项阻断：attach 已挂载后超时/非零无人接管、
+// 直接 assembler 绕过 fixture 工具合同并回退真实系统工具、中间层 symlink
+// 绕过 work-dir 隔离、DMG 常量进入通用授权模块。以下红灯先于实现建立。
+const DMG_ASSEMBLY_CONTRACT = resolve(ROOT, "scripts/quality/dmg-assembly-contract.mjs");
+const G2_SCOPE = resolve(ROOT, "scripts/quality/g2-scope.mjs");
+const CANONICAL_ASM_BASE = [
+  "--app",
+  ASSEMBLY_APP_REL,
+  "--output",
+  ASSEMBLY_DMG_REL,
+  "--after",
+  "2020-01-01T00:00:00Z",
+  "--format",
+  "ULMO",
+];
+/** 正式 app-only 窄命令（canonical root 的 gate 调用需要精确匹配）。 */
+const R2_APP_ONLY_COMMAND = [
+  "pnpm",
+  "--filter",
+  "@mindmap/desktop",
+  "tauri",
+  "build",
+  "--bundles",
+  "app",
+];
+
+describe("PRR-069C-R2 attach 接管、注入闭合与路径隔离", () => {
+  beforeEach(() => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(FIXTURE_DIR, { recursive: true, force: true });
+    } catch {}
+  });
+
+  function mockState(toolDir: string): any {
+    const p = join(toolDir, "mock-state.json");
+    if (!existsSync(p)) return { mounts: {}, calls: [] };
+    return JSON.parse(readFileSync(p, "utf8"));
+  }
+  function readMockMounts(toolDir: string): Record<string, any> {
+    return mockState(toolDir).mounts ?? {};
+  }
+  function readMockCalls(toolDir: string): Array<{ tool: string; args: string[] }> {
+    return mockState(toolDir).calls ?? [];
+  }
+  /** 解析失败记录：断言结构化字段而不只看日志字符串。 */
+  function readFailure(stderr: string): any {
+    const marker = "assemble-dmg: FAILURE ";
+    expect(stderr).toContain(marker);
+    return JSON.parse(stderr.split(marker)[1].split("\n")[0]);
+  }
+
+  // ---------------------------------------------------------------- R2-01
+  it("R2-01a 可写卷 attach 已挂载后超时：接管为 active mount、受控卸载、表内无残留、整体失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-hang-rw");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1500" },
+      {
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "rw",
+      },
+    );
+    expect(res.status).toBe(1);
+    // 缺陷证据优先：未接管时本轮挂载会留在 mock mount table 中
+    expect(readMockMounts(toolDir)).toEqual({});
+    const failure = readFailure(res.stderr);
+    // 先接管再卸载：不得把超时转成成功，也不得把未登记挂载留在表内
+    expect(failure.mountState).toBe("CLEAN");
+    expect(failure.residualMount).toBeFalsy();
+    expect(failure.activeMount).toBeFalsy();
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+    // 卸载动作在失败清理宽限预算内完成（不占用装配 deadline）
+    expect(failure.cleanup?.status).toBe("CLEAN");
+  }, 30000);
+
+  it("R2-01b 可写卷 attach 已挂载后非零退出：受控卸载后整体失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-fail-rw");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_ATTACH_FAIL_AFTER_MOUNT: "rw",
+    });
+    expect(res.status).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    const failure = readFailure(res.stderr);
+    expect(failure.mountState).toBe("CLEAN");
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-01c 最终只读卷 attach 已挂载后超时：不得转成成功，卸载后失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-hang-final");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1500" },
+      {
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "final",
+      },
+    );
+    expect(res.status).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    const failure = readFailure(res.stderr);
+    expect(failure.mountState).toBe("CLEAN");
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-01d 最终只读卷 attach 已挂载后非零退出：受控卸载后失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-fail-final");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_ATTACH_FAIL_AFTER_MOUNT: "final",
+    });
+    expect(res.status).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    const failure = readFailure(res.stderr);
+    expect(failure.mountState).toBe("CLEAN");
+  }, 30000);
+
+  it("R2-01e attach spawn error：受控失败、错误分类进命令日志、无残留无成功产物", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-spawn-error");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_HIDE_TOOL_AFTER_CREATE: "1",
+    });
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    const attachCall = failure.commands.find(
+      (c: any) => c.tool === "hdiutil" && c.args[0] === "attach",
+    );
+    expect(attachCall).toBeTruthy();
+    expect(String(attachCall.spawnError ?? "")).toMatch(/ENOENT|no such file/i);
+    expect(attachCall.status).toBeNull();
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-01f EULA 拒绝探针已挂载但错误返回：清理后失败，不得留下挂载", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-eula-fail-after-mount");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_NO_EULA_GATE: "1",
+      MOCK_ATTACH_FAIL_AFTER_MOUNT: "probe",
+    });
+    expect(res.status).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(res.stderr).toContain("挂载前 EULA 未生效");
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-01g EULA 拒绝探针已挂载后超时：清理后失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-eula-hang-after-mount");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1500" },
+      {
+        MOCK_NO_EULA_GATE: "1",
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "probe",
+      },
+    );
+    expect(res.status).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(res.stderr).toContain("挂载前 EULA 未生效");
+  }, 30000);
+
+  it("R2-01h attach 失败且 mount table 不可用：UNKNOWN + 保留 pending，不宣称已清理", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-unknown");
+    const res = runAssembler(repoDir, regPath, toolDir, [], {
+      MOCK_ATTACH_FAIL_AFTER_MOUNT: "rw",
+      MOCK_MOUNT_FAIL: "1",
+    });
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.mountState).toBe("UNKNOWN");
+    expect(failure.pendingMount?.mountpoint).toBeTruthy();
+    expect(failure.residualMount).toBeTruthy();
+    expect(failure.cleanup?.status).not.toBe("CLEAN");
+    // 不得输出成功 inventory / 已清理结论
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+    expect(res.stderr).toContain("STOP");
+  }, 30000);
+
+  it("R2-01i 成功但 stdout 无法解析：从 mount table 恢复登记并完成整轮（保留 R1 断言）", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-attach-unparsable");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { report: R1_REPORT_REL },
+      {
+        MOCK_ATTACH_UNPARSABLE: "1",
+      },
+    );
+    expect(res.status).toBe(0);
+    expect(readMockMounts(toolDir)).toEqual({});
+    const report = JSON.parse(readFileSync(join(repoDir, R1_REPORT_REL), "utf8"));
+    expect(report.commands.some((c: any) => c.recoveredFromMountTable === true)).toBe(true);
+  }, 30000);
+
+  it("R2-01j 清理宽限独立计时且有界：不参与装配预算，失败轮不产出成功 inventory", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-cleanup-grace");
+    const hung = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1500" },
+      {
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "rw",
+      },
+    );
+    expect(hung.status).toBe(1);
+    const failure = readFailure(hung.stderr);
+    expect(Number.isSafeInteger(failure.cleanup?.graceMs)).toBe(true);
+    expect(failure.cleanup.graceMs).toBeGreaterThan(0);
+    expect(failure.cleanup.graceMs).toBeLessThanOrEqual(120000);
+    expect(Number.isSafeInteger(failure.cleanup?.elapsedMs)).toBe(true);
+    // 清理宽限不顶替也不放宽装配预算：失败记录仍声明本轮有效的装配阈值
+    expect(failure.timeoutMs).toBe(1500);
+    expect(failure.deadlineMs).toBe(20000);
+    expect(failure.cleanup.graceMs).not.toBe(failure.timeoutMs);
+    // 成功路径报告同样声明清理宽限与两段耗时，装配耗时不包含清理
+    const ok = createAssemblyFixture("r2-cleanup-grace-ok");
+    const res = runAssembler(ok.repoDir, ok.regPath, ok.toolDir, { report: R1_REPORT_REL });
+    expect(res.status).toBe(0);
+    const report = JSON.parse(readFileSync(join(ok.repoDir, R1_REPORT_REL), "utf8"));
+    expect(report.timings?.cleanupGraceMs).toBeGreaterThan(0);
+    expect(report.timings?.assemblyMs).toBe(report.elapsedMs);
+    // 成功路径没有清理动作，清理段耗时恒为 0
+    expect(report.timings?.cleanupMs).toBe(0);
+    expect(report.cleanupGraceMs ?? report.timings.cleanupGraceMs).toBeLessThanOrEqual(180000);
+  }, 60000);
+
+  it("R2-01l 卸载前设备身份不符：拒绝卸载、保留 RESIDUAL 与挂载现场", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-detach-identity");
+    const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_SETFILE_SWAP_DEVICE: "1" });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("设备与预期不一致");
+    const failure = readFailure(res.stderr);
+    expect(failure.mountState).toBe("RESIDUAL");
+    expect(failure.residualMount).toBeTruthy();
+    // 身份不符时不得执行卸载：mock mount table 保留原挂载供人工复核
+    expect(Object.keys(readMockMounts(toolDir)).length).toBeGreaterThan(0);
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-01k attach 返回 0 却没有挂载：三个阶段的矛盾状态都必须失败并保留现场", () => {
+    for (const stage of ["rw", "probe", "final"]) {
+      const { repoDir, regPath, toolDir } = createAssemblyFixture(`r2-attach-fake-ok-${stage}`);
+      // probe 阶段必须先绕过挂载前 EULA 门，否则会被正常拒绝而不是命中矛盾注入。
+      const env =
+        stage === "probe"
+          ? { MOCK_NO_EULA_GATE: "1", MOCK_ATTACH_FAKE_SUCCESS: stage }
+          : { MOCK_ATTACH_FAKE_SUCCESS: stage };
+      const res = runAssembler(repoDir, regPath, toolDir, {}, env);
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain("无法确认挂载状态");
+      expect(readMockMounts(toolDir)).toEqual({});
+      expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+    }
+  }, 60000);
+
+  // ---------------------------------------------------------------- R2-02
+  it("R2-02a 直接 assembler 拒绝绝对 --tool-dir（不得绕过 fixture 工具合同）", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-inject-absolute");
+    const res = runAssembler(repoDir, regPath, toolDir, { "tool-dir": toolDir });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/绝对|注入/);
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-02b tool-dir 缺项：任何工具调用前失败，绝不回退真实系统工具", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-inject-missing");
+    rmSync(join(toolDir, "ditto"), { force: true });
+    const res = runAssembler(repoDir, regPath, toolDir);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/ditto/);
+    // 无任何工具被调用（既没有注入替身，也没有真实 /usr/bin/ditto）
+    expect(readMockCalls(toolDir)).toEqual([]);
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("R2-02c 注入工具为 symlink 或悬空断链：拒绝", () => {
+    const sym = createAssemblyFixture("r2-inject-symlink");
+    const realTool = join(sym.toolDir, "plutil");
+    execFileSync("mv", [realTool, join(sym.toolDir, "plutil.real")]);
+    execFileSync("ln", ["-s", join(sym.toolDir, "plutil.real"), realTool]);
+    const symRes = runAssembler(sym.repoDir, sym.regPath, sym.toolDir);
+    expect(symRes.status).toBe(1);
+    expect(symRes.stderr).toMatch(/symlink|符号链接|工具注入/);
+    expect(readMockCalls(sym.toolDir)).toEqual([]);
+
+    const dangling = createAssemblyFixture("r2-inject-dangling");
+    rmSync(join(dangling.toolDir, "lipo"), { force: true });
+    execFileSync("ln", [
+      "-s",
+      join(dangling.toolDir, "missing-lipo"),
+      join(dangling.toolDir, "lipo"),
+    ]);
+    const danglingRes = runAssembler(dangling.repoDir, dangling.regPath, dangling.toolDir);
+    expect(danglingRes.status).toBe(1);
+    expect(danglingRes.stderr).toMatch(/symlink|符号链接|工具注入/);
+    expect(readMockCalls(dangling.toolDir)).toEqual([]);
+  }, 30000);
+
+  it("R2-02d 注入工具非可执行或类型错误：拒绝且无任何工具调用", () => {
+    const nonExec = createAssemblyFixture("r2-inject-nonexec");
+    chmodSync(join(nonExec.toolDir, "xattr"), 0o644);
+    const nonExecRes = runAssembler(nonExec.repoDir, nonExec.regPath, nonExec.toolDir);
+    expect(nonExecRes.status).toBe(1);
+    expect(nonExecRes.stderr).toMatch(/可执行|工具注入/);
+    expect(readMockCalls(nonExec.toolDir)).toEqual([]);
+
+    const wrongType = createAssemblyFixture("r2-inject-dirtype");
+    rmSync(join(wrongType.toolDir, "mount"), { force: true });
+    mkdirSync(join(wrongType.toolDir, "mount"), { recursive: true });
+    const wrongTypeRes = runAssembler(wrongType.repoDir, wrongType.regPath, wrongType.toolDir);
+    expect(wrongTypeRes.status).toBe(1);
+    expect(wrongTypeRes.stderr).toMatch(/常规文件|工具注入/);
+    expect(readMockCalls(wrongType.toolDir)).toEqual([]);
+  }, 30000);
+
+  it("R2-02e gate 入口同样验证 tool-dir 完整：build 之前 BLOCKED", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-gate-inject-missing");
+    rmSync(join(toolDir, "ditto"), { force: true });
+    const buildMarker = join(repoDir, ".tmp/build-ran.txt");
+    const res = runNode(BUNDLE_GATE, [
+      "--host",
+      "tauri",
+      "--root",
+      repoDir,
+      "--scope-from",
+      regPath,
+      "--candidate-root",
+      ".tmp/release-runner-fixtures/bundle",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ASSEMBLY_WORK_REL,
+      "--assembler-tool-dir",
+      ".tmp/mock-tools",
+      "--",
+      process.execPath,
+      "-e",
+      appBuildScript(repoDir, `fs.writeFileSync('${buildMarker}', 'ran');`),
+    ]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/工具|ditto|注入/);
+    expect(existsSync(buildMarker)).toBe(false);
+  }, 30000);
+
+  it("R2-02f 合法完整 fixture 仍通过，且七项工具全部来自注入目录", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-inject-complete");
+    const res = runAssembler(repoDir, regPath, toolDir, { report: R1_REPORT_REL });
+    expect(res.status).toBe(0);
+    const calls = readMockCalls(toolDir).map((c) => c.tool);
+    for (const tool of ["hdiutil", "ditto", "SetFile", "mount", "plutil", "lipo", "xattr"]) {
+      expect(calls).toContain(tool);
+    }
+    const report = JSON.parse(readFileSync(join(repoDir, R1_REPORT_REL), "utf8"));
+    for (const entry of Object.values<any>(report.tools)) {
+      expect(entry.path).toContain("mock-tools");
+    }
+  }, 30000);
+
+  // ---------------------------------------------------------------- R2-03
+  it("R2-03a work-dir 中间层 symlink 指向 evidence/candidate/其他任务目录：全部拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-workdir-alias");
+    const links: Array<[string, string]> = [
+      [".tmp/release-runner-fixtures/evidence", "alias-evidence"],
+      [".tmp/release-runner-fixtures/bundle", "alias-candidate"],
+      [".tmp/other-task-dir", "alias-other-task"],
+    ];
+    for (const [target, linkName] of links) {
+      mkdirSync(join(repoDir, target), { recursive: true });
+      const linkPath = join(repoDir, ".tmp/release-runner-fixtures", linkName);
+      rmSync(linkPath, { force: true });
+      execFileSync("ln", ["-s", join(repoDir, target), linkPath]);
+      const res = runAssembler(repoDir, regPath, toolDir, {
+        "work-dir": `.tmp/release-runner-fixtures/${linkName}/work`,
+      });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/符号链接|symlink/);
+      expect(readMockCalls(toolDir)).toEqual([]);
+      // 借道目录不得被写入
+      expect(existsSync(join(repoDir, target, "work"))).toBe(false);
+    }
+  }, 30000);
+
+  it("R2-03b work-dir 末级与悬空 symlink：拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-workdir-symlink");
+    const realDir = join(repoDir, ".tmp/real-work-target");
+    mkdirSync(realDir, { recursive: true });
+    const finalLink = join(repoDir, ".tmp/release-runner-fixtures/work-final-link");
+    execFileSync("ln", ["-s", realDir, finalLink]);
+    const finalRes = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/work-final-link",
+    });
+    expect(finalRes.status).toBe(1);
+    expect(finalRes.stderr).toMatch(/符号链接|symlink/);
+
+    const danglingLink = join(repoDir, ".tmp/release-runner-fixtures/work-dangling-link");
+    execFileSync("ln", ["-s", join(repoDir, ".tmp/never-created"), danglingLink]);
+    const danglingRes = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/work-dangling-link/work",
+    });
+    expect(danglingRes.status).toBe(1);
+    expect(danglingRes.stderr).toMatch(/符号链接|symlink/);
+    expect(readMockCalls(toolDir)).toEqual([]);
+  }, 30000);
+
+  it("R2-03c work-dir 指向仓库外：拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-workdir-escape");
+    const escapeLink = join(repoDir, ".tmp/release-runner-fixtures/work-escape-link");
+    execFileSync("ln", ["-s", "/tmp", escapeLink]);
+    const res = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/work-escape-link/work",
+    });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/符号链接|symlink|越界/);
+    expect(readMockCalls(toolDir)).toEqual([]);
+  }, 30000);
+
+  it("R2-03d 历史 attempt 的新子目录与既有空 work：双侧拒绝，历史文件不变", () => {
+    const attempt = `.tmp/prr-069c-r2-test-historical-${process.pid.toString(36)}`;
+    const attemptAbs = join(ROOT, attempt);
+    rmSync(attemptAbs, { recursive: true, force: true });
+    mkdirSync(join(attemptAbs, "work"), { recursive: true });
+    const logPath = join(attemptAbs, "bundle-gate.log");
+    writeFileSync(logPath, "historical attempt evidence\n");
+    const logShaBefore = fileSha256(logPath);
+    try {
+      // 直接 assembler（canonical root）
+      for (const workDir of [`${attempt}/borrowed-work`, `${attempt}/work`]) {
+        const res = runNode(ASSEMBLE_DMG, [...CANONICAL_ASM_BASE, "--work-dir", workDir]);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toContain("work-dir");
+      }
+      // gate（canonical root）
+      const gateRes = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        `${attempt}/borrowed-work`,
+        "--",
+        ...R2_APP_ONLY_COMMAND,
+      ]);
+      expect(gateRes.status).toBe(1);
+      expect(gateRes.stderr).toContain("work-dir");
+      // 历史现场未被写入
+      expect(fileSha256(logPath)).toBe(logShaBefore);
+      expect(readdirSync(attemptAbs).sort()).toEqual(["bundle-gate.log", "work"]);
+    } finally {
+      rmSync(attemptAbs, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it("R2-03e work-dir 拒绝发生在任何 mkdir/tool/build 之前", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("r2-workdir-early");
+    execFileSync("ln", [
+      "-s",
+      join(repoDir, ".tmp/release-runner-fixtures/evidence"),
+      join(repoDir, ".tmp/release-runner-fixtures/alias-early"),
+    ]);
+    const res = runAssembler(repoDir, regPath, toolDir, {
+      "work-dir": ".tmp/release-runner-fixtures/alias-early/work",
+    });
+    expect(res.status).toBe(1);
+    expect(readMockCalls(toolDir)).toEqual([]);
+    expect(existsSync(join(repoDir, ".tmp/release-runner-fixtures/evidence/work"))).toBe(false);
+    // gate 侧同样在任何 build 之前失败
+    const buildMarker = join(repoDir, ".tmp/build-ran-early.txt");
+    const gateRes = runNode(BUNDLE_GATE, [
+      "--host",
+      "tauri",
+      "--root",
+      repoDir,
+      "--scope-from",
+      regPath,
+      "--candidate-root",
+      ".tmp/release-runner-fixtures/bundle",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ".tmp/release-runner-fixtures/alias-early/work",
+      "--",
+      process.execPath,
+      "-e",
+      appBuildScript(repoDir, `fs.writeFileSync('${buildMarker}', 'ran');`),
+    ]);
+    expect(gateRes.status).toBe(1);
+    expect(existsSync(buildMarker)).toBe(false);
+  }, 30000);
+
+  // ---------------------------------------------------------------- R2-04
+  it("R2-04 固定工具常量移出通用授权模块，两入口改从 DMG 专用模块引用", () => {
+    const g2 = readFileSync(G2_SCOPE, "utf8");
+    expect(g2).not.toContain("SYSTEM_TOOL_PATHS");
+    // 授权与路径通用契约保持原样
+    expect(g2).toContain("export function loadAndValidateG2Scope");
+    expect(g2).toContain("export function validateSafePath");
+    expect(g2).toContain("export const FORBIDDEN_EXCLUDED_ACTIONS");
+    expect(g2).toContain("export const SIGNING_ENV_KEYS");
+
+    const contract = readFileSync(DMG_ASSEMBLY_CONTRACT, "utf8");
+    expect(contract).toContain("SYSTEM_TOOL_PATHS");
+    for (const tool of ["hdiutil", "ditto", "SetFile", "mount", "plutil", "lipo", "xattr"]) {
+      expect(contract).toContain(tool);
+    }
+    for (const entry of [ASSEMBLE_DMG, BUNDLE_GATE]) {
+      const src = readFileSync(entry, "utf8");
+      expect(src).toContain('from "./dmg-assembly-contract.mjs"');
+      expect(src).not.toMatch(/SYSTEM_TOOL_PATHS[^;]*from "\.\/g2-scope\.mjs"/);
+    }
+  });
 });

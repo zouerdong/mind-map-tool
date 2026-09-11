@@ -12,6 +12,14 @@
 // 不读取、生成、复制或等待 .DS_Store；`.app` 内含 .DS_Store 时直接失败。
 // 每个子进程有显式超时，整轮有 deadline；失败只清理由本轮创建且位于本运行目录内的资源。
 //
+// PRR-069C-R2 加固：
+//   - attach 生命周期：子进程启动前登记 pending exact mountpoint；正常/非零/超时/
+//     signal/spawn error 一律先按 mount table 复核真实挂载状态，已挂载立即接管，
+//     已挂载但 attach 失败先受控卸载再失败；清理用独立有界宽限，不占用装配预算。
+//   - 工具注入闭合：提供 --tool-dir 时先校验七项工具完整合法，缺项绝不回退真实工具。
+//   - work-dir 逐分量校验：拒绝中间层/末级/悬空 symlink、越界落点与历史 attempt 借用。
+//   - 固定工具常量与注入/work-dir 契约移入 dmg-assembly-contract.mjs。
+//
 // PRR-069C-R1 加固：
 //   - 正式模式（--root 即 runner 所在 canonical 仓库）拒绝 --tool-dir 与显式
 //     timeout/deadline 覆盖；任何模式的阈值都不得超过 120000/180000ms。
@@ -41,6 +49,7 @@ import {
   readlinkSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -54,8 +63,17 @@ import {
   isSameOrDescendant,
   loadAndValidateG2Scope,
   validateSafePath,
-  SYSTEM_TOOL_PATHS,
 } from "./g2-scope.mjs";
+import {
+  SYSTEM_TOOL_PATHS,
+  DMG_TOOL_NAMES,
+  DMG_CLEANUP_GRACE_MS,
+  validateInjectionPath,
+  validateInjectedToolSet,
+  validateDmgWorkDir,
+  assertWorkDirLandingOutside,
+  assertWorkDirNotPreExisting,
+} from "./dmg-assembly-contract.mjs";
 import { RELEASE_BUDGETS } from "./release-budgets.mjs";
 import {
   buildLicenseResourceXmlFromFile,
@@ -132,6 +150,18 @@ let cleaningUp = false;
 let currentStage = "args";
 // PRR-069C-R1：卸载无法被证明干净时保留的结构化残留记录（进入失败报告）。
 let residualMount = null;
+// PRR-069C-R2：本轮 attach 的挂载点责任登记。在任何 attach 子进程启动前写入，
+// 不等待 exit 0 —— 系统工具可能已经建立挂载之后才超时/失败/被杀。
+let pendingMount = null;
+// 挂载状态分类：CLEAN（可证明无残留）/ RESIDUAL（已确认残留）/ UNKNOWN（无法确认）。
+let mountState = "CLEAN";
+// 失败清理单独计时与预算：仅用于回收本轮挂载，不计入装配预算，也不得用于完成装配。
+let cleanupStartedMs = null;
+let cleanupElapsedMs = 0;
+let cleanupStatus = "CLEAN";
+let cleanupAttempts = [];
+// 校验通过的注入工具集合（fixture 模式）；非空时 resolveTool 只认注入目录，绝不回退。
+let injectedTools = null;
 
 /**
  * fail-closed：解除本轮挂载（仅在设备匹配时）、保留本轮运行目录供复算，
@@ -152,12 +182,23 @@ function fail(message) {
     startedAt: new Date(assemblyStartedMs).toISOString(),
     finishedAt: new Date().toISOString(),
     elapsedMs: Date.now() - assemblyStartedMs,
+    // 装配预算固定值：失败记录同样声明，证明清理宽限没有放宽或顶替装配预算。
+    timeoutMs,
+    deadlineMs,
     gitHead: safeGitHead(),
     workDir: runDirRel,
     preservedWorkDir: activeRunDir ? true : false,
-    // PRR-069C-R1：失败时刻的挂载登记与残留判定（供独立复算）。
+    // PRR-069C-R1/R2：失败时刻的挂载责任登记、残留判定与清理结论（供独立复算）。
+    pendingMount,
     activeMount: mountedAt ? { device: mountedDevice, mountpoint: mountedAt } : null,
     residualMount,
+    mountState,
+    cleanup: {
+      graceMs: DMG_CLEANUP_GRACE_MS,
+      elapsedMs: cleanupElapsedMs,
+      status: cleanupStatus,
+      attempts: cleanupAttempts,
+    },
     commands: commandLog,
   };
   console.error(`assemble-dmg: FAILURE ${JSON.stringify(record)}`);
@@ -186,87 +227,49 @@ function safeGitHead() {
  * detach 失败、设备不匹配或无法复核时输出 RESIDUAL_MOUNT 并保留结构化记录。
  */
 function cleanupOnFailure() {
-  try {
-    if (mountedDevice && mountedAt) {
-      const table = mountTable();
-      const entry = table.find((line) => line.includes(` on ${mountedAt} (`));
-      const deviceEntry = table.find((line) => line.startsWith(`${mountedDevice} `));
-      if (!entry && !deviceEntry) {
-        mountedDevice = null;
-        mountedAt = null;
-      } else if (entry && !entry.startsWith(mountedDevice)) {
-        console.error(
-          `assemble-dmg: STOP — 挂载设备与预期不一致（预期 ${mountedDevice}，实际 ${entry.trim()}），保留现场等待人工检查`,
-        );
-        residualMount = residualMount ?? {
-          device: mountedDevice,
-          mountpoint: mountedAt,
-          reason: `cleanup: 设备不匹配（实际 ${entry.trim().split(/\s+/)[0]}）`,
-        };
-      } else {
-        const startedAt = new Date().toISOString();
-        const r = spawnSync(resolveTool("hdiutil"), ["detach", mountedAt], {
-          encoding: "utf8",
-          timeout: Math.min(60_000, MAX_TIMEOUT_MS),
-          killSignal: "SIGKILL",
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        commandLog.push({
-          tool: "hdiutil",
-          path: resolveTool("hdiutil"),
-          args: ["detach", mountedAt],
-          note: "cleanup-on-failure",
-          startedAt,
-          finishedAt: new Date().toISOString(),
-          timeoutMs: Math.min(60_000, MAX_TIMEOUT_MS),
-          status: r.status ?? null,
-          signal: r.signal ?? null,
-          timedOut: Boolean(r.error?.code === "ETIMEDOUT" || r.signal === "SIGKILL"),
-        });
-        if ((r.status ?? 1) !== 0) {
-          console.error(
-            `assemble-dmg: RESIDUAL_MOUNT — 失败清理 detach 退出码 ${r.status}，active mount 登记保留: ${mountedDevice} ${mountedAt}`,
-          );
-          residualMount = residualMount ?? {
-            device: mountedDevice,
-            mountpoint: mountedAt,
-            reason: `cleanup: detach 退出码 ${r.status}`,
-          };
-        } else {
-          const tableAfter = mountTable();
-          const still = tableAfter.find(
-            (line) => line.includes(` on ${mountedAt} (`) || line.startsWith(`${mountedDevice} `),
-          );
-          if (still) {
-            console.error(
-              `assemble-dmg: RESIDUAL_MOUNT — 失败清理 detach 返回 0 但 mount table 仍有条目，登记保留: ${still.trim()}`,
-            );
-            residualMount = residualMount ?? {
-              device: mountedDevice,
-              mountpoint: mountedAt,
-              reason: `cleanup: detach 后仍有残留 ${still.trim()}`,
-            };
-          } else {
-            mountedDevice = null;
-            mountedAt = null;
-          }
-        }
-      }
-    }
-  } catch (err) {
-    const evidence =
-      err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
-    console.error(
-      `assemble-dmg: STOP — 失败清理期间无法确认挂载状态（${evidence}），保留现场等待人工检查`,
-    );
-    if (mountedAt && !residualMount) {
-      residualMount = {
-        device: mountedDevice,
-        mountpoint: mountedAt,
-        reason: "cleanup: mount table 不可用",
+  cleaningUp = true;
+  const mountpoint = mountedAt ?? pendingMount?.mountpoint ?? null;
+  const device = mountedDevice ?? pendingMount?.device ?? null;
+  if (mountedAt && mountedDevice) {
+    // 已确认归属的挂载：在独立的有界宽限预算内受控卸载并复核，不占用装配 deadline。
+    const outcome = detachAndVerify({
+      mountpoint,
+      device,
+      stage: "cleanup-on-failure",
+      budget: "cleanup",
+    });
+    if (outcome === "CLEAN") {
+      mountState = "CLEAN";
+      cleanupStatus = "CLEAN";
+      pendingMount = null;
+    } else {
+      mountState = outcome;
+      cleanupStatus = outcome;
+      residualMount = residualMount ?? {
+        device,
+        mountpoint,
+        reason: `cleanup: 无法证明无残留（${outcome}）`,
       };
+      console.error(
+        `assemble-dmg: ${outcome === "UNKNOWN" ? "STOP" : "RESIDUAL_MOUNT"} — 失败清理未能证明挂载已解除` +
+          `（${outcome}），保留 pending/active/residual 结构化证据与现场，等待人工检查: ` +
+          `${device ?? "unknown-device"} ${mountpoint}`,
+      );
     }
-    return;
+  } else if (mountpoint) {
+    // 只有 pending 登记（未能在 mount table 中确认归属）：不执行未证明归属的卸载，
+    // 保留 pending/residual 结构化证据并 STOP，绝不能把“无法确认”报告成已清理。
+    mountState = "UNKNOWN";
+    cleanupStatus = "UNKNOWN";
+    residualMount = residualMount ?? {
+      device,
+      mountpoint,
+      reason: "cleanup: 仅有 pending 登记，未能在 mount table 中确认归属",
+    };
+    console.error(
+      `assemble-dmg: STOP — 失败清理时无法确认挂载归属（仅有 pending 登记 ${mountpoint}），` +
+        "不执行未证明归属的卸载，保留 pending/active/residual 结构化证据与现场，等待人工检查",
+    );
   }
   // 失败时保留本轮运行目录（staging/临时镜像/命令日志现场），供独立复算；
   // 该目录只位于本卡授权的任务临时范围内，不会成为下一次装配的输入。
@@ -329,9 +332,96 @@ function requireMountTable(stage) {
   }
 }
 
-/** 从 mount table 精确解析 expectedMountpoint 的设备条目（严格 `on <mp> (` 匹配）。 */
-function findExactMountInTable(expectedMountpoint) {
-  for (const rawLine of requireMountTable("find-mount")) {
+/**
+ * PRR-069C-R2：统一 attach 生命周期。启动子进程之前先登记本轮拥有的 pending exact
+ * mountpoint（不等 exit 0 才记责任），随后无论正常 / 非零 / timeout / signal / spawn error，
+ * 都以 mount table 复核真实挂载状态，再决定语义：
+ *   已挂载 → 立即接管为 active mount；requireSuccess 且 attach 未成功时先受控卸载再失败；
+ *   未挂载但 stdout 声称挂载 → 状态矛盾，STOP 保留现场；
+ *   未挂载且 attach 未成功 → 受控失败（无可清理资源）。
+ * mount table 不可用时由 requireMountTable fail-closed，转入有界清理宽限。
+ */
+function attachVolume({ mountpoint, cmdArgs, input, note, stage, requireSuccess = true }) {
+  pendingMount = { mountpoint, stage, startedAt: new Date().toISOString() };
+  const result = runTool("hdiutil", cmdArgs, { must: false, input, note });
+  const table = requireMountTable(`${stage}-mount-table-check`);
+  const parsed = parseAttachOutput(result.stdout, mountpoint);
+  const entry = findExactMountInLines(table, mountpoint);
+  const ok = !result.timedOut && !result.spawnError && result.status === 0;
+
+  if (entry) {
+    mountedDevice = entry.device;
+    mountedAt = mountpoint;
+    pendingMount = null;
+    if (!parsed) {
+      const lastCommand = commandLog[commandLog.length - 1];
+      if (lastCommand) lastCommand.recoveredFromMountTable = true;
+      console.error(
+        `assemble-dmg: attach stdout 不可解析，已从 mount table 恢复挂载登记: ${entry.device} ${mountpoint}`,
+      );
+    }
+    if (requireSuccess && !ok) {
+      const reason = describeAttachFailure(result);
+      const outcome = detachAndVerify({
+        mountpoint,
+        device: entry.device,
+        stage: `${stage}-failed-attach-recovery`,
+        budget: "cleanup",
+      });
+      if (outcome === "CLEAN") {
+        mountState = "CLEAN";
+        cleanupStatus = "CLEAN";
+      } else {
+        mountState = outcome;
+        cleanupStatus = outcome;
+        residualMount = residualMount ?? {
+          device: entry.device,
+          mountpoint,
+          reason: `${stage}: attach 失败后卸载未证明无残留（${outcome}）`,
+        };
+      }
+      fail(
+        `${stage}: ${reason}，但挂载已建立；` +
+          (outcome === "CLEAN"
+            ? "已受控卸载并复核 mount table 无残留"
+            : `尝试卸载但未能证明无残留（${outcome}，见上方 RESIDUAL_MOUNT/STOP 记录）`) +
+          "，整体判定失败（不得把超时或非零退出转成成功）",
+      );
+    }
+    return { ...result, ok, mounted: true, device: entry.device, mountpoint };
+  }
+
+  pendingMount = null;
+  if (parsed) {
+    fail(
+      `${stage}: attach stdout 声称挂载 ${parsed.device} ${mountpoint}，但 mount table 无该挂载点，` +
+        "挂载状态不可确认，STOP 保留真实现场",
+    );
+  }
+  if (ok) {
+    // 退出 0 却没在 mount table 中看到挂载：这是状态矛盾，绝不能被当成“没有挂载”。
+    fail(
+      `${stage}: attach 返回 0 但 stdout 不可解析且 mount table 无 ${mountpoint} 条目，` +
+        "无法确认挂载状态，STOP 保留真实现场",
+    );
+  }
+  if (requireSuccess) fail(`${stage}: ${describeAttachFailure(result)}`);
+  return { ...result, ok, mounted: false, device: null, mountpoint };
+}
+
+/** attach 结果的结构化失败分类（spawn error / 超时 / signal / 非零退出）。 */
+function describeAttachFailure(result) {
+  if (result.spawnError) return `attach 无法启动（spawn error ${result.spawnError}）`;
+  if (result.timedOut) return `attach 超时（${result.timeoutMs ?? timeoutMs}ms）`;
+  if (result.signal) return `attach 被信号终止 (${result.signal})`;
+  return `attach 退出码非零 (${result.status})：${String(result.out ?? "")
+    .trim()
+    .slice(0, 300)}`;
+}
+
+/** 从 mount table 行集合中精确解析 expectedMountpoint 的设备条目（严格 `on <mp> (` 匹配）。 */
+function findExactMountInLines(table, expectedMountpoint) {
+  for (const rawLine of table) {
     const line = rawLine.trim();
     const device = line.split(/\s+/)[0];
     if (!/^\/dev\/disk\d*(s\d+)?$/.test(device)) continue;
@@ -344,47 +434,82 @@ function findExactMountInTable(expectedMountpoint) {
 }
 
 /**
- * attach 返回 0 后的统一登记：优先解析 stdout；不可解析时从 mount table 精确恢复
- * （恢复事实写回命令日志供审计）。两者都无法确认挂载状态时 STOP 保留真实现场。
+ * 受控卸载并复核：只有 detach 退出 0 且 mount table 复核不再包含 exact 挂载点/设备时才返回
+ * CLEAN。返回 CLEAN / RESIDUAL / UNKNOWN，不抛异常、不递归 fail，正常路径与失败清理共用。
+ * 不使用 force / sudo / 批量卸载。
  */
-function registerAttachResult(attachResult, expectedMountpoint) {
-  const parsed = parseAttachOutput(attachResult.stdout, expectedMountpoint);
-  if (parsed) return parsed;
-  const fromTable = findExactMountInTable(expectedMountpoint);
-  if (fromTable) {
-    console.error(
-      `assemble-dmg: attach stdout 不可解析，已从 mount table 恢复挂载登记: ${fromTable.device} ${expectedMountpoint}`,
-    );
-    const lastCommand = commandLog[commandLog.length - 1];
-    if (lastCommand) lastCommand.recoveredFromMountTable = true;
-    return {
-      device: fromTable.device,
-      mountpoint: expectedMountpoint,
-      recoveredFromMountTable: true,
-    };
-  }
-  fail(
-    `attach 返回 0 但 stdout 不可解析且 mount table 无 ${expectedMountpoint} 条目，无法确认挂载状态，STOP 保留真实现场`,
-  );
-}
+function detachAndVerify({ mountpoint, device, stage, budget = "assembly" }) {
+  if (!mountpoint) return "CLEAN";
+  const attempt = {
+    stage,
+    mountpoint,
+    device: device ?? null,
+    budget,
+    startedAt: new Date().toISOString(),
+  };
 
-/**
- * 受控卸载：detach 退出 0 且 mount table 复核不再包含 exact 挂载点/设备时才清空登记。
- * detach 失败、复核仍有条目或表不可读时保留登记、记录 RESIDUAL_MOUNT 并返回 false。
- */
-function controlledDetach(stage) {
-  if (!mountedAt || !mountedDevice) return true;
-  const r = runTool("hdiutil", ["detach", mountedAt], { must: false, note: stage });
-  if ((r.status ?? 1) !== 0) {
+  // 卸载前置身份核对：只有能证明该挂载点/设备属于本轮时才执行 detach。
+  // 归属无法证明（表不可读）或设备不匹配时一律不卸载，保留 pending/active/residual 证据。
+  if (device) {
+    let pre;
+    try {
+      pre = mountTable();
+    } catch (err) {
+      const evidence =
+        err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
+      attempt.result = "UNKNOWN";
+      attempt.reason = "卸载前 mount table 不可用，无法证明归属";
+      cleanupAttempts.push(attempt);
+      console.error(
+        `assemble-dmg: STOP — ${stage}: 卸载前 mount table 不可读，无法证明 ${mountpoint} 归属本轮，` +
+          `拒绝卸载并保留现场等待人工检查: ${evidence}`,
+      );
+      return "UNKNOWN";
+    }
+    const preEntry = findExactMountInLines(pre, mountpoint);
+    const preDeviceEntry = pre.find((line) => line.startsWith(`${device} `));
+    if (!preEntry && !preDeviceEntry) {
+      attempt.result = "CLEAN";
+      attempt.reason = "卸载前 mount table 已无该挂载点/设备（无资源需要回收）";
+      cleanupAttempts.push(attempt);
+      mountedDevice = null;
+      mountedAt = null;
+      return "CLEAN";
+    }
+    if (preEntry && preEntry.device !== device) {
+      attempt.result = "RESIDUAL";
+      attempt.reason = `设备不匹配（预期 ${device}，实际 ${preEntry.device}）`;
+      cleanupAttempts.push(attempt);
+      console.error(
+        `assemble-dmg: STOP — ${stage}: 挂载设备与预期不一致（预期 ${device}，实际 ${preEntry.device}），` +
+          "拒绝卸载并保留现场等待人工检查",
+      );
+      return "RESIDUAL";
+    }
+  }
+
+  const r = spawnDetach(mountpoint, { stage, budget });
+  attempt.status = r.status;
+  attempt.signal = r.signal;
+  attempt.timedOut = r.timedOut;
+  attempt.spawnError = r.spawnError;
+  if (!r.spawned) {
+    attempt.result = "UNKNOWN";
+    attempt.reason = r.reason ?? "detach 未能启动";
+    cleanupAttempts.push(attempt);
     console.error(
-      `assemble-dmg: RESIDUAL_MOUNT — ${stage}: hdiutil detach ${mountedAt} 退出码 ${r.status}，active mount 登记保留（${mountedDevice}）`,
+      `assemble-dmg: STOP — ${stage}: detach 未启动（${attempt.reason}），无法证明无残留，登记保留: ${mountpoint}`,
     );
-    residualMount = residualMount ?? {
-      device: mountedDevice,
-      mountpoint: mountedAt,
-      reason: `${stage}: detach 退出码 ${r.status}`,
-    };
-    return false;
+    return "UNKNOWN";
+  }
+  if ((r.status ?? 1) !== 0) {
+    attempt.result = "RESIDUAL";
+    attempt.reason = `detach 退出码 ${r.status}`;
+    cleanupAttempts.push(attempt);
+    console.error(
+      `assemble-dmg: RESIDUAL_MOUNT — ${stage}: hdiutil detach ${mountpoint} 退出码 ${r.status}，active mount 登记保留（${device ?? "unknown-device"}）`,
+    );
+    return "RESIDUAL";
   }
   let table;
   try {
@@ -392,39 +517,159 @@ function controlledDetach(stage) {
   } catch (err) {
     const evidence =
       err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
+    attempt.result = "UNKNOWN";
+    attempt.reason = "detach 后 mount table 不可用";
+    cleanupAttempts.push(attempt);
     console.error(
       `assemble-dmg: RESIDUAL_MOUNT — ${stage}: detach 成功但 mount table 不可读，无法证明无残留，登记保留: ${evidence}`,
     );
-    residualMount = residualMount ?? {
-      device: mountedDevice,
-      mountpoint: mountedAt,
-      reason: `${stage}: detach 后 mount table 不可用`,
-    };
-    return false;
+    return "UNKNOWN";
   }
   const entry = table.find(
-    (line) => line.includes(` on ${mountedAt} (`) || line.startsWith(`${mountedDevice} `),
+    (line) =>
+      line.includes(` on ${mountpoint} (`) || (device ? line.startsWith(`${device} `) : false),
   );
   if (entry) {
+    attempt.result = "RESIDUAL";
+    attempt.reason = `detach 后仍有残留 ${entry.trim()}`;
+    cleanupAttempts.push(attempt);
     console.error(
       `assemble-dmg: RESIDUAL_MOUNT — ${stage}: detach 返回 0 但 mount table 仍有条目，登记保留: ${entry.trim()}`,
     );
-    residualMount = residualMount ?? {
-      device: mountedDevice,
-      mountpoint: mountedAt,
-      reason: `${stage}: detach 后仍有残留 ${entry.trim()}`,
-    };
-    return false;
+    return "RESIDUAL";
   }
+  attempt.result = "CLEAN";
+  cleanupAttempts.push(attempt);
   mountedDevice = null;
   mountedAt = null;
-  return true;
+  return "CLEAN";
 }
 
+/** 失败后的清理宽限：独立计时、有界；不占用装配预算，也不允许无限等待。 */
+function cleanupRemainingMs() {
+  if (cleanupStartedMs === null) cleanupStartedMs = Date.now();
+  cleanupElapsedMs = Date.now() - cleanupStartedMs;
+  return DMG_CLEANUP_GRACE_MS - cleanupElapsedMs;
+}
+
+/**
+ * 有界 detach 子进程：参数数组、显式超时、按所选预算收紧。
+ * assembly 预算受装配 deadline 约束（用尽则转失败清理宽限）；cleanup 预算受独立宽限约束。
+ * 两者都不会无限等待，且都记录结构化结果，供“是否已证明清理”的判定与复算。
+ */
+function spawnDetach(mountpoint, { stage, budget }) {
+  const tool = resolveTool("hdiutil");
+  const detachArgs = ["detach", mountpoint];
+  const baseLog = { tool: "hdiutil", path: tool, args: detachArgs, note: stage, budget };
+  let perCommandTimeout;
+  if (budget === "cleanup") {
+    const remaining = cleanupRemainingMs();
+    if (remaining <= 0) {
+      commandLog.push({
+        ...baseLog,
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        timeoutMs: 0,
+        status: null,
+        signal: null,
+        timedOut: false,
+        spawnError: null,
+        skipped: "cleanup-grace-exhausted",
+      });
+      return {
+        spawned: false,
+        status: null,
+        signal: null,
+        timedOut: false,
+        spawnError: null,
+        reason: `清理宽限 ${DMG_CLEANUP_GRACE_MS}ms 已用尽`,
+      };
+    }
+    perCommandTimeout = Math.min(timeoutMs, remaining);
+  } else {
+    const remaining = deadlineMs - (Date.now() - assemblyStartedMs);
+    if (remaining <= 0) {
+      commandLog.push({
+        ...baseLog,
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        timeoutMs: 0,
+        status: null,
+        signal: null,
+        timedOut: false,
+        spawnError: null,
+        skipped: "assembly-budget-exhausted",
+      });
+      return {
+        spawned: false,
+        status: null,
+        signal: null,
+        timedOut: false,
+        spawnError: null,
+        reason: `装配 deadline ${deadlineMs}ms 已用尽（转失败清理宽限）`,
+      };
+    }
+    perCommandTimeout = Math.min(timeoutMs, remaining);
+  }
+  const startedAt = new Date().toISOString();
+  const r = spawnSync(tool, detachArgs, {
+    encoding: "utf8",
+    timeout: perCommandTimeout,
+    killSignal: "SIGKILL",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const timedOut = r.error?.code === "ETIMEDOUT";
+  const spawnError =
+    r.error && !timedOut ? `${r.error.code ?? ""}: ${r.error.message}`.trim() : null;
+  commandLog.push({
+    ...baseLog,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    timeoutMs: perCommandTimeout,
+    status: r.status ?? null,
+    signal: r.signal ?? null,
+    timedOut: Boolean(timedOut),
+    spawnError,
+  });
+  return {
+    spawned: true,
+    status: r.status ?? null,
+    signal: r.signal ?? null,
+    timedOut: Boolean(timedOut),
+    spawnError,
+  };
+}
+
+/**
+ * 正常路径的受控卸载入口：先在装配预算内尝试，未证明干净时登记残留并返回 false。
+ */
+function controlledDetach(stage, budget = "assembly") {
+  const mountpoint = mountedAt;
+  const device = mountedDevice;
+  if (!mountpoint) return true;
+  const outcome = detachAndVerify({ mountpoint, device, stage, budget });
+  if (outcome === "CLEAN") return true;
+  mountState = outcome;
+  cleanupStatus = outcome;
+  residualMount = residualMount ?? {
+    device,
+    mountpoint,
+    reason: `${stage}: 无法证明无残留（${outcome}）`,
+  };
+  return false;
+}
+
+/**
+ * R2-02：工具解析。提供 --tool-dir 时只认校验通过的注入集合，缺项即拒绝，
+ * 绝不回退 /usr/bin 等真实系统工具。
+ */
 function resolveTool(name) {
   if (toolDirFlag) {
-    const candidate = resolve(ROOT, toolDirFlag, name);
-    if (existsSync(candidate)) return candidate;
+    const injected = injectedTools?.[name];
+    if (!injected) {
+      fail(`工具注入缺少 ${name}：注入模式下回退真实系统工具被禁止（fail-closed）`);
+    }
+    return injected;
   }
   return TOOLS[name];
 }
@@ -450,6 +695,10 @@ function runTool(name, cmdArgs, opts = {}) {
   });
   const finishedAt = new Date().toISOString();
   const timedOut = r.error?.code === "ETIMEDOUT" || r.signal === "SIGKILL";
+  const spawnError =
+    r.error && r.error.code !== "ETIMEDOUT"
+      ? `${r.error.code ?? ""}: ${r.error.message}`.trim()
+      : null;
   commandLog.push({
     tool: name,
     path: tool,
@@ -461,8 +710,12 @@ function runTool(name, cmdArgs, opts = {}) {
     status: r.status ?? null,
     signal: r.signal ?? null,
     timedOut: Boolean(timedOut),
+    spawnError,
   });
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+  if (spawnError && must) {
+    fail(`${name} 无法启动（spawn error ${spawnError}）`);
+  }
   if (timedOut && must) {
     fail(`子进程超时（${name} ${cmdArgs.slice(0, 2).join(" ")}，${perCommandTimeout}ms）`);
   }
@@ -471,7 +724,15 @@ function runTool(name, cmdArgs, opts = {}) {
       `${name} ${cmdArgs.slice(0, 2).join(" ")} 退出码非零 (${r.status})：${out.trim().slice(0, 400)}`,
     );
   }
-  return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "", timedOut, out };
+  return {
+    status: r.status ?? 1,
+    stdout: r.stdout ?? "",
+    stderr: r.stderr ?? "",
+    timedOut,
+    spawnError,
+    timeoutMs: perCommandTimeout,
+    out,
+  };
 }
 
 // ---------------------------------------------------------------- 1. 参数契约
@@ -504,6 +765,27 @@ if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > MAX_DEA
 }
 if (deadlineMs < timeoutMs) fail("--deadline-ms 不得小于单命令 --timeout-ms");
 
+// PRR-069C-R2：工具注入校验必须先于任何工具调用、工作目录写入与挂载。
+// 正式模式已在上面拒绝 --tool-dir；fixture 模式下注入目录与其七项工具必须完整合法，
+// 缺项 / 断链 / symlink / 类型错误 / 不可执行一律 fail-closed，绝不回退真实系统工具。
+if (toolDirFlag) {
+  try {
+    const injection = validateInjectionPath({
+      value: toolDirFlag,
+      fieldName: "tool-dir",
+      root: ROOT,
+      canonicalRoot: CANONICAL_ROOT,
+    });
+    injectedTools = validateInjectedToolSet({
+      toolDirAbs: injection.abs,
+      root: ROOT,
+      canonicalRoot: CANONICAL_ROOT,
+    }).tools;
+  } catch (err) {
+    fail(`工具注入校验未通过: ${err.message}`);
+  }
+}
+
 // ---------------------------------------------------------------- 2. 路径与 G2 授权
 let appRel;
 let outputRel;
@@ -521,28 +803,21 @@ try {
 }
 if (!appRel.endsWith(".app")) fail(`--app 必须是 .app 目录: ${appRel}`);
 if (!outputRel.endsWith(".dmg")) fail(`--output 必须是 .dmg 文件: ${outputRel}`);
-if (!workDirRel.startsWith(`.tmp${sep}`)) {
-  fail(
-    `work-dir 必须位于仓库内被忽略的 .tmp/ 下（临时 staging/镜像只允许进入任务临时范围）: ${workDirRel}`,
-  );
-}
-// PRR-069C-R1：正式 work-dir 只允许 .tmp/prr-069c-<非空> 任务目录（R1 使用
-// .tmp/prr-069c-r1-*），不得使用模糊的 .tmp 根、普通 .tmp/work 或历史
-// candidate/evidence 目录。
-if (IS_PRODUCTION && !/^\.tmp\/prr-069c-.+/.test(workDirRel.split(sep).join("/"))) {
-  fail(`正式 work-dir 必须位于 .tmp/prr-069c-<非空> 任务目录内，拒绝: ${workDirRel}`);
-}
-// work-dir 自身若已存在：只接受空常规目录（拒绝符号链接与预存外来目标，
-// 防止把历史现场当作工作区混入或覆盖）。
-const workDirPreAbs = resolve(ROOT, workDirRel);
-if (existsSync(workDirPreAbs)) {
-  const workDirStat = lstatSync(workDirPreAbs);
-  if (workDirStat.isSymbolicLink() || !workDirStat.isDirectory()) {
-    fail(`work-dir 已存在且不是常规目录（拒绝符号链接）: ${workDirRel}`);
-  }
-  if (readdirSync(workDirPreAbs).length > 0) {
-    fail(`work-dir 已存在且非空（拒绝预存外来目标，防止混入或破坏历史现场）: ${workDirRel}`);
-  }
+// PRR-069C-R2：work-dir 结构校验（正式白名单、任一分量 symlink、实际落点、
+// 历史 attempt 借用）必须在任何 mkdir / 工具调用 / 挂载之前完成。
+// R1 的「已存在但为空」不再接受：那正是借用历史 attempt 树复跑同一 work-dir 的入口。
+let workDirPreAbs;
+try {
+  const workDirInfo = validateDmgWorkDir({
+    workDir: workDirRel,
+    root: ROOT,
+    isProduction: IS_PRODUCTION,
+  });
+  workDirRel = workDirInfo.rel;
+  workDirPreAbs = workDirInfo.abs;
+  assertWorkDirNotPreExisting(workDirInfo.abs, workDirInfo.rel);
+} catch (err) {
+  fail(err.message);
 }
 if (isSameOrDescendant(dirname(outputRel), workDirRel)) {
   fail(`work-dir 不得位于候选产物目录内: ${workDirRel}`);
@@ -579,6 +854,24 @@ if (
   )
 ) {
   fail(`work-dir 不得位于 G2 evidence 输出目录内（证据目录只读，不得成为工作区）: ${workDirRel}`);
+}
+
+// PRR-069C-R2：再用实际落点（最近已存在祖先的 realpath）核对一次，避免仅靠词法前缀。
+try {
+  assertWorkDirLandingOutside({
+    workDirAbs: workDirPreAbs,
+    label: "G2 evidence 输出目录",
+    forbiddenAbsPaths: validated.normalized.evidenceOutputPaths.map((p) => resolve(ROOT, p)),
+  });
+  assertWorkDirLandingOutside({
+    workDirAbs: workDirPreAbs,
+    label: "候选产物目录",
+    forbiddenAbsPaths: approvedCandidates
+      .filter((p) => p.endsWith(".dmg"))
+      .map((p) => dirname(resolve(ROOT, p))),
+  });
+} catch (err) {
+  fail(err.message);
 }
 
 let reportRel = null;
@@ -640,7 +933,7 @@ for (const dir of [stagingAbs, mntRwAbs, mntFinalAbs]) mkdirSync(dir, { recursiv
 // PRR-069C-R1：固定工具清单绑定。正式模式下 TOOLS 即系统绝对路径；fixture 模式下
 // 为注入目录内的替身。每个工具的 path+sha256 写入报告，供 bundle gate 复核归因。
 const toolsManifest = {};
-for (const toolName of Object.keys(TOOLS)) {
+for (const toolName of DMG_TOOL_NAMES) {
   const toolPath = resolveTool(toolName);
   let toolSha;
   try {
@@ -707,20 +1000,13 @@ runTool("hdiutil", [
 ]);
 
 currentStage = "attach-rw";
-const rwAttach = runTool("hdiutil", [
-  "attach",
-  "-nobrowse",
-  "-noautoopen",
-  "-mountpoint",
-  mntRwAbs,
-  rwImageAbs,
-]);
-// PRR-069C-R1：attach 返回 0 后先登记（stdout 可解析或从 mount table 恢复），
-// 再执行任何语义断言；无法确认挂载状态时 STOP 保留现场。
-const rwMount = registerAttachResult(rwAttach, mntRwAbs);
-if (rwMount.mountpoint !== mntRwAbs) fail(`可写卷挂载点与预期不一致: ${rwMount.mountpoint}`);
-mountedDevice = rwMount.device;
-mountedAt = rwMount.mountpoint;
+// PRR-069C-R2：统一 attach 生命周期——启动前登记 pending exact mountpoint，
+// 返回后先按 mount table 核对真实挂载状态，已挂载则立即接管，未确认状态即 STOP。
+const rwMount = attachVolume({
+  mountpoint: mntRwAbs,
+  cmdArgs: ["attach", "-nobrowse", "-noautoopen", "-mountpoint", mntRwAbs, rwImageAbs],
+  stage: "attach-rw",
+});
 
 currentStage = "volume-icon";
 runTool("SetFile", ["-a", "C", rwMount.mountpoint]);
@@ -770,9 +1056,9 @@ if (tempDmgBytes > RELEASE_BUDGETS.installerBytes) {
 
 // 挂载前 EULA：未同意时 attach 必须打印许可证正文并拒绝挂载（该镜像因此不可静默挂载）。
 currentStage = "pre-mount-eula";
-const refusal = runTool(
-  "hdiutil",
-  [
+const refusal = attachVolume({
+  mountpoint: mntFinalAbs,
+  cmdArgs: [
     "attach",
     "-readonly",
     "-nobrowse",
@@ -782,14 +1068,15 @@ const refusal = runTool(
     mntFinalAbs,
     tempDmgAbs,
   ],
-  { must: false, input: "", note: "pre-mount-eula-refusal" },
-);
-// PRR-069C-R1：探针意外返回 0（或超时）时可能已真实挂载——必须先登记、
-// 受控卸载并复核表空，然后才允许以失败结束；不能先 fail 后让未登记挂载失去清理。
-if (refusal.status === 0 || refusal.timedOut) {
-  const leaked = registerAttachResult(refusal, mntFinalAbs);
-  registerLeakedMount(leaked);
-  if (!controlledDetach("pre-mount-eula-recovery")) {
+  input: "",
+  note: "pre-mount-eula-refusal",
+  stage: "pre-mount-eula",
+  requireSuccess: false,
+});
+// PRR-069C-R2：探针只要建立了挂载（无论退出码 0、非零、超时还是被信号终止）都视为
+// EULA 未生效——必须先受控卸载并复核表空，然后才允许以失败结束；不得先 fail 让挂载失去清理。
+if (refusal.mounted) {
+  if (!controlledDetach("pre-mount-eula-recovery", "cleanup")) {
     fail(
       "未同意 EULA 时 attach 意外成功挂载，且受控卸载未能证明无残留（RESIDUAL_MOUNT），挂载前 EULA 未生效",
     );
@@ -807,9 +1094,9 @@ if (!refusal.out.includes(licenseMarker)) {
 }
 
 currentStage = "verify-mount";
-const finalAttach = runTool(
-  "hdiutil",
-  [
+const finalMount = attachVolume({
+  mountpoint: mntFinalAbs,
+  cmdArgs: [
     "attach",
     "-readonly",
     "-nobrowse",
@@ -819,13 +1106,9 @@ const finalAttach = runTool(
     mntFinalAbs,
     tempDmgAbs,
   ],
-  { input: "Y\n" },
-);
-const finalMount = registerAttachResult(finalAttach, mntFinalAbs);
-if (finalMount.mountpoint !== mntFinalAbs)
-  fail(`只读卷挂载点与预期不一致: ${finalMount.mountpoint}`);
-mountedDevice = finalMount.device;
-mountedAt = finalMount.mountpoint;
+  input: "Y\n",
+  stage: "verify-mount",
+});
 
 currentStage = "payload-verify";
 const payload = verifyMountedPayload(finalMount.mountpoint, { appName, sourceAppSha });
@@ -904,6 +1187,12 @@ const report = {
     imageInfoDeclaresAgreement: true,
   },
   payload,
+  // R2-01：装配耗时与失败清理宽限分开声明；成功路径没有清理，cleanupMs 恒为 0。
+  timings: {
+    assemblyMs: elapsedMs,
+    cleanupGraceMs: DMG_CLEANUP_GRACE_MS,
+    cleanupMs: cleanupElapsedMs,
+  },
   checks: {
     format: FORMAT,
     crc32: "VALID",
@@ -924,16 +1213,19 @@ if (reportAbs) {
 // 成功路径：清掉本轮 staging/临时镜像，只保留报告与最终 DMG。
 rmSync(runDirAbs, { recursive: true, force: true });
 activeRunDir = null;
+// work-dir 合同：本轮创建且已清空的 work-dir 一并回收，避免留下可被下一轮借用的
+// 空目录（正式 attempt 目录本身与其中的日志不受影响）。
+try {
+  if (existsSync(workDirPreAbs) && readdirSync(workDirPreAbs).length === 0) {
+    rmdirSync(workDirPreAbs);
+  }
+} catch {
+  // 回收失败不影响装配结论：目录仍为空，下一轮的“不得预存”合同会拒绝复用。
+}
 
 console.log(JSON.stringify(report));
 
 // ------------------------------------------------------------------ helpers
-/** 把确认过的挂载登记为 active mount（供受控卸载与失败清理使用）。 */
-function registerLeakedMount(mount) {
-  mountedDevice = mount.device;
-  mountedAt = mount.mountpoint;
-}
-
 function parseAttachOutput(stdout, expectedMountpoint) {
   for (const rawLine of stdout.split("\n")) {
     const line = rawLine.trim();
