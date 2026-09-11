@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-11 当前派发更新：`R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED`。R2 独立审阅确认 EULA 异常分类、清理统一计时和历史任务目录隔离仍需返修；当前唯一入口为 [R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。现在只执行阶段 A（代码与合成异常测试），交回 STOP_FOR_CODE_REVIEW；阶段 B 三轮原生预检暂不派发。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
+2026-09-11 当前派发更新：`R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2-F1 阶段 A 已按修复指南实施：进程结果与 EULA 语义分离（超时/信号/spawn error 不再被当作正常拒绝）、清理共用单一单调时钟截止时间并记录真实耗时、正式任务根由 assembler 原子创建（历史任务根一律拒绝）。红灯先行后修复，源码门全绿（release-runners 129/129、unit 651）。执行侧自述见[阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)，等待独立代码审阅；完整卡与协议见[R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。阶段 B 三轮原生预检不因阶段 A 通过而自动解锁；PRR-070/080/090 与 G-FINAL 保持阻塞。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
@@ -13,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED`。R2 正常预检记录保留，独立审阅要求先完成 F1 阶段 A 返修；返修与审阅依据见页首。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
+当前整改批次状态为 `IN_PROGRESS / R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2 正常预检记录保留，独立审阅要求先完成 F1 阶段 A 返修；返修与审阅依据见页首。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 

@@ -11,6 +11,18 @@
   它的父提交即上面的 SourceCommit，两者差异仅限文档（§5 末节给出逐项证明）。
 - 依据：[PRR-069C-R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)、[R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)
 
+> **勘误（2026-09-11，PRR-069C-R2-F1 阶段 A 追加，不改动任何历史结果）**
+>
+> 本报告原先写「交回 HEAD 的**父提交**即 SourceCommit」，该说法不成立：交回 HEAD `7d496a8` 的父提交是
+> `e284be3`（同为文档提交），SourceCommit `885d877` 还要再上一级。正确关系是
+> **source 是代码提交，交回 HEAD 是它的纯文档后代，中间可以隔多个文档提交**。
+> 可复算判据不依赖提交图的相邻关系，只依赖代码树一致性：
+> `git diff --stat 885d877b660a608604c8dc5921aeabd49fd4131e..7d496a849a06c3149be706f4febe675f8503885f -- scripts tests apps packages`
+> 为空，且 `git diff --name-only` 只列出 `AGENTS.md` 与 `docs/` 下的文件。
+> 上文 §5 末节「HandoffCommit：本报告所在的文档提交（父提交即 SourceCommit）」中的括注按此勘误理解。
+> 三轮正常预检记录、DMG 字节、hash 与全部历史证据保持原样，未因本次返修被补写或覆盖；
+> 后续阶段改用 [R2-F1 阶段 A 报告](./prr-069c-r2-f1-stage-a-report-2026-09-11.md) 的写法。
+
 ## 1. 修改内容
 
 | 文件 | 变更 |
@@ -134,7 +146,8 @@ node scripts/quality/bundle-gate.mjs --host tauri \
 ### source 与交回 HEAD 的差异
 
 - SourceCommit（三轮预检实际 source）：`885d877b660a608604c8dc5921aeabd49fd4131e`
-- HandoffCommit：本报告所在的文档提交（父提交即 SourceCommit）
+- HandoffCommit：本报告所在的文档提交（`7d496a849a06c3149be706f4febe675f8503885f`；它是 source 的文档后代，
+  中间还隔着一个文档提交 `e284be3` —— 关系说明见页首勘误）
 - 复算命令：`git diff --stat 885d877b660a608604c8dc5921aeabd49fd4131e..HEAD -- scripts tests apps packages`
   必须为空输出；`git diff --name-only 885d877..HEAD` 必须只列出 `AGENTS.md` 与 `docs/` 下的文件。
 - 两者差异**仅限文档**；`scripts/quality/*.mjs`、`tests/bootstrap/release-runners.test.ts` 在两棵树中逐字节相同：

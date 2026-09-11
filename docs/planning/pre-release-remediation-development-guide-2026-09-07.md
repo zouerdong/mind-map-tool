@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-11 当前派发更新：`R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED`。R2 独立审阅确认 EULA 异常分类、清理统一计时和历史任务目录隔离仍需返修；当前唯一入口为 [R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。现在只执行阶段 A（代码与合成异常测试），交回 STOP_FOR_CODE_REVIEW；阶段 B 三轮原生预检暂不派发。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
+2026-09-11 当前派发更新：`R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2-F1 阶段 A 已按修复指南实施：进程结果与 EULA 语义分离（超时/信号/spawn error 不再被当作正常拒绝）、清理共用单一单调时钟截止时间并记录真实耗时、正式任务根由 assembler 原子创建（历史任务根一律拒绝）。红灯先行后修复，源码门全绿（release-runners 129/129、unit 651）。执行侧自述见[阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)，等待独立代码审阅；完整卡与协议见[R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。阶段 B 三轮原生预检不因阶段 A 通过而自动解锁；PRR-070/080/090 与 G-FINAL 保持阻塞。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED`（R2 已关闭 R1 审阅的 R2-01～04，source `885d877` 三轮正式预检通过；执行侧自述不构成独立验收）
+状态：`IN_PROGRESS / R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`（R2 已关闭 R1 审阅的 R2-01～04，source `885d877` 三轮正式预检通过；执行侧自述不构成独立验收）
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -66,7 +66,7 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-11，PRR-000～069 已集成并完成独立审阅；source `b45dc0c` 的 PRR-070 阶段 A 因 Tauri Finder `.DS_Store` 无上限等待命中预先声明的 STOP。PRR-069C 已证明替代路线正常路径成立，但独立审阅发现发布门和挂载清理缺口；PRR-069C-R2 已执行完成（source `885d877`，三轮正式预检通过）并停在 STOP_FOR_INDEPENDENT_REVIEW，独立审阅接受后才重新派发 PRR-070。因此：
+截至 2026-09-11，PRR-000～069 已集成并完成独立审阅；source `b45dc0c` 的 PRR-070 阶段 A 因 Tauri Finder `.DS_Store` 无上限等待命中预先声明的 STOP。PRR-069C 已证明替代路线正常路径成立，但独立审阅发现发布门和挂载清理缺口；PRR-069C-R2 已执行完成（source `885d877`，三轮正式预检通过），但 R2 独立审阅结论为 REVISE；PRR-069C-R2-F1 阶段 A 已按修复指南完成返修（source `3214809`，源码门全绿，交回 STOP_FOR_CODE_REVIEW），阶段 B 三轮原生预检尚未派发。独立代码审阅接受并给出新 clean 基线后，才重新派发 PRR-070。因此：
 
 1. PRR-069C-R2 已从包含返卡与状态同步的最新 clean HEAD（`ed30987`）开始，实现 source 为 `885d877`；PRR-070 随后从包含 PRR-069C-R2 独立审阅接受记录的新 clean HEAD 开始。不得退回历史 source，也不得复用 `b45dc0c`、原 PRR-069C/R1/R2 attempts 或更早候选/证据。
 2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。
