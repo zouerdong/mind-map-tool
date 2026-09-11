@@ -6,7 +6,9 @@
 
 - 派发基线：`ed30987fe64756cee3057d8c4f4320bef51335b1`（clean，与派发时一致）
 - 实现 source（三轮预检实际 source）：`885d877b660a608604c8dc5921aeabd49fd4131e`
-- 交回 HEAD：见本报告所属文档提交（下表“source 与交回 HEAD 的差异”）
+- 交回 HEAD（HandoffCommit）：包含本报告的文档提交，可由
+  `git log -1 --format=%H -- docs/quality/prr-069c-r2-implementation-report-2026-09-11.md` 复算；
+  它的父提交即上面的 SourceCommit，两者差异仅限文档（§5 末节给出逐项证明）。
 - 依据：[PRR-069C-R1 独立审阅](./prr-069c-r1-independent-review-2026-09-11.md)、[R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)
 
 ## 1. 修改内容
@@ -132,7 +134,9 @@ node scripts/quality/bundle-gate.mjs --host tauri \
 ### source 与交回 HEAD 的差异
 
 - SourceCommit（三轮预检实际 source）：`885d877b660a608604c8dc5921aeabd49fd4131e`
-- HandoffCommit：见本报告的文档提交（父提交即 SourceCommit）
+- HandoffCommit：本报告所在的文档提交（父提交即 SourceCommit）
+- 复算命令：`git diff --stat 885d877b660a608604c8dc5921aeabd49fd4131e..HEAD -- scripts tests apps packages`
+  必须为空输出；`git diff --name-only 885d877..HEAD` 必须只列出 `AGENTS.md` 与 `docs/` 下的文件。
 - 两者差异**仅限文档**；`scripts/quality/*.mjs`、`tests/bootstrap/release-runners.test.ts` 在两棵树中逐字节相同：
 
 | 文件 | source `885d877` SHA-256 | 交回 HEAD SHA-256 |
