@@ -1,6 +1,6 @@
 # PRR-069C-R2：attach 异常接管与路径隔离闭合
 
-状态：`EXECUTED / STOP_FOR_INDEPENDENT_REVIEW`（2026-09-11）
+状态：`REVISE / SUPERSEDED_BY_R2-F1`（2026-09-11）。当前仅执行 [R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)阶段 A；本卡三轮预检顺序由 F1 分阶段交回取代。
 
 执行记录：派发基线 `ed30987fe64756cee3057d8c4f4320bef51335b1`（clean）；实现 source `885d877b660a608604c8dc5921aeabd49fd4131e`；三轮正式预检 attempt-01/02/03 全部通过（DMG 24284033/24284017/24284025B，装配 9397/10100/9886ms）。R2-01～04 的处置、红绿证据与遗留项见 [R2 实施报告](../../docs/quality/prr-069c-r2-implementation-report-2026-09-11.md)。执行侧自述不构成独立验收。
 

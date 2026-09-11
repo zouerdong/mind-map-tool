@@ -1,6 +1,6 @@
 # Quality
 
-2026-09-11 当前派发更新：`PRR-069C-R2_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。R2 已关闭 R1 独立审阅的 R2-01～04（attach 异常接管、fixture 工具注入闭合、work-dir 路径隔离、DMG 常量模块归位），从同一 clean source `885d877b660a608604c8dc5921aeabd49fd4131e` 连续三轮正式预检全部通过，详情见 [R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)；执行侧自述不构成独立验收，当前唯一待办是 [R2 完整任务卡](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md) 的交回与独立审阅。下文 R1 实施完成、CLOSED、37/37 等描述仅保留执行侧历史报告。R2 独立审阅接受前，不执行 PRR-070/G-FINAL/080/090；如与下文旧派发状态冲突，以本更新与 R2 卡为准。
+2026-09-11 当前派发更新：`R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED`。R2 独立审阅确认 EULA 异常分类、清理统一计时和历史任务目录隔离仍需返修；当前唯一入口为 [R2-F1 修复指南与任务卡](../planning/prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。现在只执行阶段 A（代码与合成异常测试），交回 STOP_FOR_CODE_REVIEW；阶段 B 三轮原生预检暂不派发。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
 
 记录可测量的非功能标准，包括启动耗时、空闲内存、安装包体积、大型脑图响应、崩溃恢复、可访问性和 macOS/Windows 兼容矩阵。
 
