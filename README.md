@@ -24,11 +24,21 @@ node scripts/quality/check-boundaries.mjs --scope selected-canvas   # 架构边�
 node scripts/quality/scan-dependency-licenses.mjs                   # 依赖许可扫描
 source ~/.cargo/env && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml  # Rust 侧
 
-pnpm bundle:tauri                # 候选构建（由 bundle-gate 严格校验 G2 授权与 candidate-root 边界；检测到签名配置/凭据即 fail-closed，“unsigned”由签名提示门保证；Tauri 只构建 app-only，再由 scripts/quality/assemble-dmg.mjs 用 macOS 系统工具装配 ULMO DMG（含 Applications 链接、卷图标与根 LICENSE 生成的挂载前 EULA）；正式路径不调用 Finder/AppleScript、不读不写 .DS_Store，装配失败即整体失败且不回退）
+pnpm bundle:tauri                # 候选构建（由 bundle-gate 严格校验 G2 授权与 candidate-root 边界；检测到签名配置/凭据即 fail-closed，“unsigned”由签名提示门保证；Tauri 只构建 app-only，再由 scripts/quality/assemble-dmg.mjs 用 macOS 系统工具装配 ULMO DMG（含 Applications 链接、卷图标与根 LICENSE 生成的挂载前 EULA）；正式路径不调用 Finder/AppleScript、不读不写 .DS_Store，装配失败即整体失败且不回退；省略 --work-dir 时每轮自动生成唯一任务根 .tmp/prr-069c-&lt;run-id&gt;/work，该任务根必须全新并由 assembler 原子创建，历史任务根一律拒绝复用）
 pnpm test:install:tauri         # 安装门（默认 --plan 零写入干运行；--execute 在 G2 批准的 deletionBoundaries 内沙箱验证）
 ```
 
 性能采样入口（`run-performance.mjs`）在 `--scope release` 下由 G2 授权门保护，消费真实候选产物进行冷/热启动及 RSS 采样；无真实证据时不产假绿。
+
+### DMG 装配的 work-dir 合同（PRR-069C-R2-F1）
+
+正式工作树固定为 `.tmp/prr-069c-<run-id>/work`，其中 `.tmp/` 下的直接子目录 `prr-069c-<run-id>` 是**本轮任务根**：
+
+- `bundle:tauri` 省略 `--work-dir`，由 `bundle-gate` 为每一轮生成一次性唯一任务根（默认值不是固定目录，因此命令可重复执行）；
+- 显式 `--work-dir` 仍受支持（用于预先固定的验收轮次），但必须是同一形状，且任务根在本轮之前**不存在**；
+- 任务根只由 `assemble-dmg.mjs` 原子创建（非递归 `mkdir`，`EEXIST` 即失败，不删除重试、不另找目录），`bundle-gate` 在 build 之前只做只读校验；
+- 已存在的任务根一律拒绝——无论它里面是空目录、仅含日志、含历史 work，还是 work 已被回收过；同名任务根不会被第二次使用；
+- 日志与报告写入本轮新的证据目录（`--inventory` 所在目录），不写入工作树。
 
 ## 目录
 

@@ -12,6 +12,17 @@
 // 不读取、生成、复制或等待 .DS_Store；`.app` 内含 .DS_Store 时直接失败。
 // 每个子进程有显式超时，整轮有 deadline；失败只清理由本轮创建且位于本运行目录内的资源。
 //
+// PRR-069C-R2-F1 加固：
+//   - 进程结果与业务语义分离：超时/信号/spawn error/无退出码都是执行失败，绝不是
+//     "用户拒绝 EULA"；挂载前 EULA 探针只接受「正常结束 + 非零 + 无挂载 + 目录空 +
+//     marker 匹配」，marker 已输出也不能挽救进程异常。
+//   - 单一清理截止时间：装配预算与失败清理宽限各只持有一个单调时钟截止时间，
+//     mount 查询 / detach / 清理后复核共享同一个 context；预算耗尽即不启动子进程，
+//     耗时按单调时钟真实记录（清理未开始才是 0）。
+//   - 任务根由本轮原子创建：正式工作树固定为 `.tmp/prr-069c-<run-id>/work`，
+//     `.tmp/` 下这一直接子目录必须不存在并由本进程非递归 mkdir 建立（EEXIST 即失败），
+//     不复用历史任务树、日志与工作树分离。
+//
 // PRR-069C-R2 加固：
 //   - attach 生命周期：子进程启动前登记 pending exact mountpoint；正常/非零/超时/
 //     signal/spawn error 一律先按 mount table 复核真实挂载状态，已挂载立即接管，
@@ -49,7 +60,6 @@ import {
   readlinkSync,
   realpathSync,
   renameSync,
-  rmdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -73,7 +83,11 @@ import {
   validateDmgWorkDir,
   assertWorkDirLandingOutside,
   assertWorkDirNotPreExisting,
+  assertTaskRootAbsent,
+  createTaskRootAtomically,
+  classifyProcessResult,
 } from "./dmg-assembly-contract.mjs";
+import { createBudgetContext, elapsedMs, timeoutFor, remainingMs } from "./dmg-budget.mjs";
 import { RELEASE_BUDGETS } from "./release-budgets.mjs";
 import {
   buildLicenseResourceXmlFromFile,
@@ -100,6 +114,8 @@ const DEFAULT_DEADLINE_MS = 180_000;
 // PRR-069C-R1：单命令超时与整轮 deadline 的不可放宽上限（正式值即默认值）。
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_DEADLINE_MS = 180_000;
+// PRR-069C-R2-F1：fixture 专用的清理宽限缩短入口（正式模式设置即 fail-closed）。
+const ENV_CLEANUP_GRACE = "MINDMAP_DMG_CLEANUP_GRACE_MS";
 
 const TOOLS = SYSTEM_TOOL_PATHS;
 
@@ -155,11 +171,61 @@ let residualMount = null;
 let pendingMount = null;
 // 挂载状态分类：CLEAN（可证明无残留）/ RESIDUAL（已确认残留）/ UNKNOWN（无法确认）。
 let mountState = "CLEAN";
-// 失败清理单独计时与预算：仅用于回收本轮挂载，不计入装配预算，也不得用于完成装配。
-let cleanupStartedMs = null;
-let cleanupElapsedMs = 0;
+// PRR-069C-R2-F1：两段预算各只有一个单调时钟截止时间。
+//   assemblyCtx —— 装配流程（含正常路径的 mount 查询与 detach），上限 deadlineMs；
+//   cleanupCtx  —— 首次失败清理时惰性创建，此后永不重置，上限清理宽限。
+// 两者不得混用：正常流程不会"借用"清理宽限，清理也不会重新拿到完整的装配预算。
+const assemblyCtx = createBudgetContext({
+  budgetMs: deadlineMs,
+  label: "assembly",
+});
+let cleanupCtx = null;
 let cleanupStatus = "CLEAN";
 let cleanupAttempts = [];
+
+// 清理宽限（毫秒）：正式固定 DMG_CLEANUP_GRACE_MS。先落默认值再应用 fixture 覆盖，
+// 这样即使覆盖值非法、fail() 在覆盖校验阶段被触发，失败记录仍能完整序列化。
+let cleanupGraceMs = DMG_CLEANUP_GRACE_MS;
+cleanupGraceMs = resolveCleanupGraceMs();
+
+/**
+ * 失败清理上下文：首次进入清理时创建，包含它的第一次 mount 查询；
+ * 同一轮内不得重建或重置（否则"再次 detach / 复核失败"会变成新的 60 秒）。
+ */
+function cleanupBudget() {
+  if (cleanupCtx === null) {
+    cleanupCtx = createBudgetContext({ budgetMs: cleanupGraceMs, label: "cleanup" });
+  }
+  return cleanupCtx;
+}
+
+function cleanupElapsedMs() {
+  return cleanupCtx === null ? 0 : elapsedMs(cleanupCtx);
+}
+
+/** 清理阶段可用的预算上下文：失败接管与清理一律用 cleanup，正常流程用 assembly。 */
+function budgetContext(kind) {
+  return kind === "cleanup" ? cleanupBudget() : assemblyCtx;
+}
+
+/**
+ * 正式装配的清理宽限是固定预算，不得放宽。fixture（合成 root）允许用环境变量缩短，
+ * 以便在不真实等待 60 秒的前提下验证"预算耗尽即不启动子进程"；正式模式设置即失败。
+ */
+function resolveCleanupGraceMs() {
+  const raw = process.env[ENV_CLEANUP_GRACE];
+  if (!raw) return DMG_CLEANUP_GRACE_MS;
+  if (IS_PRODUCTION) {
+    fail(
+      `正式模式禁止覆盖清理宽限（固定 ${DMG_CLEANUP_GRACE_MS}ms，不得放大或调小）: ${ENV_CLEANUP_GRACE}`,
+    );
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0 || value > DMG_CLEANUP_GRACE_MS) {
+    fail(`${ENV_CLEANUP_GRACE} 必须是不超过 ${DMG_CLEANUP_GRACE_MS} 的正整数：${raw}`);
+  }
+  return value;
+}
 // 校验通过的注入工具集合（fixture 模式）；非空时 resolveTool 只认注入目录，绝不回退。
 let injectedTools = null;
 
@@ -173,6 +239,9 @@ function fail(message) {
     cleaningUp = true;
     cleanupOnFailure();
   }
+  // 序列化时才取真实终值：清理未开始才是 0，UNKNOWN 也必须记录已花费时间。
+  const cleanupMs = cleanupElapsedMs();
+  const assemblyMs = elapsedMs(assemblyCtx);
   const record = {
     status: "failed",
     runner: "assemble-dmg.mjs",
@@ -181,10 +250,19 @@ function fail(message) {
     error: message,
     startedAt: new Date(assemblyStartedMs).toISOString(),
     finishedAt: new Date().toISOString(),
-    elapsedMs: Date.now() - assemblyStartedMs,
+    // 总耗时 = 装配段 + 清理段（同一单调时钟基准），由两段现算得出。
+    elapsedMs: assemblyMs + cleanupMs,
     // 装配预算固定值：失败记录同样声明，证明清理宽限没有放宽或顶替装配预算。
     timeoutMs,
     deadlineMs,
+    timings: {
+      assemblyMs,
+      cleanupMs,
+      totalElapsedMs: assemblyMs + cleanupMs,
+      cleanupGraceMs,
+      cleanupStarted: cleanupCtx !== null,
+      cleanupStatus,
+    },
     gitHead: safeGitHead(),
     workDir: runDirRel,
     preservedWorkDir: activeRunDir ? true : false,
@@ -194,8 +272,8 @@ function fail(message) {
     residualMount,
     mountState,
     cleanup: {
-      graceMs: DMG_CLEANUP_GRACE_MS,
-      elapsedMs: cleanupElapsedMs,
+      graceMs: cleanupGraceMs,
+      elapsedMs: cleanupMs,
       status: cleanupStatus,
       attempts: cleanupAttempts,
     },
@@ -231,7 +309,7 @@ function cleanupOnFailure() {
   const mountpoint = mountedAt ?? pendingMount?.mountpoint ?? null;
   const device = mountedDevice ?? pendingMount?.device ?? null;
   if (mountedAt && mountedDevice) {
-    // 已确认归属的挂载：在独立的有界宽限预算内受控卸载并复核，不占用装配 deadline。
+    // 已确认归属的挂载：在同一个有界清理宽限内受控卸载并复核，不占用装配 deadline。
     const outcome = detachAndVerify({
       mountpoint,
       device,
@@ -242,6 +320,8 @@ function cleanupOnFailure() {
       mountState = "CLEAN";
       cleanupStatus = "CLEAN";
       pendingMount = null;
+      // 已证明无残留：此前因装配预算耗尽/复核失败留下的残留记录不再成立。
+      residualMount = null;
     } else {
       mountState = outcome;
       cleanupStatus = outcome;
@@ -289,29 +369,77 @@ class MountTableUnavailable extends Error {
 /**
  * 读取 mount table。任何失败（timeout、spawn error、非零退出）都抛出携带结构化
  * 证据的 MountTableUnavailable，绝不把空输出解释为“没有挂载”。
- * 超时受当前 timeout 预算约束（正式 30s 封顶，fixture 可更小以便测试）。
+ * 超时由传入的预算上下文决定：命令上限 30s 与「该上下文剩余预算」取较小者，
+ * 因此失败清理里的前查询/后查询会共享同一个 60 秒宽限，而不是各自拿满 30 秒。
+ * 剩余预算 ≤0 时不启动子进程（Node 的 timeout=0 表示不设超时，绝不能传 0）。
  */
-function mountTable() {
-  const timeout = Math.min(30_000, timeoutMs);
+function mountTable(ctx, stage = "mount-table") {
+  const tool = resolveTool("mount");
+  const timeout = timeoutFor(ctx, Math.min(30_000, timeoutMs));
+  const baseLog = { tool: "mount", path: tool, args: [], note: stage, budget: ctx.label };
+  if (timeout <= 0) {
+    const now = new Date().toISOString();
+    commandLog.push({
+      ...baseLog,
+      startedAt: now,
+      finishedAt: now,
+      timeoutMs: 0,
+      status: null,
+      signal: null,
+      timedOut: false,
+      spawnError: null,
+      skipped: `${ctx.label}-budget-exhausted`,
+    });
+    throw new MountTableUnavailable({
+      tool: "mount",
+      path: tool,
+      startedAt: now,
+      finishedAt: now,
+      timeoutMs: 0,
+      status: null,
+      signal: null,
+      timedOut: false,
+      spawnError: null,
+      budgetExhausted: true,
+      budget: ctx.label,
+      remainingMs: remainingMs(ctx),
+      stdout: "",
+      stderr: "",
+    });
+  }
   const startedAt = new Date().toISOString();
-  const r = spawnSync(resolveTool("mount"), [], {
+  const r = spawnSync(tool, [], {
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
     stdio: ["ignore", "pipe", "pipe"],
   });
   const timedOut = Boolean(r.error?.code === "ETIMEDOUT" || r.signal === "SIGKILL");
+  const spawnError = r.error ? String(r.error.message) : null;
+  commandLog.push({
+    ...baseLog,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    timeoutMs: timeout,
+    status: r.status ?? null,
+    signal: r.signal ?? null,
+    timedOut,
+    spawnError,
+  });
   if (r.error || (r.status ?? 1) !== 0) {
     throw new MountTableUnavailable({
       tool: "mount",
-      path: resolveTool("mount"),
+      path: tool,
       startedAt,
       finishedAt: new Date().toISOString(),
       timeoutMs: timeout,
       status: r.status ?? null,
       signal: r.signal ?? null,
       timedOut,
-      spawnError: r.error ? String(r.error.message) : null,
+      spawnError,
+      budgetExhausted: false,
+      budget: ctx.label,
+      remainingMs: remainingMs(ctx),
       stdout: (r.stdout ?? "").slice(0, 400),
       stderr: (r.stderr ?? "").slice(0, 400),
     });
@@ -319,15 +447,19 @@ function mountTable() {
   return (r.stdout ?? "").split("\n").filter((l) => l.trim().length > 0);
 }
 
-/** 在主流程中使用 mount table：不可用时以结构化证据 fail（STOP 语义）。 */
+/** 在主流程中使用 mount table（装配预算）：不可用时以结构化证据 fail（STOP 语义）。 */
 function requireMountTable(stage) {
   try {
-    return mountTable();
+    return mountTable(assemblyCtx, stage);
   } catch (err) {
     const evidence =
       err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
+    const cause =
+      err instanceof MountTableUnavailable && err.evidence?.budgetExhausted
+        ? `装配预算（${assemblyCtx.label}）已耗尽，不得启动子进程`
+        : "退出码/超时/spawn 异常";
     fail(
-      `${stage}: mount table 不可用（退出码/超时/spawn 异常），不得把空输出解释为无挂载，STOP 保留真实现场: ${evidence}`,
+      `${stage}: mount table 不可用（${cause}），不得把空输出解释为无挂载，STOP 保留真实现场: ${evidence}`,
     );
   }
 }
@@ -335,20 +467,28 @@ function requireMountTable(stage) {
 /**
  * PRR-069C-R2：统一 attach 生命周期。启动子进程之前先登记本轮拥有的 pending exact
  * mountpoint（不等 exit 0 才记责任），随后无论正常 / 非零 / timeout / signal / spawn error，
- * 都以 mount table 复核真实挂载状态，再决定语义：
- *   已挂载 → 立即接管为 active mount；requireSuccess 且 attach 未成功时先受控卸载再失败；
- *   未挂载但 stdout 声称挂载 → 状态矛盾，STOP 保留现场；
- *   未挂载且 attach 未成功 → 受控失败（无可清理资源）。
+ * 都以 mount table 复核真实挂载状态，再决定语义。
+ *
+ * PRR-069C-R2-F1：把「进程结果」与「业务语义」彻底分开，顺序固定为
+ *   1. 接管——只要 mount table 里出现本挂载点，立即登记为 active mount（先管资源）；
+ *   2. 探针意外挂载——EULA 拒绝探针建立挂载即失败，无论退出码，先受控回收再失败；
+ *   3. 进程异常——超时/信号/spawn error/无退出码一律失败，marker 已输出也不能挽救；
+ *   4. 正常结束才谈语义——mount 意图要求 exit 0 且已挂载；EULA 探针要求 exit 非零
+ *      且无挂载（目录空与 marker 匹配由调用点继续校验）。
  * mount table 不可用时由 requireMountTable fail-closed，转入有界清理宽限。
+ * intent 只有两种取值："mount"（必须挂载成功）与 "eula-probe"（必须是正常拒绝）。
  */
-function attachVolume({ mountpoint, cmdArgs, input, note, stage, requireSuccess = true }) {
+function attachVolume({ mountpoint, cmdArgs, input, note, stage, intent = "mount" }) {
+  const probing = intent === "eula-probe";
+  const requireSuccess = !probing;
   pendingMount = { mountpoint, stage, startedAt: new Date().toISOString() };
   const result = runTool("hdiutil", cmdArgs, { must: false, input, note });
   const table = requireMountTable(`${stage}-mount-table-check`);
   const parsed = parseAttachOutput(result.stdout, mountpoint);
   const entry = findExactMountInLines(table, mountpoint);
-  const ok = !result.timedOut && !result.spawnError && result.status === 0;
+  const execution = classifyProcessResult(result);
 
+  // 1. 接管：先按 mount table 复核真实挂载状态，再谈退出码。
   if (entry) {
     mountedDevice = entry.device;
     mountedAt = mountpoint;
@@ -360,53 +500,101 @@ function attachVolume({ mountpoint, cmdArgs, input, note, stage, requireSuccess 
         `assemble-dmg: attach stdout 不可解析，已从 mount table 恢复挂载登记: ${entry.device} ${mountpoint}`,
       );
     }
-    if (requireSuccess && !ok) {
-      const reason = describeAttachFailure(result);
+  } else {
+    pendingMount = null;
+  }
+
+  // 2. EULA 拒绝探针意外建立挂载：无论退出码如何，先受控回收再失败。
+  if (probing && mountedAt) {
+    const outcome = detachAndVerify({
+      mountpoint,
+      device: mountedDevice,
+      stage: `${stage}-recovery`,
+      budget: "cleanup",
+    });
+    recordCleanupOutcome(outcome, mountedDevice, mountpoint, `${stage}: 探针意外挂载后卸载`);
+    fail(
+      "未同意 EULA 时 hdiutil attach 仍然成功挂载" +
+        (outcome === "CLEAN"
+          ? "（已受控卸载并复核 mount table 无残留）"
+          : `（尝试卸载但未能证明无残留：${outcome}，见上方 RESIDUAL_MOUNT/STOP 记录）`) +
+        "，挂载前 EULA 未生效",
+    );
+  }
+
+  // 3. 进程异常：不是"用户拒绝"，也不是"没有挂载"，必须失败。
+  if (execution) {
+    if (mountedAt) {
       const outcome = detachAndVerify({
         mountpoint,
-        device: entry.device,
+        device: mountedDevice,
         stage: `${stage}-failed-attach-recovery`,
         budget: "cleanup",
       });
-      if (outcome === "CLEAN") {
-        mountState = "CLEAN";
-        cleanupStatus = "CLEAN";
-      } else {
-        mountState = outcome;
-        cleanupStatus = outcome;
-        residualMount = residualMount ?? {
-          device: entry.device,
-          mountpoint,
-          reason: `${stage}: attach 失败后卸载未证明无残留（${outcome}）`,
-        };
-      }
+      recordCleanupOutcome(outcome, mountedDevice, mountpoint, `${stage}: attach 异常后卸载`);
       fail(
-        `${stage}: ${reason}，但挂载已建立；` +
+        `${stage}: ${describeAttachFailure(result)}（${execution.code}），但挂载已建立；` +
           (outcome === "CLEAN"
             ? "已受控卸载并复核 mount table 无残留"
             : `尝试卸载但未能证明无残留（${outcome}，见上方 RESIDUAL_MOUNT/STOP 记录）`) +
           "，整体判定失败（不得把超时或非零退出转成成功）",
       );
     }
-    return { ...result, ok, mounted: true, device: entry.device, mountpoint };
-  }
-
-  pendingMount = null;
-  if (parsed) {
     fail(
-      `${stage}: attach stdout 声称挂载 ${parsed.device} ${mountpoint}，但 mount table 无该挂载点，` +
-        "挂载状态不可确认，STOP 保留真实现场",
+      `${stage}: attach 进程异常（${execution.reason}），未建立挂载；` +
+        "进程异常不接受作为 EULA 拒绝证据，也不得进入最终挂载，整体判定失败",
     );
   }
-  if (ok) {
-    // 退出 0 却没在 mount table 中看到挂载：这是状态矛盾，绝不能被当成“没有挂载”。
+
+  // 4. 正常结束才谈业务语义。
+  // 挂载意图：必须 exit 0 且已挂载；"已挂载但退出码非零"同样不是成功，先回收再失败。
+  if (!probing && mountedAt && result.status !== 0) {
+    const outcome = detachAndVerify({
+      mountpoint,
+      device: mountedDevice,
+      stage: `${stage}-failed-attach-recovery`,
+      budget: "cleanup",
+    });
+    recordCleanupOutcome(outcome, mountedDevice, mountpoint, `${stage}: attach 非零退出后卸载`);
     fail(
-      `${stage}: attach 返回 0 但 stdout 不可解析且 mount table 无 ${mountpoint} 条目，` +
+      `${stage}: ${describeAttachFailure(result)}，但挂载已建立；` +
+        (outcome === "CLEAN"
+          ? "已受控卸载并复核 mount table 无残留"
+          : `尝试卸载但未能证明无残留（${outcome}，见上方 RESIDUAL_MOUNT/STOP 记录）`) +
+        "，整体判定失败（不得把超时或非零退出转成成功）",
+    );
+  }
+  // 未挂载却声称成功是状态矛盾，绝不能被当成"没有挂载"。
+  if (!mountedAt && result.status === 0) {
+    fail(
+      `${stage}: attach 返回 0 但 stdout ${parsed ? "声称挂载而 mount table 无该挂载点" : "不可解析且 mount table 无该挂载点"}，` +
         "无法确认挂载状态，STOP 保留真实现场",
     );
   }
-  if (requireSuccess) fail(`${stage}: ${describeAttachFailure(result)}`);
-  return { ...result, ok, mounted: false, device: null, mountpoint };
+  if (probing) {
+    // 到这里必然 正常结束 + 非零退出 + 无挂载（挂载与异常分支已在前面处理）。
+    return { ...result, ok: true, mounted: false, device: null, mountpoint, refused: true };
+  }
+  if (mountedAt) {
+    return { ...result, ok: true, mounted: true, device: mountedDevice, mountpoint };
+  }
+  fail(`${stage}: ${describeAttachFailure(result)}`);
+}
+
+/** 记录一次受控卸载的结论（CLEAN 视为已回收；其余保留残留证据，绝不写成已清理）。 */
+function recordCleanupOutcome(outcome, device, mountpoint, reason) {
+  if (outcome === "CLEAN") {
+    mountState = "CLEAN";
+    cleanupStatus = "CLEAN";
+    return;
+  }
+  mountState = outcome;
+  cleanupStatus = outcome;
+  residualMount = residualMount ?? {
+    device,
+    mountpoint,
+    reason: `${reason}未证明无残留（${outcome}）`,
+  };
 }
 
 /** attach 结果的结构化失败分类（spawn error / 超时 / signal / 非零退出）。 */
@@ -440,31 +628,39 @@ function findExactMountInLines(table, expectedMountpoint) {
  */
 function detachAndVerify({ mountpoint, device, stage, budget = "assembly" }) {
   if (!mountpoint) return "CLEAN";
+  const ctx = budgetContext(budget);
   const attempt = {
     stage,
     mountpoint,
     device: device ?? null,
-    budget,
+    budget: ctx.label,
     startedAt: new Date().toISOString(),
   };
 
   // 卸载前置身份核对：只有能证明该挂载点/设备属于本轮时才执行 detach。
   // 归属无法证明（表不可读）或设备不匹配时一律不卸载，保留 pending/active/residual 证据。
+  // 预算耗尽与"表不可读"必须区分：前者责任明确（本轮登记仍在），后者才是状态未知。
   if (device) {
     let pre;
     try {
-      pre = mountTable();
+      pre = mountTable(ctx, `${stage}-pre-detach`);
     } catch (err) {
+      const exhausted =
+        err instanceof MountTableUnavailable && err.evidence?.budgetExhausted === true;
       const evidence =
         err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
-      attempt.result = "UNKNOWN";
-      attempt.reason = "卸载前 mount table 不可用，无法证明归属";
+      attempt.result = exhausted ? "RESIDUAL" : "UNKNOWN";
+      attempt.reason = exhausted
+        ? `卸载前预算（${ctx.label}）已耗尽，未启动 mount 查询`
+        : "卸载前 mount table 不可用，无法证明归属";
       cleanupAttempts.push(attempt);
       console.error(
-        `assemble-dmg: STOP — ${stage}: 卸载前 mount table 不可读，无法证明 ${mountpoint} 归属本轮，` +
-          `拒绝卸载并保留现场等待人工检查: ${evidence}`,
+        `assemble-dmg: ${exhausted ? "RESIDUAL_MOUNT" : "STOP"} — ${stage}: ` +
+          (exhausted
+            ? `清理预算（${ctx.label}）已耗尽，未执行归属复核与卸载，挂载登记保留: ${mountpoint}`
+            : `卸载前 mount table 不可读，无法证明 ${mountpoint} 归属本轮，拒绝卸载并保留现场等待人工检查: ${evidence}`),
       );
-      return "UNKNOWN";
+      return attempt.result;
     }
     const preEntry = findExactMountInLines(pre, mountpoint);
     const preDeviceEntry = pre.find((line) => line.startsWith(`${device} `));
@@ -494,13 +690,15 @@ function detachAndVerify({ mountpoint, device, stage, budget = "assembly" }) {
   attempt.timedOut = r.timedOut;
   attempt.spawnError = r.spawnError;
   if (!r.spawned) {
-    attempt.result = "UNKNOWN";
+    // 预算耗尽时责任是明确的（登记仍在、未被回收），不是状态未知。
+    attempt.result = r.budgetExhausted ? "RESIDUAL" : "UNKNOWN";
     attempt.reason = r.reason ?? "detach 未能启动";
     cleanupAttempts.push(attempt);
     console.error(
-      `assemble-dmg: STOP — ${stage}: detach 未启动（${attempt.reason}），无法证明无残留，登记保留: ${mountpoint}`,
+      `assemble-dmg: ${r.budgetExhausted ? "RESIDUAL_MOUNT" : "STOP"} — ${stage}: detach 未启动（${attempt.reason}），` +
+        `无法证明无残留，登记保留: ${mountpoint}`,
     );
-    return "UNKNOWN";
+    return attempt.result;
   }
   if ((r.status ?? 1) !== 0) {
     attempt.result = "RESIDUAL";
@@ -513,15 +711,20 @@ function detachAndVerify({ mountpoint, device, stage, budget = "assembly" }) {
   }
   let table;
   try {
-    table = mountTable();
+    table = mountTable(ctx, `${stage}-post-detach`);
   } catch (err) {
+    const exhausted =
+      err instanceof MountTableUnavailable && err.evidence?.budgetExhausted === true;
     const evidence =
       err instanceof MountTableUnavailable ? JSON.stringify(err.evidence) : String(err);
     attempt.result = "UNKNOWN";
-    attempt.reason = "detach 后 mount table 不可用";
+    attempt.reason = exhausted
+      ? `detach 后预算（${ctx.label}）已耗尽，未启动复核查询`
+      : "detach 后 mount table 不可用";
     cleanupAttempts.push(attempt);
     console.error(
-      `assemble-dmg: RESIDUAL_MOUNT — ${stage}: detach 成功但 mount table 不可读，无法证明无残留，登记保留: ${evidence}`,
+      `assemble-dmg: RESIDUAL_MOUNT — ${stage}: detach ${exhausted ? "后预算耗尽" : "成功但 mount table 不可读"}，` +
+        `无法证明无残留，登记保留: ${exhausted ? attempt.reason : evidence}`,
     );
     return "UNKNOWN";
   }
@@ -545,71 +748,42 @@ function detachAndVerify({ mountpoint, device, stage, budget = "assembly" }) {
   return "CLEAN";
 }
 
-/** 失败后的清理宽限：独立计时、有界；不占用装配预算，也不允许无限等待。 */
-function cleanupRemainingMs() {
-  if (cleanupStartedMs === null) cleanupStartedMs = Date.now();
-  cleanupElapsedMs = Date.now() - cleanupStartedMs;
-  return DMG_CLEANUP_GRACE_MS - cleanupElapsedMs;
-}
-
 /**
  * 有界 detach 子进程：参数数组、显式超时、按所选预算收紧。
- * assembly 预算受装配 deadline 约束（用尽则转失败清理宽限）；cleanup 预算受独立宽限约束。
- * 两者都不会无限等待，且都记录结构化结果，供“是否已证明清理”的判定与复算。
+ * 两个预算都只持有一个单调时钟截止时间：assembly 受整轮 deadline 约束
+ * （用尽则转失败清理宽限），cleanup 受独立宽限约束且被同一段清理内的
+ * 前查询/后查询共同消耗。任一预算耗尽都不启动子进程（绝不把 0 当成"不设超时"）。
  */
 function spawnDetach(mountpoint, { stage, budget }) {
+  const ctx = budgetContext(budget);
   const tool = resolveTool("hdiutil");
   const detachArgs = ["detach", mountpoint];
-  const baseLog = { tool: "hdiutil", path: tool, args: detachArgs, note: stage, budget };
-  let perCommandTimeout;
-  if (budget === "cleanup") {
-    const remaining = cleanupRemainingMs();
-    if (remaining <= 0) {
-      commandLog.push({
-        ...baseLog,
-        startedAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        timeoutMs: 0,
-        status: null,
-        signal: null,
-        timedOut: false,
-        spawnError: null,
-        skipped: "cleanup-grace-exhausted",
-      });
-      return {
-        spawned: false,
-        status: null,
-        signal: null,
-        timedOut: false,
-        spawnError: null,
-        reason: `清理宽限 ${DMG_CLEANUP_GRACE_MS}ms 已用尽`,
-      };
-    }
-    perCommandTimeout = Math.min(timeoutMs, remaining);
-  } else {
-    const remaining = deadlineMs - (Date.now() - assemblyStartedMs);
-    if (remaining <= 0) {
-      commandLog.push({
-        ...baseLog,
-        startedAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        timeoutMs: 0,
-        status: null,
-        signal: null,
-        timedOut: false,
-        spawnError: null,
-        skipped: "assembly-budget-exhausted",
-      });
-      return {
-        spawned: false,
-        status: null,
-        signal: null,
-        timedOut: false,
-        spawnError: null,
-        reason: `装配 deadline ${deadlineMs}ms 已用尽（转失败清理宽限）`,
-      };
-    }
-    perCommandTimeout = Math.min(timeoutMs, remaining);
+  const baseLog = { tool: "hdiutil", path: tool, args: detachArgs, note: stage, budget: ctx.label };
+  const perCommandTimeout = timeoutFor(ctx, timeoutMs);
+  if (perCommandTimeout <= 0) {
+    commandLog.push({
+      ...baseLog,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      timeoutMs: 0,
+      status: null,
+      signal: null,
+      timedOut: false,
+      spawnError: null,
+      skipped: `${ctx.label}-budget-exhausted`,
+    });
+    return {
+      spawned: false,
+      status: null,
+      signal: null,
+      timedOut: false,
+      spawnError: null,
+      budgetExhausted: true,
+      reason:
+        ctx.label === "cleanup"
+          ? `清理宽限 ${cleanupGraceMs}ms 已用尽，不再启动 detach`
+          : `装配 deadline ${deadlineMs}ms 已用尽（转失败清理宽限）`,
+    };
   }
   const startedAt = new Date().toISOString();
   const r = spawnSync(tool, detachArgs, {
@@ -675,15 +849,19 @@ function resolveTool(name) {
 }
 
 /**
- * 单次受控子进程调用：参数数组、显式超时、按剩余 deadline 收紧、记录起止与结果。
+ * 单次受控子进程调用：参数数组、显式超时、按装配预算剩余收紧、记录起止与结果。
  * 超时与非零退出由调用点决定语义（must=false 时只回报）。
+ * status 一律保留原值（可能是 null）：分类信息不能被提前压成"普通非零码"。
  */
 function runTool(name, cmdArgs, opts = {}) {
   const { must = true, input, note } = opts;
   const tool = resolveTool(name);
-  const remaining = deadlineMs - (Date.now() - assemblyStartedMs);
-  if (remaining <= 0) fail(`超出装配 deadline（${deadlineMs}ms）`);
-  const perCommandTimeout = Math.min(timeoutMs, remaining);
+  const perCommandTimeout = timeoutFor(assemblyCtx, timeoutMs);
+  if (perCommandTimeout <= 0) {
+    fail(
+      `超出装配 deadline（${deadlineMs}ms，剩余 ${Math.round(remainingMs(assemblyCtx))}ms），不得启动新子进程`,
+    );
+  }
   const startedAt = new Date().toISOString();
   const r = spawnSync(tool, cmdArgs, {
     encoding: "utf8",
@@ -725,7 +903,9 @@ function runTool(name, cmdArgs, opts = {}) {
     );
   }
   return {
-    status: r.status ?? 1,
+    // 保留 null：调用点需要据此区分"正常结束但退出码非零"与"进程从未正常结束"。
+    status: r.status ?? null,
+    signal: r.signal ?? null,
     stdout: r.stdout ?? "",
     stderr: r.stderr ?? "",
     timedOut,
@@ -807,14 +987,20 @@ if (!outputRel.endsWith(".dmg")) fail(`--output 必须是 .dmg 文件: ${outputR
 // 历史 attempt 借用）必须在任何 mkdir / 工具调用 / 挂载之前完成。
 // R1 的「已存在但为空」不再接受：那正是借用历史 attempt 树复跑同一 work-dir 的入口。
 let workDirPreAbs;
+let workDirInfo;
 try {
-  const workDirInfo = validateDmgWorkDir({
+  workDirInfo = validateDmgWorkDir({
     workDir: workDirRel,
     root: ROOT,
     isProduction: IS_PRODUCTION,
   });
   workDirRel = workDirInfo.rel;
   workDirPreAbs = workDirInfo.abs;
+  // R2-F1：正式任务根必须全新——这是"本轮拥有该工作树"的证明，必须在任何
+  // G2 校验、mkdir、工具调用与挂载之前判定（创建动作在后面，且只由本进程执行）。
+  // 先判任务根：它比"末级 work 是否已存在"更根本（历史上成功过、或只写过日志的
+  // 任务根同样不能被这一轮接管）。
+  assertTaskRootAbsent(workDirInfo.taskRootAbs, workDirInfo.taskRootRel);
   assertWorkDirNotPreExisting(workDirInfo.abs, workDirInfo.rel);
 } catch (err) {
   fail(err.message);
@@ -916,6 +1102,21 @@ const volumeName = volumeNameFlag ?? basename(appRel).replace(/\.app$/, "");
 if (!volumeName || /[ -/]/.test(volumeName)) fail(`非法的卷名: ${volumeName}`);
 
 // ---------------------------------------------------------------- 4. 运行目录
+// PRR-069C-R2-F1：正式模式下任务根本轮由本进程独占创建（非递归 mkdir，EEXIST 即失败）——
+// 这是"本轮拥有该工作树"的唯一证明，不依据已有目录内容或年龄推测归属。
+// 创建发生在全部校验通过之后：被拒绝的运行不会留下任何任务根。
+if (IS_PRODUCTION) {
+  try {
+    createTaskRootAtomically({
+      taskRootAbs: workDirInfo.taskRootAbs,
+      taskRootRel: workDirInfo.taskRootRel,
+      parentAbs: resolve(ROOT, ".tmp"),
+      parentRel: ".tmp",
+    });
+  } catch (err) {
+    fail(err.message);
+  }
+}
 const runStamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "Z");
 runDirRel = `${workDirRel}/assemble-${runStamp}-${process.pid}`;
 const runDirAbs = resolve(ROOT, runDirRel);
@@ -1055,6 +1256,8 @@ if (tempDmgBytes > RELEASE_BUDGETS.installerBytes) {
 }
 
 // 挂载前 EULA：未同意时 attach 必须打印许可证正文并拒绝挂载（该镜像因此不可静默挂载）。
+// PRR-069C-R2-F1：探针语义只由「正常结束 + 非零退出 + 无挂载」构成；进程异常（超时/信号/
+// spawn error）与意外挂载都在 attachVolume 内部先受控回收再失败，不会走到这里。
 currentStage = "pre-mount-eula";
 const refusal = attachVolume({
   mountpoint: mntFinalAbs,
@@ -1071,20 +1274,8 @@ const refusal = attachVolume({
   input: "",
   note: "pre-mount-eula-refusal",
   stage: "pre-mount-eula",
-  requireSuccess: false,
+  intent: "eula-probe",
 });
-// PRR-069C-R2：探针只要建立了挂载（无论退出码 0、非零、超时还是被信号终止）都视为
-// EULA 未生效——必须先受控卸载并复核表空，然后才允许以失败结束；不得先 fail 让挂载失去清理。
-if (refusal.mounted) {
-  if (!controlledDetach("pre-mount-eula-recovery", "cleanup")) {
-    fail(
-      "未同意 EULA 时 attach 意外成功挂载，且受控卸载未能证明无残留（RESIDUAL_MOUNT），挂载前 EULA 未生效",
-    );
-  }
-  fail(
-    "未同意 EULA 时 hdiutil attach 仍然成功挂载（已受控卸载并复核 mount table 无残留），挂载前 EULA 未生效",
-  );
-}
 if (readdirSync(mntFinalAbs).length !== 0) {
   fail("EULA 拒绝路径留下了挂载内容，现场不干净");
 }
@@ -1119,8 +1310,13 @@ if (!controlledDetach("verify-mount")) {
 }
 
 // EULA 内容绑定：从最终镜像提取 TEXT 资源与根 LICENSE 逐字节比对。
+// 进程异常（spawn error / 超时 / 无退出码）同样不是"非零退出"，必须先分类再报错。
 currentStage = "eula-binding";
 const rezXml = runTool("hdiutil", ["udifderez", "-xml", tempDmgAbs], { must: false });
+const rezXmlFault = classifyProcessResult(rezXml);
+if (rezXmlFault) {
+  fail(`hdiutil udifderez 进程异常（${rezXmlFault.reason}），无法复算 EULA 内容`);
+}
 if (rezXml.status !== 0) {
   fail(`hdiutil udifderez 失败，无法复算 EULA 内容：${rezXml.out.trim().slice(0, 200)}`);
 }
@@ -1152,8 +1348,14 @@ if (gitAfter.head !== gitBefore.head || gitAfter.status.length > 0) {
 }
 
 const finishedMs = Date.now();
-const elapsedMs = finishedMs - assemblyStartedMs;
-if (elapsedMs > deadlineMs) fail(`装配阶段耗时 ${elapsedMs}ms 超过 deadline ${deadlineMs}ms`);
+// PRR-069C-R2-F1：耗时一律由单调时钟上下文给出，墙钟只用于审计时间戳。
+// 成功路径没有清理动作，因此 cleanupMs 恒为 0，assemblyMs 即总耗时。
+const assemblyMs = elapsedMs(assemblyCtx);
+const cleanupMs = cleanupElapsedMs();
+const elapsedMsTotal = assemblyMs + cleanupMs;
+if (assemblyMs > deadlineMs) {
+  fail(`装配阶段耗时 ${assemblyMs}ms 超过 deadline ${deadlineMs}ms`);
+}
 
 currentStage = "report";
 const report = {
@@ -1164,10 +1366,13 @@ const report = {
   sourceWorktree: "clean",
   startedAt: new Date(assemblyStartedMs).toISOString(),
   finishedAt: new Date(finishedMs).toISOString(),
-  elapsedMs,
+  elapsedMs: elapsedMsTotal,
   timeoutMs,
   deadlineMs,
   workDir: runDirRel,
+  workTree: workDirInfo.taskRootRel
+    ? { taskRoot: workDirInfo.taskRootRel, workDir: workDirInfo.rel }
+    : null,
   volumeName,
   dmgFormat: FORMAT,
   tools: toolsManifest,
@@ -1187,11 +1392,15 @@ const report = {
     imageInfoDeclaresAgreement: true,
   },
   payload,
-  // R2-01：装配耗时与失败清理宽限分开声明；成功路径没有清理，cleanupMs 恒为 0。
+  // R2-01 / R2-F1：装配段与清理段分开声明（同一单调时钟基准）；
+  // 成功路径没有清理动作，cleanupMs 恒为 0，totalElapsedMs 即 assemblyMs。
   timings: {
-    assemblyMs: elapsedMs,
-    cleanupGraceMs: DMG_CLEANUP_GRACE_MS,
-    cleanupMs: cleanupElapsedMs,
+    assemblyMs,
+    cleanupGraceMs,
+    cleanupMs,
+    totalElapsedMs: elapsedMsTotal,
+    cleanupStarted: cleanupCtx !== null,
+    cleanupStatus,
   },
   checks: {
     format: FORMAT,
@@ -1213,15 +1422,9 @@ if (reportAbs) {
 // 成功路径：清掉本轮 staging/临时镜像，只保留报告与最终 DMG。
 rmSync(runDirAbs, { recursive: true, force: true });
 activeRunDir = null;
-// work-dir 合同：本轮创建且已清空的 work-dir 一并回收，避免留下可被下一轮借用的
-// 空目录（正式 attempt 目录本身与其中的日志不受影响）。
-try {
-  if (existsSync(workDirPreAbs) && readdirSync(workDirPreAbs).length === 0) {
-    rmdirSync(workDirPreAbs);
-  }
-} catch {
-  // 回收失败不影响装配结论：目录仍为空，下一轮的“不得预存”合同会拒绝复用。
-}
+// PRR-069C-R2-F1：任务根一律保留（成功的轮次也一样）。任务根的存在本身就是
+// "这个任务根已被某一轮用过"的记录，因此同名的下一次调用必然失败；绝不再回收
+// 空 work-dir —— 那正是历史目录重入被放行的入口。
 
 console.log(JSON.stringify(report));
 

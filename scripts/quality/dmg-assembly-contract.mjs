@@ -1,16 +1,18 @@
-// dmg-assembly-contract.mjs — DMG 装配专用契约模块（PRR-069C-R2）。
+// dmg-assembly-contract.mjs — DMG 装配专用契约模块（PRR-069C-R2 / R2-F1）。
 //
-// 只服务两个 DMG 装配入口：`bundle-gate.mjs` 与 `assemble-dmg.mjs`。三块内容：
+// 只服务两个 DMG 装配入口：`bundle-gate.mjs` 与 `assemble-dmg.mjs`。四块内容：
 //   1. 固定系统工具清单（正式证据逐项绑定系统绝对路径与重算 hash）；
 //   2. 测试注入路径与注入工具集合的完整校验：fixture 专用，缺一项即拒绝，
 //      绝不在缺项后回退真实系统工具；
-//   3. work-dir 路径分量与实际落点校验：拒绝中间层/末级/悬空 symlink、
-//      越界落点与借用历史 attempt 树。
+//   3. work-dir 路径分量与实际落点校验：拒绝中间层/末级/悬空 symlink 与越界落点；
+//   4. R2-F1：正式工作树形状与任务根归属 —— 正式 work-dir 固定为
+//      `.tmp/prr-069c-<run-id>/work`，任务根（`.tmp/` 下这一直接子目录）必须由
+//      assembler 在本轮原子创建；已存在的任务根一律拒绝，不复用历史现场。
 //
 // 通用 G2 授权、签名检测与路径通用策略仍归 g2-scope.mjs；本模块不复制也不放宽其逻辑，
 // 只消费其 isSameOrDescendant 做落点比较，避免两套边界判断分叉。
 
-import { lstatSync, realpathSync, readlinkSync, existsSync, readdirSync } from "node:fs";
+import { lstatSync, realpathSync, readlinkSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { resolve, relative, join, isAbsolute, dirname, sep } from "node:path";
 import { isSameOrDescendant } from "./g2-scope.mjs";
 
@@ -39,6 +41,117 @@ export const DMG_TOOL_NAMES = Object.freeze(Object.keys(SYSTEM_TOOL_PATHS));
  * 或通过预算；父 gate 的终止策略必须容纳这段有界清理，避免在清理中途杀掉 assembler。
  */
 export const DMG_CLEANUP_GRACE_MS = 60_000;
+
+/** 正式工作树的任务根前缀：`.tmp/prr-069c-<run-id>`（`.tmp/` 的直接子目录）。 */
+export const DMG_TASK_ROOT_PREFIX = "prr-069c-";
+/** 正式工作树的末级目录名。 */
+export const DMG_WORK_DIR_NAME = "work";
+/** 正式 work-dir 的完整形状。 */
+export const DMG_PRODUCTION_WORK_DIR_SHAPE = ".tmp/prr-069c-<run-id>/work";
+
+/**
+ * R2-F1：进程结果分类（纯函数，可离线单测）。
+ * 返回 null 表示「正常结束」（退出码可能是 0 也可能是非零，语义由调用点决定）；
+ * 否则返回 { code, reason } 描述这一类执行失败。
+ * 超时、被信号终止、spawn 失败、缺失或非法退出码都属于执行失败，
+ * 不得被当成「用户拒绝」这类正常业务结果。
+ */
+export function classifyProcessResult(result) {
+  if (!result) return { code: "missing-result", reason: "没有可判定的进程结果" };
+  if (result.spawnError) {
+    return { code: "spawn-error", reason: `无法启动（spawn error ${result.spawnError}）` };
+  }
+  if (result.timedOut) {
+    return { code: "timeout", reason: `超时（${String(result.timeoutMs ?? "?")}ms）` };
+  }
+  if (result.signal) {
+    return { code: "signal", reason: `被信号终止 (${result.signal})` };
+  }
+  if (result.status === null || result.status === undefined) {
+    return { code: "no-status", reason: "既无退出码又无异常标记，无法判定为正常结束" };
+  }
+  if (!Number.isInteger(result.status)) {
+    return { code: "invalid-status", reason: `退出码不是整数 (${String(result.status)})` };
+  }
+  return null;
+}
+
+/**
+ * 正式工作树的形状解析：必须精确为 `.tmp/prr-069c-<run-id>/work`。
+ * 任务根 = `.tmp/` 下的这一直接子目录，是本轮的创建单元与归属证明。
+ */
+export function parseProductionWorkTree(normalizedRel) {
+  const segments = normalizedRel.split("/").filter((s) => s.length > 0);
+  const runId = segments[1] ?? "";
+  const shapeOk =
+    segments.length === 3 &&
+    segments[0] === ".tmp" &&
+    runId.startsWith(DMG_TASK_ROOT_PREFIX) &&
+    runId.length > DMG_TASK_ROOT_PREFIX.length &&
+    segments[2] === DMG_WORK_DIR_NAME;
+  if (!shapeOk) {
+    throw new Error(
+      `work-dir 必须精确为 ${DMG_PRODUCTION_WORK_DIR_SHAPE}（任务根由本轮唯一创建；` +
+        "省略 --work-dir 时 gate 会生成默认唯一路径，也可显式给出完整的新 <任务根>/work；" +
+        "不接受旧的固定目录、普通 .tmp 子目录或历史任务根下的子目录）: " +
+        normalizedRel,
+    );
+  }
+  return {
+    taskRootRel: `${segments[0]}/${segments[1]}`,
+    workDirRel: normalizedRel,
+  };
+}
+
+/**
+ * gate 与 assembler 共用：断言任务根此刻不存在（只读检查）。
+ * 创建动作只由 assembler 负责（见 createTaskRootAtomically），gate 绝不预先创建。
+ */
+export function assertTaskRootAbsent(taskRootAbs, taskRootRel) {
+  // fixture（合成 root）没有正式任务根合同，work-dir 自身的新鲜度另行校验。
+  if (!taskRootAbs) return;
+  if (!existsSync(taskRootAbs)) return;
+  const st = lstatSync(taskRootAbs);
+  if (st.isSymbolicLink()) {
+    throw new Error(`work-dir 的任务根是符号链接（含悬空链接），拒绝借道: ${taskRootRel}`);
+  }
+  const kind = st.isDirectory() ? "目录" : "非目录条目";
+  throw new Error(
+    `work-dir 的任务根已存在（${kind}；历史任务树、空目录、仅含日志或已回收过 work 的任务根` +
+      `都不得复用，本轮必须换一个全新的唯一任务根）: ${taskRootRel}`,
+  );
+}
+
+/**
+ * R2-F1：由 assembler 独占的任务根原子创建。
+ * 末级用非递归 mkdir：EEXIST 即失败，不删除重试、不另找目录、不猜测归属。
+ * `.tmp/` 是共享父目录，缺失时单独创建（EEXIST 视为并发创建者已建立，可继续）。
+ * 调用方必须先跑过 validateDmgWorkDir：到仓库根为止每个分量的 symlink 校验在那里完成，
+ * 本函数只负责"从这一层起由本轮独占创建"，不重复也不放宽路径判定。
+ */
+export function createTaskRootAtomically({ taskRootAbs, taskRootRel, parentAbs, parentRel }) {
+  if (!existsSync(parentAbs)) {
+    try {
+      mkdirSync(parentAbs, { recursive: false });
+    } catch (err) {
+      if (err.code !== "EEXIST") {
+        throw new Error(`无法创建 ${parentRel}（任务根父目录）: ${err.message}`);
+      }
+    }
+  }
+  try {
+    mkdirSync(taskRootAbs, { recursive: false });
+  } catch (err) {
+    if (err.code === "EEXIST") {
+      throw new Error(
+        `任务根已存在（拒绝复用历史任务树；不删除重试、不另找替代目录，并发创建者一律失败）: ` +
+          `${taskRootRel}`,
+      );
+    }
+    throw new Error(`任务根无法原子创建: ${taskRootRel}: ${err.message}`);
+  }
+  return { taskRootRel, taskRootAbs };
+}
 
 function readlinkQuiet(p) {
   try {
@@ -218,8 +331,9 @@ export function validateInjectedToolSet({ toolDirAbs, root, canonicalRoot }) {
 
 /**
  * work-dir 结构校验（两入口共用，先于 build/mkdir/工具/挂载）。
- * 覆盖：白名单前缀、任一分量（中间层/末级/悬空）symlink、越界落点、历史 attempt 借用。
- * 正式模式额外要求 `.tmp/prr-069c-<非空>` 白名单与 attempt 树新用合同。
+ * 覆盖：仓库内相对路径、任一分量（中间层/末级/悬空）symlink、越界落点；
+ * 正式模式额外要求精确形状 `.tmp/prr-069c-<run-id>/work` 并回报任务根。
+ * 这里只做结构与「任务根是否已存在」的只读判断，创建动作归 assembler。
  */
 export function validateDmgWorkDir({ workDir, root, isProduction }) {
   if (typeof workDir !== "string" || workDir.trim().length === 0) {
@@ -261,43 +375,16 @@ export function validateDmgWorkDir({ workDir, root, isProduction }) {
         `work-dir 必须位于仓库内被忽略的 .tmp/ 下（临时 staging/镜像只允许进入任务临时范围）: ${normalizedRel}`,
       );
     }
-    // fixture 模式只做结构检查，白名单与 attempt 新鲜度合同不适用。
-    return { rel: normalizedRel, abs: workDirAbs, landing };
+    // fixture 模式（合成 root）只做结构检查：任务根合同只约束正式工作树。
+    return { rel: normalizedRel, abs: workDirAbs, landing, taskRootRel: null, taskRootAbs: null };
   }
 
-  // 正式模式先判白名单（早于通用 .tmp/ 检查，保证 .tmp 根也被同一白名单拒绝）。
-  if (!/^\.tmp\/prr-069c-.+/.test(normalizedRel)) {
-    throw new Error(
-      `正式 work-dir 必须位于 .tmp/prr-069c-<非空> 任务目录内（不得使用 .tmp 根、普通工作目录或历史 candidate/evidence 目录）: ${normalizedRel}`,
-    );
-  }
+  // 正式模式：形状固定为 .tmp/prr-069c-<run-id>/work（先于通用 .tmp/ 检查，保证
+  // .tmp 根、普通工作目录、历史 candidate/evidence 目录与旧固定目录都被同一规则拒绝）。
+  const { taskRootRel } = parseProductionWorkTree(normalizedRel);
+  const taskRootAbs = resolve(rootAbs, taskRootRel);
 
-  // 第 3 层：attempt 新鲜度合同。
-  const segments = normalizedRel.split("/").filter((s) => s.length > 0);
-  const attemptAbs = resolve(rootAbs, segments[0], segments[1]);
-  const attemptExists = existsSync(attemptAbs);
-  if (attemptExists) {
-    const attemptStat = lstatSync(attemptAbs);
-    if (!attemptStat.isDirectory()) {
-      throw new Error(`正式 attempt 目录不是常规目录: ${segments[0]}/${segments[1]}`);
-    }
-    // 本轮 work-dir 相对 attempt 目录的首个分量；同级只允许日志目录 logs。
-    const localFirst = segments[2];
-    const allowedSiblings = new Set(localFirst ? [localFirst, "logs"] : ["logs"]);
-    const foreignDirs = [];
-    for (const entry of readdirSync(attemptAbs, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      if (!allowedSiblings.has(entry.name)) foreignDirs.push(entry.name);
-    }
-    if (foreignDirs.length > 0) {
-      throw new Error(
-        `正式 work-dir 不得借用历史 attempt 树（该 attempt 目录已含其他运行目录 ${foreignDirs.join(", ")}，` +
-          `本轮必须使用全新 attempt 目录）: ${normalizedRel}`,
-      );
-    }
-  }
-
-  return { rel: normalizedRel, abs: workDirAbs, landing };
+  return { rel: normalizedRel, abs: workDirAbs, landing, taskRootRel, taskRootAbs };
 }
 
 /**

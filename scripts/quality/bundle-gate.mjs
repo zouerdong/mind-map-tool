@@ -37,12 +37,15 @@ import {
   SYSTEM_TOOL_PATHS,
   DMG_TOOL_NAMES,
   DMG_CLEANUP_GRACE_MS,
+  DMG_PRODUCTION_WORK_DIR_SHAPE,
   validateInjectionPath,
   validateInjectedToolSet,
   validateDmgWorkDir,
   assertWorkDirLandingOutside,
   assertWorkDirNotPreExisting,
+  assertTaskRootAbsent,
 } from "./dmg-assembly-contract.mjs";
+import { randomUUID } from "node:crypto";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = fileURLToPath(import.meta.url);
@@ -81,9 +84,21 @@ const inventoryOutput = flag("inventory");
 // （非发布路径的旧用法保持原语义）。--work-dir 是 assembler 的任务临时工作目录。
 const assembleDmg = args.includes("--assemble-dmg");
 const dmgFormat = flag("dmg-format");
-const workDir = flag("work-dir");
+const workDirFlag = flag("work-dir");
 const dashdash = args.indexOf("--");
 const command = dashdash === -1 ? [] : args.slice(dashdash + 1);
+
+/**
+ * PRR-069C-R2-F1：--work-dir 省略时由 gate 生成一次性唯一任务根
+ * （`.tmp/prr-069c-<run-id>/work`），因此默认命令不再指向固定目录，
+ * `pnpm bundle:tauri` 可以重复执行且每次都用全新工作树。
+ * gate 只做只读校验并把这个路径交给 assembler；任务根本身只由 assembler 创建。
+ */
+const workDir = workDirFlag ?? (assembleDmg ? defaultDmgWorkDir() : null);
+
+function defaultDmgWorkDir() {
+  return `.tmp/prr-069c-${randomUUID()}/work`;
+}
 
 // 以下均为测试注入入口，只在非 canonical 的合成 fixture root 内合法；默认使用
 // 真实 assembler 与系统工具。
@@ -123,9 +138,14 @@ if (assembleDmg && dmgFormat !== "ULMO") {
   console.error("bundle-gate: BLOCKED — --assemble-dmg 必须与 --dmg-format ULMO 同时声明");
   process.exit(1);
 }
+if (assembleDmg && workDirFlag === null) {
+  // 默认唯一路径必须让操作者可见：日志单独一行给出本轮实际使用的工作树。
+  console.log(`bundle-gate: 省略 --work-dir，本轮自动生成唯一任务根`);
+  console.log(`bundle-gate: 默认唯一任务根: ${workDir}`);
+}
 if (assembleDmg && !workDir) {
   console.error(
-    "bundle-gate: BLOCKED — --assemble-dmg 必须声明 --work-dir <repo-relative .tmp/...>",
+    `bundle-gate: BLOCKED — --assemble-dmg 需要 --work-dir <repo-relative ${DMG_PRODUCTION_WORK_DIR_SHAPE}>`,
   );
   process.exit(1);
 }
@@ -153,6 +173,8 @@ if (IS_PRODUCTION) {
         root: ROOT,
         isProduction: IS_PRODUCTION,
       });
+      // R2-F1：任务根必须全新。gate 只读校验，绝不预先创建（创建归 assembler）。
+      assertTaskRootAbsent(safeWorkDirEarly.taskRootAbs, safeWorkDirEarly.taskRootRel);
       assertWorkDirNotPreExisting(safeWorkDirEarly.abs, safeWorkDirEarly.rel);
     } catch (err) {
       gateBlocked(`work-dir 无效: ${err.message}`);
@@ -272,6 +294,8 @@ if (assembleDmg) {
   let workDirEarly;
   try {
     workDirEarly = validateDmgWorkDir({ workDir, root: ROOT, isProduction: IS_PRODUCTION });
+    // R2-F1：build 之前只读校验任务根不存在；build 本身不得写该任务树。
+    assertTaskRootAbsent(workDirEarly.taskRootAbs, workDirEarly.taskRootRel);
     assertWorkDirNotPreExisting(workDirEarly.abs, workDirEarly.rel);
   } catch (err) {
     gateBlocked(`work-dir 无效: ${err.message}`);

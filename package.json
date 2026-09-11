@@ -20,7 +20,7 @@
     "test:visual": "node scripts/quality/run-visual-alignment.mjs",
     "test:a11y": "node scripts/quality/run-all.mjs --suite a11y",
     "test:e2e": "scripts/quality/run-e2e-macos.sh",
-    "bundle:tauri": "node scripts/quality/bundle-gate.mjs --host tauri --scope-from docs/decisions/decision-register.json --candidate-root apps/desktop/src-tauri/target/release/bundle --assemble-dmg --dmg-format ULMO --work-dir .tmp/prr-069c-assembly --inventory .tmp/release-candidate/bundle-inventory.json -- pnpm --filter @mindmap/desktop tauri build --bundles app",
+    "bundle:tauri": "node scripts/quality/bundle-gate.mjs --host tauri --scope-from docs/decisions/decision-register.json --candidate-root apps/desktop/src-tauri/target/release/bundle --assemble-dmg --dmg-format ULMO --inventory .tmp/release-candidate/bundle-inventory.json -- pnpm --filter @mindmap/desktop tauri build --bundles app",
     "test:install:tauri": "node scripts/quality/install-gate.mjs --host tauri --scope-from docs/decisions/decision-register.json --candidate \"apps/desktop/src-tauri/target/release/bundle/macos/Mind Map.app\" --evidence-dir .tmp/release-candidate --plan",
     "quality": "node scripts/quality/run-all.mjs",
     "license:notices": "node scripts/quality/generate-third-party-notices.mjs",

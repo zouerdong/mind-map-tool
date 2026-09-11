@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve, join, dirname, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = resolve(__dirname, "../..");
 const BUNDLE_GATE = resolve(ROOT, "scripts/quality/bundle-gate.mjs");
@@ -258,6 +259,9 @@ function flagValue(name) { const i = args.indexOf(name); return i === -1 ? null 
 function last() { return args[args.length - 1]; }
 function die(code, msg) { process.stderr.write(msg + "\\n"); process.exit(code); }
 function sleepForever() { const end = Date.now() + 3600000; while (Date.now() < end) { /* hang */ } }
+// PRR-069C-R2-F1：让合成工具按 env 消耗真实时间，用于验证"清理阶段的多个子进程
+// 共享同一个截止时间"，而不是各自拿满冻结的宽限。子进程仍受 spawnSync 超时终止。
+function sleepMs(ms) { const end = Date.now() + ms; while (Date.now() < end) { /* busy */ } }
 function copyTree(from, to) {
   if (!from) throw new Error("mock: image has no contents");
   mkdirSync(to, { recursive: true });
@@ -307,6 +311,10 @@ if (tool === "hdiutil") {
     const stdin = readFileSync(0, "utf8");
     if (image.eulaText && !env.MOCK_NO_EULA_GATE && !/Y/i.test(stdin)) {
       process.stdout.write(image.eulaText + "\\nAgree Y/N?\\n");
+      // PRR-069C-R2-F1：正常拒绝之后的进程异常注入（许可正文已输出、未建立挂载）。
+      // 用于证明"进程异常不是有效的 EULA 拒绝证据"，不得被当成正常非零拒绝。
+      if (env.MOCK_EULA_PROBE_FAULT === "hang") sleepForever();
+      if (env.MOCK_EULA_PROBE_FAULT === "signal") process.kill(process.pid, "SIGTERM");
       process.exit(1);
     }
     const mp = flagValue("-mountpoint");
@@ -358,6 +366,7 @@ if (tool === "hdiutil") {
   }
   if (cmd === "detach") {
     if (env.MOCK_DETACH_FAIL) die(5, "mock detach failure");
+    if (env.MOCK_DETACH_DELAY_MS) sleepMs(Number(env.MOCK_DETACH_DELAY_MS));
     // MOCK_DETACH_FAIL_ON：第 N 次 detach 起失败（区分 rw 与只读卷的清理路径）。
     state.detachCount = (state.detachCount || 0) + 1;
     if (env.MOCK_DETACH_FAIL_ON && state.detachCount >= Number(env.MOCK_DETACH_FAIL_ON)) {
@@ -396,6 +405,9 @@ if (tool === "hdiutil") {
     if (env.MOCK_VERIFY_FAIL) die(9, "CRC32 mismatch");
     if (!readImage(resolve(last()))) die(9, "mock verify: not a mock image");
     process.stdout.write("已验证CRC32 $DEADBEEF\\n");
+    // PRR-069C-R2-F1：verify 之后撤掉 hdiutil 替身，让随后的挂载前 EULA 探针
+    // 以 spawn error（ENOENT）结束 —— 进程从未启动，绝不构成 EULA 拒绝证据。
+    if (env.MOCK_HIDE_TOOL_AFTER_VERIFY) rmSync(join(DIR, "hdiutil"), { force: true });
     process.exit(0);
   }
   if (cmd === "udifrez") {
@@ -438,6 +450,7 @@ if (tool === "mount") {
   // MOCK_MOUNT_FAIL/HANG：mount table 不可用（fail-closed 红灯）。
   if (env.MOCK_MOUNT_FAIL) die(15, "mock mount failure");
   if (env.MOCK_MOUNT_HANG) sleepForever();
+  if (env.MOCK_MOUNT_DELAY_MS) sleepMs(Number(env.MOCK_MOUNT_DELAY_MS));
   for (const mp of Object.keys(state.mounts)) {
     const dev = state.deviceSwapped ? "/dev/disk7s1" : state.mounts[mp].device;
     process.stdout.write(dev + " on " + mp + " (hfs, local, read-only)\\n");
@@ -2404,12 +2417,18 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
     const { repoDir, regPath, toolDir } = setup("assemble-report-repo");
     const first = runAssembler(repoDir, regPath, toolDir, { report: REPORT_REL });
     expect(first.status).toBe(0);
-    const second = runAssembler(repoDir, regPath, toolDir, { report: REPORT_REL });
+    // PRR-069C-R2-F1：本轮工作树不再回收，同一次 fixture 内的后续运行必须换新 work-dir
+    // （这正是"历史目录不得重入"的合同），因此这里显式给出新的工作树。
+    const second = runAssembler(repoDir, regPath, toolDir, {
+      report: REPORT_REL,
+      "work-dir": ".tmp/release-runner-fixtures/work-second",
+    });
     expect(second.status).toBe(1);
     expect(second.stderr).toContain("拒绝覆盖既有证据");
 
     const outside = runAssembler(repoDir, regPath, toolDir, {
       report: "docs/assembly-report.json",
+      "work-dir": ".tmp/release-runner-fixtures/work-third",
     });
     expect(outside.status).toBe(1);
     expect(outside.stderr).toContain("不在 G2 批准的 evidenceOutputPaths 内");
@@ -2438,7 +2457,10 @@ describe("PRR-069C 正式发布路径命令禁区", () => {
     expect(bundleCommand).toContain("--bundles app");
     expect(bundleCommand).toContain("--assemble-dmg");
     expect(bundleCommand).toContain("--dmg-format ULMO");
-    expect(bundleCommand).toContain("--work-dir");
+    // PRR-069C-R2-F1：固定 `--work-dir .tmp/prr-069c-assembly` 已移除——写死的目录会被
+    // 第二轮复用，正是"历史目录重入"的入口。默认改为 gate 每轮生成的唯一任务根。
+    expect(bundleCommand).not.toContain("--work-dir");
+    expect(bundleCommand).not.toContain("prr-069c-assembly");
     expect(bundleCommand).not.toContain("repack");
     const tauriSegment = bundleCommand.split(" -- ").pop() ?? "";
     expect(tauriSegment).toContain("tauri build --bundles app");
@@ -2505,7 +2527,12 @@ describe("PRR-069C-R1 发布门边界与挂载清理加固", () => {
     } catch {}
   });
 
-  /** canonical root（真实仓库）下的 gate 调用：参数契约检查必须先于 G2/git/build。 */
+  /**
+   * canonical root（真实仓库）下的 gate 调用：参数契约检查必须先于 G2/git/build。
+   * PRR-069C-R2-F1：work-dir 形状已收紧为 `.tmp/prr-069c-<run-id>/work`，
+   * 此处给出合法形状（任务根不存在），使被断言的门（注入参数/build command）
+   * 而不是路径形状先触发。
+   */
   function runCanonicalGate(extra: string[], command: string[]) {
     return runNode(BUNDLE_GATE, [
       "--host",
@@ -2514,7 +2541,7 @@ describe("PRR-069C-R1 发布门边界与挂载清理加固", () => {
       "--dmg-format",
       "ULMO",
       "--work-dir",
-      ".tmp/prr-069c-r1-canary",
+      ".tmp/prr-069c-r1-canary/work",
       ...extra,
       "--",
       ...command,
@@ -3432,4 +3459,445 @@ describe("PRR-069C-R2 attach 接管、注入闭合与路径隔离", () => {
       expect(src).not.toMatch(/SYSTEM_TOOL_PATHS[^;]*from "\.\/g2-scope\.mjs"/);
     }
   });
+});
+
+// ==================== 1g. PRR-069C-R2-F1 进程结果分类、单一清理预算与任务根原子创建 ====================
+// 独立审阅（2026-09-11）三项 REVISE：requireSuccess:false 把"允许正常拒绝"扩大成允许任意
+// 执行失败、清理时钟各自独立且结束不更新耗时、按已有目录内容推测任务归属。以下红灯先于实现建立。
+const DMG_BUDGET = resolve(ROOT, "scripts/quality/dmg-budget.mjs");
+const F3_ATTEMPT_REL = `.tmp/prr-069c-r2-f1-canary-${process.pid.toString(36)}`;
+
+async function loadDmgContract(): Promise<any> {
+  return import(pathToFileURL(DMG_ASSEMBLY_CONTRACT).href);
+}
+async function loadDmgBudget(): Promise<any> {
+  return import(pathToFileURL(DMG_BUDGET).href);
+}
+
+/** 合成工具调用轨迹里的只读 attach 次数（最终复核卷每跑一次就 +1）。 */
+function readonlyAttachCalls(toolDir: string): Array<{ tool: string; args: string[] }> {
+  const p = join(toolDir, "mock-state.json");
+  if (!existsSync(p)) return [];
+  const state = JSON.parse(readFileSync(p, "utf8"));
+  return (state.calls ?? []).filter(
+    (c: any) => c.tool === "hdiutil" && c.args?.[0] === "attach" && c.args.includes("-readonly"),
+  );
+}
+
+describe("PRR-069C-R2-F1 进程结果分类与清理预算（纯函数）", () => {
+  it("F1-U1 timeout / signal / spawn error / 缺失或非法 status 都是执行失败，正常结束返回 null", async () => {
+    const { classifyProcessResult } = await loadDmgContract();
+    // 正常结束：退出码可以是 0 也可以是非零，语义交给调用点判断
+    expect(
+      classifyProcessResult({ status: 0, timedOut: false, spawnError: null, signal: null }),
+    ).toBeNull();
+    expect(
+      classifyProcessResult({ status: 1, timedOut: false, spawnError: null, signal: null }),
+    ).toBeNull();
+    const cases: Array<[any, string]> = [
+      [{ status: null, timedOut: true, spawnError: null, signal: "SIGKILL" }, "timeout"],
+      [{ status: null, timedOut: false, spawnError: null, signal: "SIGTERM" }, "signal"],
+      [
+        { status: null, timedOut: false, spawnError: "ENOENT: no such file", signal: null },
+        "spawn-error",
+      ],
+      [{ status: null, timedOut: false, spawnError: null, signal: null }, "no-status"],
+      [{ status: "0", timedOut: false, spawnError: null, signal: null }, "invalid-status"],
+      [undefined, "missing-result"],
+    ];
+    for (const [result, code] of cases) {
+      expect(classifyProcessResult(result)?.code).toBe(code);
+    }
+  });
+
+  it("F2-U1 前查询耗 29 秒后 detach 上限 ≤31 秒；再耗 31 秒则清理查询不得启动", async () => {
+    const { createBudgetContext, remainingMs, timeoutFor, elapsedMs, isExhausted } =
+      await loadDmgBudget();
+    let now = 5_000;
+    const ctx = createBudgetContext({ budgetMs: 60_000, nowMono: () => now });
+    // 清理前查询：命令上限 30 秒，未被消耗前就用满它
+    expect(timeoutFor(ctx, 30_000)).toBe(30_000);
+    now += 29_000;
+    expect(elapsedMs(ctx)).toBe(29_000);
+    expect(remainingMs(ctx)).toBe(31_000);
+    // detach 只能用剩下的 31 秒，而不是另一个完整的 60 秒或 120000 的单命令上限
+    expect(timeoutFor(ctx, 120_000)).toBe(31_000);
+    now += 31_000;
+    expect(isExhausted(ctx)).toBe(true);
+    expect(remainingMs(ctx)).toBe(0);
+    // 预算耗尽后不得启动子进程：0 是"不许启动"，绝不能被当成 Node 的"不设超时"
+    expect(timeoutFor(ctx, 30_000)).toBe(0);
+  });
+
+  it("F2-U2 前查询 29 秒 + detach 20 秒后，清理后查询上限 ≤11 秒且耗时可复算", async () => {
+    const { createBudgetContext, remainingMs, timeoutFor, elapsedMs } = await loadDmgBudget();
+    let now = 0;
+    const ctx = createBudgetContext({ budgetMs: 60_000, nowMono: () => now });
+    now += 29_000;
+    now += 20_000;
+    expect(remainingMs(ctx)).toBe(11_000);
+    expect(timeoutFor(ctx, 30_000)).toBe(11_000);
+    expect(elapsedMs(ctx)).toBe(49_000);
+    expect(ctx.deadlineMono - ctx.startMono).toBe(60_000);
+  });
+
+  it("F2-U3 同一上下文只持有一个截止时间：多次取用与再次 detach 都不重置", async () => {
+    const { createBudgetContext, timeoutFor, elapsedMs } = await loadDmgBudget();
+    let now = 0;
+    const ctx = createBudgetContext({ budgetMs: 60_000, nowMono: () => now });
+    const deadline = ctx.deadlineMono;
+    now += 5_000;
+    timeoutFor(ctx, 30_000);
+    now += 7_000;
+    timeoutFor(ctx, 30_000); // 再次尝试（模拟多次进入失败出口）
+    expect(ctx.deadlineMono).toBe(deadline);
+    expect(ctx.startMono).toBe(0);
+    expect(elapsedMs(ctx)).toBe(12_000);
+  });
+
+  it("F2-U4 预算耗尽只返回 0，不返回负数，也不因非法命令上限绕开剩余预算", async () => {
+    const { createBudgetContext, timeoutFor, remainingMs } = await loadDmgBudget();
+    let now = 0;
+    const ctx = createBudgetContext({ budgetMs: 1_000, nowMono: () => now });
+    // 非法/过小的命令上限不能放大预算：仍以剩余预算为准
+    expect(timeoutFor(ctx, 0)).toBe(1_000);
+    expect(timeoutFor(ctx, -5)).toBe(1_000);
+    now += 10_000;
+    expect(remainingMs(ctx)).toBe(0);
+    expect(timeoutFor(ctx, 0)).toBe(0);
+    expect(timeoutFor(ctx, 120_000)).toBe(0);
+  });
+});
+
+describe("PRR-069C-R2-F1 EULA 探针进程异常、共享清理预算与任务根原子创建", () => {
+  beforeEach(() => {
+    mkdirSync(FIXTURE_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(FIXTURE_DIR, { recursive: true, force: true });
+    } catch {}
+    rmSync(join(ROOT, F3_ATTEMPT_REL), { recursive: true, force: true });
+  });
+
+  function mockState(toolDir: string): any {
+    const p = join(toolDir, "mock-state.json");
+    if (!existsSync(p)) return { mounts: {}, calls: [] };
+    return JSON.parse(readFileSync(p, "utf8"));
+  }
+  function readMockMounts(toolDir: string): Record<string, any> {
+    return mockState(toolDir).mounts ?? {};
+  }
+  function readMockCalls(toolDir: string): Array<{ tool: string; args: string[] }> {
+    return mockState(toolDir).calls ?? [];
+  }
+  function readFailure(stderr: string): any {
+    const marker = "assemble-dmg: FAILURE ";
+    expect(stderr).toContain(marker);
+    return JSON.parse(stderr.split(marker)[1].split("\n")[0]);
+  }
+
+  // ---------------------------------------------------------------- F1 进程结果 ≠ EULA 拒绝
+  it("F1-a 探针已输出许可正文后超时：不得当成正常拒绝，不得运行最终挂载", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f1-probe-timeout");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "1200", report: R1_REPORT_REL },
+      { MOCK_EULA_PROBE_FAULT: "hang" },
+    );
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.stage).toBe("pre-mount-eula");
+    // marker 已输出不能挽救进程异常：失败分类必须指向超时，而不是"许可内容不匹配"
+    expect(failure.error).toMatch(/超时/);
+    expect(failure.error).toMatch(/进程异常|不得|不接受/);
+    // 最终只读挂载从未运行：只读 attach 只有探针这一次
+    expect(readonlyAttachCalls(toolDir).length).toBe(1);
+    // 无挂载可清理：不得对只读卷做无归属 detach，也不产出成功证据
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(
+      readMockCalls(toolDir).filter(
+        (c) =>
+          c.tool === "hdiutil" &&
+          c.args?.[0] === "detach" &&
+          c.args.some((a) => a.includes("mnt-final")),
+      ),
+    ).toEqual([]);
+    expect(failure.commands.some((c: any) => c.tool === "mount" && c.skipped)).toBe(false);
+    expect(existsSync(join(repoDir, R1_REPORT_REL))).toBe(false);
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("F1-b 探针已输出许可正文后被信号终止：同样不得当成正常拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f1-probe-signal");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      {},
+      {
+        MOCK_EULA_PROBE_FAULT: "signal",
+      },
+    );
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.stage).toBe("pre-mount-eula");
+    expect(failure.error).toMatch(/信号|SIGTERM/);
+    expect(failure.error).toMatch(/进程异常|不得|不接受/);
+    expect(readonlyAttachCalls(toolDir).length).toBe(1);
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("F1-c 探针 attach 从未启动（spawn error）：不得把空输出当成拒绝证据或许可不匹配", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f1-probe-spawn-error");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      {},
+      {
+        MOCK_HIDE_TOOL_AFTER_VERIFY: "1",
+      },
+    );
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.stage).toBe("pre-mount-eula");
+    // 诊断必须指向"进程没起来"，而不是把失败归因于 LICENSE 内容
+    expect(failure.error).toMatch(/无法启动|spawn error|ENOENT/);
+    expect(failure.error).not.toMatch(/展示内容与根 LICENSE 不匹配/);
+    expect(readonlyAttachCalls(toolDir).length).toBe(0);
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(existsSync(join(repoDir, ASSEMBLY_DMG_REL))).toBe(false);
+  }, 30000);
+
+  it("F1-d 正常非零拒绝（无挂载 + 目录空 + marker 匹配）仍然是有效的 EULA 证据", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f1-probe-normal");
+    const res = runAssembler(repoDir, regPath, toolDir, { report: R1_REPORT_REL });
+    expect(res.status).toBe(0);
+    const report = JSON.parse(readFileSync(join(repoDir, R1_REPORT_REL), "utf8"));
+    expect(report.eula.preMountDisplayVerified).toBe(true);
+    expect(readMockMounts(toolDir)).toEqual({});
+  }, 30000);
+
+  it("F2-a 清理前查询消耗同一宽限：detach 上限收紧，耗尽后不再启动清理查询", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-shared-cleanup-budget");
+    const grace = 4000;
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      { "timeout-ms": "6000" },
+      {
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "rw",
+        // 清理前查询真实消耗约 2 秒（单命令上限 6000ms，留足并发运行时的启动余量）
+        MOCK_MOUNT_DELAY_MS: "2000",
+        MOCK_DETACH_DELAY_MS: "60000",
+        MINDMAP_DMG_CLEANUP_GRACE_MS: String(grace),
+      },
+    );
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.cleanup.graceMs).toBe(grace);
+    const detach = failure.commands.find(
+      (c: any) => c.tool === "hdiutil" && c.args?.[0] === "detach",
+    );
+    expect(detach).toBeTruthy();
+    // detach 只能用"宽限 − 前查询已耗"，而不是完整宽限，也不是单命令上限
+    expect(detach.timeoutMs).toBeGreaterThan(0);
+    expect(detach.timeoutMs).toBeLessThanOrEqual(grace - 1000);
+    expect(detach.timeoutMs).toBeLessThan(6000);
+    // 预算耗尽后不得再启动 mount 子进程；挂载责任保留，不得写 CLEAN
+    const mounts = failure.commands.filter((c: any) => c.tool === "mount");
+    expect(mounts.length).toBeGreaterThan(0);
+    expect(mounts[mounts.length - 1].skipped).toContain("budget-exhausted");
+    expect(failure.mountState).not.toBe("CLEAN");
+    expect(failure.residualMount).toBeTruthy();
+    expect(Object.keys(readMockMounts(toolDir)).length).toBeGreaterThan(0);
+    // 清理耗时是真实终值（不是 0，也不是只到 detach 前的耗时）
+    expect(failure.cleanup.elapsedMs).toBeGreaterThanOrEqual(2500);
+    expect(failure.cleanup.elapsedMs).toBeLessThanOrEqual(grace + 3000);
+    expect(failure.timings?.totalElapsedMs).toBe(failure.elapsedMs);
+    expect(failure.timings?.cleanupMs).toBe(failure.cleanup.elapsedMs);
+  }, 60000);
+
+  it("F2-b 清理阶段一次成功即可：正常全流程 cleanupMs 为 0 且不启动清理子进程", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-no-cleanup");
+    const res = runAssembler(repoDir, regPath, toolDir, { report: R1_REPORT_REL });
+    expect(res.status).toBe(0);
+    const report = JSON.parse(readFileSync(join(repoDir, R1_REPORT_REL), "utf8"));
+    expect(report.timings.cleanupMs).toBe(0);
+    expect(report.timings.cleanupStarted).toBe(false);
+    expect(report.timings.cleanupStatus).toBe("CLEAN");
+    expect(report.timings.totalElapsedMs).toBe(report.timings.assemblyMs);
+    expect(report.commands.some((c: any) => c.skipped)).toBe(false);
+  }, 30000);
+
+  // ---------------------------------------------------------------- F3 任务根由本轮原子创建
+  it("F3-a 历史任务根五态一律拒绝新 work：仅 logs / 仅文件 / 空 / 已有 work / 已回收过 work", () => {
+    const attemptAbs = join(ROOT, F3_ATTEMPT_REL);
+    const states: Array<[string, () => void]> = [
+      ["仅 logs", () => mkdirSync(join(attemptAbs, "logs"), { recursive: true })],
+      ["仅文件", () => writeFileSync(join(attemptAbs, "bundle-gate.log"), "historical\n")],
+      ["空", () => {}],
+      ["已有 work", () => mkdirSync(join(attemptAbs, "work"), { recursive: true })],
+      [
+        "已回收过 work",
+        () => {
+          mkdirSync(join(attemptAbs, "work"), { recursive: true });
+          rmSync(join(attemptAbs, "work"), { recursive: true, force: true });
+        },
+      ],
+    ];
+    for (const [label, seed] of states) {
+      rmSync(attemptAbs, { recursive: true, force: true });
+      mkdirSync(attemptAbs, { recursive: true });
+      seed();
+      writeFileSync(join(attemptAbs, "history.json"), `${label}\n`);
+      const historySha = fileSha256(join(attemptAbs, "history.json"));
+      const before = readdirSync(attemptAbs).sort();
+
+      // 直接 assembler（canonical root，正式任务根合同）
+      const asm = runNode(ASSEMBLE_DMG, [
+        ...CANONICAL_ASM_BASE,
+        "--work-dir",
+        `${F3_ATTEMPT_REL}/work`,
+      ]);
+      expect(asm.status).toBe(1);
+      expect(asm.stderr).toContain("任务根");
+      // gate（canonical root）：build 之前就拒绝
+      const gate = runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        `${F3_ATTEMPT_REL}/work`,
+        "--",
+        ...R2_APP_ONLY_COMMAND,
+      ]);
+      expect(gate.status).toBe(1);
+      expect(gate.stderr).toContain("任务根");
+      // build 从未被放行
+      expect(gate.stdout).not.toContain("放行");
+      // 历史现场未被写入或删除
+      expect(fileSha256(join(attemptAbs, "history.json"))).toBe(historySha);
+      expect(readdirSync(attemptAbs).sort()).toEqual(before);
+    }
+  }, 60000);
+
+  it("F3-b 全新任务根形状被判为合法：不创建目录、也不报任务根冲突", () => {
+    const freshRel = `.tmp/prr-069c-r2-f1-fresh-${process.pid.toString(36)}/work`;
+    const freshAbs = join(ROOT, dirname(freshRel));
+    rmSync(freshAbs, { recursive: true, force: true });
+    try {
+      const res = runNode(ASSEMBLE_DMG, [...CANONICAL_ASM_BASE, "--work-dir", freshRel]);
+      // 形状合法即进入后续校验（此处由真实仓库的 G2/输入前置拦下，而非任务根规则）
+      expect(res.status).toBe(1);
+      expect(res.stderr).not.toContain("任务根");
+      // 任务根由 assembler 在全部校验通过后才创建：本轮未通过校验，因此不得预建
+      expect(existsSync(freshAbs)).toBe(false);
+    } finally {
+      rmSync(freshAbs, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it("F3-c 旧固定 work-dir 不再被接受，错误可操作（指出新形状）", () => {
+    const res = runNode(ASSEMBLE_DMG, [
+      ...CANONICAL_ASM_BASE,
+      "--work-dir",
+      ".tmp/prr-069c-assembly",
+    ]);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain(".tmp/prr-069c-");
+    expect(res.stderr).toContain("work");
+    const gate = runNode(BUNDLE_GATE, [
+      "--host",
+      "tauri",
+      "--assemble-dmg",
+      "--dmg-format",
+      "ULMO",
+      "--work-dir",
+      ".tmp/prr-069c-assembly",
+      "--",
+      ...R2_APP_ONLY_COMMAND,
+    ]);
+    expect(gate.status).toBe(1);
+    expect(gate.stderr).toContain(".tmp/prr-069c-");
+  }, 30000);
+
+  it("F3-d 任务根原子创建：首次成功、重复 EEXIST 失败，且不删除既有内容", async () => {
+    const { createTaskRootAtomically } = await loadDmgContract();
+    const parent = join(FIXTURE_DIR, "f3-atomic-parent");
+    mkdirSync(parent, { recursive: true });
+    const taskRootAbs = join(parent, "prr-069c-atomic");
+    const args = {
+      taskRootAbs,
+      taskRootRel: ".tmp/prr-069c-atomic",
+      parentAbs: parent,
+      parentRel: ".tmp",
+    };
+    createTaskRootAtomically(args);
+    expect(existsSync(taskRootAbs)).toBe(true);
+    writeFileSync(join(taskRootAbs, "kept.txt"), "owner evidence\n");
+    // 并发创建者/重复调用一律失败：不删除重试、不另找替代目录
+    expect(() => createTaskRootAtomically(args)).toThrow(/已存在|EEXIST/);
+    expect(readFileSync(join(taskRootAbs, "kept.txt"), "utf8")).toBe("owner evidence\n");
+    expect(readdirSync(parent).filter((n) => n.startsWith("prr-069c-"))).toEqual([
+      "prr-069c-atomic",
+    ]);
+  });
+
+  it("F3-e 默认 gate 省略 --work-dir 时生成唯一任务根：两次运行不同且各自装配成功", () => {
+    const { repoDir, regPath } = createAssemblyFixture("f3-default-workdir");
+    const runOnce = (tag: string) =>
+      runNode(BUNDLE_GATE, [
+        "--host",
+        "tauri",
+        "--root",
+        repoDir,
+        "--scope-from",
+        regPath,
+        "--candidate-root",
+        ".tmp/release-runner-fixtures/bundle",
+        "--inventory",
+        `.tmp/release-runner-fixtures/evidence/${tag}/inventory.json`,
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--assembler-tool-dir",
+        ".tmp/mock-tools",
+        "--",
+        process.execPath,
+        "-e",
+        appBuildScript(repoDir),
+      ]);
+    const first = runOnce("run1");
+    expect(first.status).toBe(0);
+    const second = runOnce("run2");
+    expect(second.status).toBe(0);
+    const workOf = (stdout: string) => /默认唯一任务根[：:]\s*(\S+)\s*$/m.exec(stdout)?.[1] ?? null;
+    const firstWork = workOf(first.stdout);
+    const secondWork = workOf(second.stdout);
+    expect(firstWork).toBeTruthy();
+    expect(secondWork).toBeTruthy();
+    // 默认值不是固定目录：两次独立运行选出不同任务根，保证 pnpm bundle:tauri 可重复执行
+    expect(firstWork).not.toBe(secondWork);
+    for (const work of [firstWork, secondWork]) {
+      expect(work).toMatch(/^\.tmp\/prr-069c-[^/]+\/work$/);
+      expect(existsSync(join(repoDir, work as string))).toBe(true);
+    }
+    // 日志与证据落在独立证据树，未预先创建工作树
+    const report = JSON.parse(
+      readFileSync(
+        join(repoDir, ".tmp/release-runner-fixtures/evidence/run2/inventory.json"),
+        "utf8",
+      ),
+    );
+    expect(report.dmgAssembly.workDir).toContain(secondWork as string);
+  }, 90000);
 });
