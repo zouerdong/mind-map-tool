@@ -80,7 +80,8 @@ wave2 --only S7
    - 保存并重新打开一份 `.mindmap`；
    - SVG、2x PNG、PDF 各导出一次且文件可打开；
    - 切换主题一次；
-   - 新建第二窗口；dirty 关闭的 Cancel 与 Discard 各一次。
+   - 新建第二窗口；
+   - dirty 关闭的 Cancel 与 Discard 各一次。
 
 无需临时安装到 `/Applications`，无需修改 LaunchServices；独立审阅通过后再把 DMG 交给负责人作为本机 dogfood 版本。
 
@@ -114,4 +115,3 @@ NotRun: full legacy matrix / G-FINAL / PRR-080/090 / signing / notarization / pu
 Risks: <真实遗留；无则 none>
 Next: STOP_FOR_INDEPENDENT_REVIEW
 ```
-
