@@ -84,8 +84,16 @@ export async function exportFlow(
     // 动态导入与 ports.ts 的 LazyTauriExportRenderer 同模式（ADR 0011：
     // 导出栈不占首屏 entry）；这里只加载纯序列化模块代码——字体/WASM
     // 资源由 renderer 实例在视觉格式路径才加载，本分支零依赖。
-    const { encodeGraphJson } = await import("@mindmap/export");
-    frozenBytes = encodeGraphJson(session.current.document);
+    try {
+      const { encodeGraphJson } = await import("@mindmap/export");
+      frozenBytes = encodeGraphJson(session.current.document);
+    } catch (e) {
+      return {
+        kind: "error",
+        code: "GRAPH_JSON_ENCODING_FAILED",
+        message: `Graph JSON 编码失败：${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
   } else {
     const sceneResult = await deps.renderer.buildScene(session.current.document);
     if (!sceneResult.ok)

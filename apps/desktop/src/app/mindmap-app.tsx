@@ -534,21 +534,26 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, [applyCloseState, closePort]);
   const onExport = useCallback(
     async (format: ExportFormat) => {
-      // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
-      // 必须包含未提交的编辑中文字）。
-      activeEditorRef.current?.flush();
-      // 字体/geometry barrier 只约束三种视觉导出；Graph JSON 不进渲染管线，
-      // 字体资源失败不得阻断该格式（PRR-070-R2 §2.5）。
-      if (format !== "graph-json") {
-        try {
+      try {
+        // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
+        // 必须包含未提交的编辑中文字）。
+        activeEditorRef.current?.flush();
+        // Graph JSON 本身不依赖字体；但若 flush 后仍有 geometry intent，
+        // session 尚未包含用户眼前的节点/文字。此时必须先收敛，失败就阻止
+        // 导出，绝不能用“成功”掩盖旧快照或空图。
+        if (format !== "graph-json" || geometryBarrier.hasPendingIntents()) {
           await geometryBarrier.flush();
-        } catch (e) {
-          setNotice({
-            tone: "error",
-            text: `字体资源加载失败，无法导出：${e instanceof Error ? e.message : String(e)}`,
-          });
-          return;
         }
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        setNotice({
+          tone: "error",
+          text:
+            format === "graph-json"
+              ? `当前有尚未完成的编辑，无法导出准确的 Graph JSON：${detail}`
+              : `字体资源加载失败，无法导出：${detail}`,
+        });
+        return;
       }
       const result = await exportFlow(
         session,

@@ -316,12 +316,16 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     expect(g.graph.nodes.some((n: { text: string }) => n.text === "编辑中的未提交文字")).toBe(true);
   });
 
-  it("字体资源失败：Graph JSON 仍可导出，视觉格式仍被 barrier 阻断（§3.4）", async () => {
+  it("字体资源失败但没有待提交几何：Graph JSON 仍可导出既有文档（§3.4）", async () => {
     const filePort = new CountingFilePort();
     const renderer = new FakeExportRenderer();
-    renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
     setup(filePort, renderer);
-    await createNodeViaCanvas();
+
+    // 先打开一个已提交文档，再模拟字体资源失败；Graph JSON 不应为了
+    // 读取既有 core 数据触碰 renderer/font metrics。
+    fireEvent.keyDown(window, { key: "o", metaKey: true });
+    await waitFor(() => expect(screen.getByText("打开的文档")).toBeTruthy());
+    renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
 
     fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/nofont.graph.json";
@@ -332,13 +336,29 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     );
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.graph\.json/)).toBeTruthy());
     expect(renderer.rendered.length).toBe(0); // 渲染管线零调用
-
-    // 同一状态下视觉格式不回归：字体失败仍阻断并给出 notice
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!,
+    const graph = JSON.parse(
+      new TextDecoder().decode(filePort.files.get("/out/nofont.graph.json")!),
     );
-    await waitFor(() => expect(screen.getByText(/字体资源加载失败，无法导出/)).toBeTruthy());
+    expect(graph.graph.nodes[0].text).toBe("打开的文档");
+  });
+
+  it("字体失败且存在待提交节点：阻止 Graph JSON，不能静默导出旧快照或空图", async () => {
+    const filePort = new CountingFilePort();
+    const renderer = new FakeExportRenderer();
+    renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
+    setup(filePort, renderer);
+    await createNodeViaCanvas();
+
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    filePort.nextSaveDialog = "/out/stale.graph.json";
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector(
+        '[data-testid="export-graph-json"]',
+      )!,
+    );
+    await waitFor(() => expect(screen.getByText(/无法导出准确的 Graph JSON/)).toBeTruthy());
+    expect(filePort.files.has("/out/stale.graph.json")).toBe(false);
+    expect(filePort.saveDialogCalls).toBe(0);
   });
 });
 
