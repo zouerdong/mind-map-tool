@@ -38,7 +38,7 @@ import {
   type OrganizeCommandResult,
   type Point,
 } from "@mindmap/core";
-import { measureNodeBox, type FontResolver } from "@mindmap/export/src/layout.js";
+import type { FontResolver } from "@mindmap/export/src/layout.js";
 import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
 import {
@@ -231,7 +231,7 @@ export function EditorCanvas({
       createInteractionController({
         nextNodeId: nextNodeId ?? (() => defaultId("n")),
         nextEdgeId: nextEdgeId ?? (() => defaultId("e")),
-        measure: (text, fontId) => measureNodeBox(text, undefined, fontId, fonts), // 权威 size：与 exporter 同源
+        measure: (text, fontId) => measureNodeVisual({ text }, fontId, fonts), // 完整视觉 size：与 UI/exporter 同源
         currentFont: () => documentDefaults(session.current.document).font,
       }),
     [fonts, nextNodeId, nextEdgeId, session],
@@ -505,8 +505,10 @@ export function EditorCanvas({
         const id = (nextNodeId ?? (() => defaultId("n")))();
         void geometryBarrier.enqueue({ kind: "create-node", id, position: point, text: "" });
         setPendingNodes((prev) => new Map(prev).set(id, { id, position: point, text: "" }));
+        setEditingId(id);
       } else {
-        api.commit(controller.createNodeAt(point));
+        const command = controller.createNodeAt(point);
+        if (command.kind === "CreateNode" && api.commit(command)) setEditingId(command.id);
       }
     },
     [api, controller, geometryBarrier, nextNodeId, viewport],
@@ -844,7 +846,18 @@ export function EditorCanvas({
                   });
                 } else {
                   const fontId = documentDefaults(session.current.document).font;
-                  const box = measureNodeBox(command.text, command.runs, fontId, fonts);
+                  const node = session.current.document.document.nodes.find(
+                    (n) => n.id === command.id,
+                  );
+                  const box = measureNodeVisual(
+                    {
+                      text: command.text,
+                      ...(command.runs !== undefined ? { runs: command.runs } : {}),
+                      ...(node?.kicker !== undefined ? { kicker: node.kicker } : {}),
+                    },
+                    fontId,
+                    fonts,
+                  );
                   api.commit({
                     ...command,
                     size: { width: box.width, height: box.height },

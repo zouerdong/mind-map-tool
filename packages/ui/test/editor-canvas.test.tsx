@@ -54,7 +54,8 @@ describe("EditorCanvas", () => {
     });
     const created = session.current.document.document.nodes[2]!;
     expect(created.position).toEqual({ x: 320, y: 240 });
-    expect(created.size.width).toBeGreaterThan(0); // 权威 size 随命令
+    expect(created.size.width).toBeGreaterThanOrEqual(120); // G-VIS 完整卡片最小宽度
+    expect(await screen.findByLabelText("编辑节点文本")).toBeTruthy(); // 创建后直接输入
     expect(session.isDirty).toBe(true);
   });
 
@@ -74,6 +75,7 @@ describe("EditorCanvas", () => {
     const pane = screen.getByTestId("rf-pane");
     fireEvent.doubleClick(pane, { clientX: 10, clientY: 10 });
     await waitFor(() => expect(session.current.document.document.nodes).toHaveLength(3));
+    fireEvent.keyDown(await screen.findByLabelText("编辑节点文本"), { key: "Escape" });
     expect(session.canUndo).toBe(true);
 
     fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });

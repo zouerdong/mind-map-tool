@@ -33,4 +33,4 @@
 
 ## 权威尺寸约定
 
-`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeBox(text, undefined, fontId, fonts)`（`@mindmap/export` 共享 layout）计算——与 exporter 同一实现、同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。
+`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeVisual({ text, runs, kicker }, fontId, fonts)`（`@mindmap/export` 共享完整视觉契约）计算——包含 G-VIS 卡片最小宽度与内距，并与 exporter 使用同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。

@@ -49,10 +49,10 @@ describe("PRC-025 GeometryBarrier 单元测试", () => {
     // 3. session 中有节点，尺寸必须是 REAL_FONTS 计算的尺寸，绝非 FALLBACK_FONTS 尺寸
     expect(session.current.document.document.nodes).toHaveLength(1);
     const node = session.current.document.document.nodes[0]!;
-    // FALLBACK 宽度: 2 * 10 = 20 + 20 = 40
-    // REAL 宽度: 2 * 25 = 50 + 20 = 70
-    expect(node.size.width).toBe(70);
-    expect(node.size.width).not.toBe(40);
+    // 完整视觉卡使用 32px 横向内距并遵守 120px 最小宽度；不能回退成
+    // 旧 measureNodeBox 的 40/70px 微型节点。
+    expect(node.size.width).toBe(120);
+    expect(node.size.width).not.toBe(70);
     expect(barrier.hasPendingIntents()).toBe(false);
 
     // 4. 单次 undo 撤销
@@ -119,7 +119,7 @@ describe("PRC-025 GeometryBarrier 单元测试", () => {
     // 用户下一次显式保存触发重试后，原意图仍可用真实字体完成提交。
     await barrier.flush();
     expect(session.current.document.document.nodes[0]?.text).toBe("失败测试");
-    expect(session.current.document.document.nodes[0]?.size.width).toBe(120);
+    expect(session.current.document.document.nodes[0]?.size.width).toBe(132);
     expect(barrier.hasPendingIntents()).toBe(false);
   });
 
@@ -317,8 +317,8 @@ describe("PRR-066 首个几何意图自动启动字体加载", () => {
     resolveReady(REAL_FONTS);
     await barrier.flush(); // 并入同一 in-flight（或已完成后 no-op）
     expect(session.current.document.document.nodes).toHaveLength(1);
-    // REAL_FONTS 口径："自动加载" 4 字 × 25 + padding 20 = 120（fallback 会是 60）
-    expect(session.current.document.document.nodes[0]!.size.width).toBe(120);
+    // G-VIS 口径："自动加载" 4 字 × 25 + padding 32 = 132（旧口径为 120）
+    expect(session.current.document.document.nodes[0]!.size.width).toBe(132);
     expect(committed).toEqual([1]); // 恰好一次 onCommitted
     expect(barrier.hasPendingIntents()).toBe(false);
     expect(readyCalls).toBe(1); // 单一 in-flight，不重复加载
@@ -430,8 +430,8 @@ describe("PRR-066 首个几何意图自动启动字体加载", () => {
     await saveFlush;
     expect(readyCalls).toBe(1);
     expect(session.current.document.document.nodes).toHaveLength(1);
-    // 落盘内容必须源自真实字体（4 字 × 25 + 20 = 120；fallback 会是 60）
-    expect(session.current.document.document.nodes[0]!.size.width).toBe(120);
+    // 落盘内容必须源自真实字体和完整视觉内距（4 字 × 25 + 32 = 132）
+    expect(session.current.document.document.nodes[0]!.size.width).toBe(132);
   });
 });
 

@@ -17,7 +17,7 @@ export type MeasureText = (text: string, fontId: FontToken) => Size;
 export interface InteractionControllerDeps {
   nextNodeId(): string;
   nextEdgeId(): string;
-  /** 共享 layout 度量（packages/export measureNodeBox + FontResolver 注入）。 */
+  /** 共享完整视觉度量（packages/export measureNodeVisual + FontResolver 注入）。 */
   measure: MeasureText;
   /** 当前文档字体（EditNodeText/CreateNode 尺寸必须与文档字体一致）。 */
   currentFont: () => FontToken;

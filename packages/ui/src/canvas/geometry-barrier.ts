@@ -14,7 +14,6 @@
 import type { Command, DocumentSession, FontToken, NodeShape, Point, TextRun } from "@mindmap/core";
 import { documentDefaults } from "../projection/projection.js";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
-import { measureNodeBox } from "@mindmap/export/src/layout.js";
 import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 
 export type FontMetricsState = "pending" | "ready" | "failed";
@@ -222,7 +221,14 @@ export class GeometryBarrier {
     const fontId = documentDefaults(doc).font;
 
     if (intent.kind === "create-node") {
-      const box = measureNodeBox(intent.text, intent.runs, fontId, fonts);
+      const box = measureNodeVisual(
+        {
+          text: intent.text,
+          ...(intent.runs !== undefined ? { runs: intent.runs } : {}),
+        },
+        fontId,
+        fonts,
+      );
       const cmd: Command = {
         kind: "CreateNode",
         id: intent.id,
@@ -236,7 +242,15 @@ export class GeometryBarrier {
     } else if (intent.kind === "edit-text") {
       const node = doc.document.nodes.find((n) => n.id === intent.id);
       if (node && (node.text !== intent.text || intent.runs !== undefined)) {
-        const box = measureNodeBox(intent.text, intent.runs, fontId, fonts);
+        const box = measureNodeVisual(
+          {
+            ...node,
+            text: intent.text,
+            ...(intent.runs !== undefined ? { runs: intent.runs } : {}),
+          },
+          fontId,
+          fonts,
+        );
         const cmd: Command = {
           kind: "EditNodeText",
           id: intent.id,

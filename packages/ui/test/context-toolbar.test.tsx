@@ -132,6 +132,7 @@ describe("上下文工具条（VRA-050）", () => {
       const n = session.current.document.document.nodes.find((x) => x.id === "b");
       expect(n?.runs?.[0]?.fontSize).toBe(18);
       expect(n?.text).toBe("目标"); // 文本不被清空（runs 不清内容）
+      expect(n?.size.width).toBeGreaterThanOrEqual(120); // G-VIS 完整卡片几何，不回退旧小框
     });
     session.undo();
     await waitFor(() => {

@@ -9,7 +9,8 @@ import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { FontToken } from "@mindmap/core";
 import { layoutNodeVisual, VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
-import { measureNodeBox, LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
+import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
+import { LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 import type { MindFlowNode } from "../projection/projection.js";
 import { NodeTextEditor } from "./node-text-editor.js";
@@ -117,7 +118,16 @@ function MindNodeViewImpl({
           textColor={text}
           background={fill}
           // 实时增长与提交后渲染同一测量源（所见即所得；runs 在编辑态按纯文本计）
-          measureBox={(txt) => measureNodeBox(txt, undefined, data.font, fonts)}
+          measureBox={(txt) =>
+            measureNodeVisual(
+              {
+                text: txt,
+                ...(data.kicker !== undefined ? { kicker: data.kicker } : {}),
+              },
+              data.font,
+              fonts,
+            )
+          }
           onMeasure={setEditBox}
           onCommit={(txt) => onCommitEdit(id, txt)}
           onCancel={onCancelEdit}
