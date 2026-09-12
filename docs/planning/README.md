@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](../quality/prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](./prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。旧路线与本更新冲突时，以本更新与阶段 B 卡为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过（12 项源码门全绿 + 3 轮真实 `hdiutil` 装配，`cleanupMs=0` 无残留挂载），执行侧报告见[阶段 B 报告](../quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞；当前无待执行任务卡，等待独立审阅。旧路线与本更新冲突时，以本更新为准。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
@@ -13,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
+当前整改批次状态为 `IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；历史候选与证据继续只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 

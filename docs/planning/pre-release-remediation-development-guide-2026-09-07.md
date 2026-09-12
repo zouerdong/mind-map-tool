@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](../quality/prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](./prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过，执行侧报告见[阶段 B 报告](../quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`
+状态：`IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)

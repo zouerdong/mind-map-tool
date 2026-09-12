@@ -1,6 +1,6 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 已独立审阅并由维护者直接收口局部边界，最终代码 source `0da0d406a3d9b9041921d470363d7db52d5f59f9`，源码门全绿（release-runners 132/132、unit 654）。结论见[独立审阅](docs/quality/prr-069c-r2-f1-independent-review-2026-09-12.md)；当前唯一执行入口为[阶段 B 三轮原生预检任务卡](docs/planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)。阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。下文历史 R1/R2/F1 执行记录只保留事实；冲突时以本更新与阶段 B 卡为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a`（clean，含任务卡与阶段 A 修复）全部通过：12 项源码门全绿（release-runners 132/132、unit 654、cargo 210），三轮真实 `hdiutil` ULMO 装配均 `cleanupMs=0`、无残留挂载、EULA 探针正常拒绝。执行侧报告见[阶段 B 报告](docs/quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)；交回仅含报告/状态文档，`scripts tests apps packages` 相对 SourceCommit 无差异。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞；当前无待执行任务卡。下文历史 R1/R2/F1 执行记录只保留事实；冲突时以本更新为准。
 
 ## 项目阶段
 

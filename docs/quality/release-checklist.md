@@ -1,8 +1,8 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](./prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](../planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，本清单不放行 PRR-070/080/090 或 G-FINAL。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过（12 项源码门全绿 + 3 轮真实 `hdiutil` 装配，`cleanupMs=0` 无残留挂载），执行侧报告见[阶段 B 报告](./prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，本清单不放行 PRR-070/080/090 或 G-FINAL。
 
-状态：**IN_PROGRESS / R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。阶段 B 原生预检尚未执行，本清单仍未放行。
+状态：**IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。阶段 B 已执行、待独立审阅，本清单仍未放行。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
