@@ -1,10 +1,10 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a`（clean，含任务卡与阶段 A 修复）全部通过：12 项源码门全绿（release-runners 132/132、unit 654、cargo 210），三轮真实 `hdiutil` ULMO 装配均 `cleanupMs=0`、无残留挂载、EULA 探针正常拒绝。执行侧报告见[阶段 B 报告](docs/quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)；交回仅含报告/状态文档，`scripts tests apps packages` 相对 SourceCommit 无差异。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞；当前无待执行任务卡。下文历史 R1/R2/F1 执行记录只保留事实；冲突时以本更新为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 的三轮真实 `hdiutil` ULMO 预检已独立接受；结论与限制见[阶段 B 独立审阅](docs/quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](docs/planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)：从包含本卡的最新 clean HEAD 构建唯一候选并完成性能、安装/LaunchServices 与完整原生矩阵，随后停在 `WAITING_FOR_OWNER_G_FINAL`。PRR-070 阶段 B、PRR-080/090 与 G-FINAL 记录仍阻塞；冲突时以本更新与新卡为准。
 
 ## 项目阶段
 
-当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选、source `b45dc0c` 命中 `.DS_Store` STOP 后自然完成的候选及全部历史证据继续只读作废。PRR-069C-R1/R2 的历史返修链已由 R2-F1 阶段 A 收口并独立接受；当前只执行页首阶段 B 三轮原生预检，历史正常预检不作为新 source 的发布输入。阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
+当前处于发布前原生候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选、source `b45dc0c` 命中 `.DS_Store` STOP 后自然完成的候选及全部历史证据继续只读作废。PRR-069C-R1/R2/F1 的返修与原生预检链已独立接受；当前只执行页首 PRR-070 阶段 A，所有历史候选与预检 DMG 均不得作为新候选输入。
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 

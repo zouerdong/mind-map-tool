@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过，执行侧报告见[阶段 B 报告](../quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B 已独立接受，见[阶段 B 独立审阅](../quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](./prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`
+状态：`IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
@@ -66,11 +66,11 @@ PRR-010/020/040/050 可在各自决策明确后并行开发，但 PRR-030 涉及
 
 ## 2.1 派发基线与工作区规则
 
-截至 2026-09-12，PRR-000～069 已集成并完成独立审阅；source `b45dc0c` 的 PRR-070 阶段 A 因 Tauri Finder `.DS_Store` 无上限等待命中预先声明的 STOP。PRR-069C/R1/R2 的历史缺口已由 R2-F1 阶段 A 收口；最终代码 source `0da0d40` 已独立接受，阶段 B 三轮原生预检现已派发但尚未执行。阶段 B 交回并再次独立审阅接受后，才重新派发 PRR-070。因此：
+截至 2026-09-12，PRR-000～069 已集成并完成独立审阅；source `b45dc0c` 的 PRR-070 阶段 A 因 Tauri Finder `.DS_Store` 无上限等待命中预先声明的 STOP。PRR-069C/R1/R2/F1 的缺口与三轮真实原生预检现已独立接受，PRR-070 阶段 A 已重新派发。因此：
 
-1. R2-F1 阶段 B 必须从包含 `0da0d40` 修复与当前任务卡的最新 clean HEAD 开始；PRR-070 随后从包含阶段 B 独立审阅接受记录的新 clean HEAD 开始。不得退回历史 source，也不得复用 `b45dc0c`、原 PRR-069C/R1/R2/F1 attempts 或更早候选/证据。
+1. PRR-070 必须从包含阶段 B 独立审阅与新任务卡的最新 clean HEAD 开始。不得退回历史 source，也不得复用 `b45dc0c`、原 PRR-069C/R1/R2/F1 attempts 或更早候选/证据。
 2. 旧 `.tmp/release-candidate` 内容全部只读；新证据写入当前 source commit 对应的新子目录。不得覆盖根层旧 manifest/report，也不得清理历史目录。
-3. R2-F1 阶段 B 只生成三轮原生预检证据，不执行 PRR-070。PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回对应整改卡，修复后换新 source hash 从头重做。
+3. PRR-070 原则上只生成 ignored candidate/evidence；一旦需要修改源码、测试、runner 或 tracked 文档，立即停止并退回对应整改卡，修复后换新 source hash 从头重做。
 4. 执行 Agent 不得自行批准 G-FINAL、MM-110 或 handoff，也不得开始 PRR-080；自动化与 Agent 只能整理一份绑定候选 hash 的负责人验收请求。
 5. 不授权 push/rebase；签名、公证、凭据、系统信任修改、上传和公开发布仍明确禁止。
 

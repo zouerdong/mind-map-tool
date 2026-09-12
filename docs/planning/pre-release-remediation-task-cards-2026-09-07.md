@@ -1,9 +1,9 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过，执行侧报告见[阶段 B 报告](../quality/prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B 已独立接受，见[阶段 B 独立审阅](../quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](./prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`
+状态：`IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -551,9 +551,11 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 
 类型：候选构建 / 原生验收  
 优先级：P0  
-状态：`BLOCKED_BY_PRR-069C-R2`（PRR-069C 独立审阅结论为 `REVISE`；原三轮预检不得作为 PRR-070 输入）
+状态：`READY_FOR_EXECUTION / STAGE_A_ONLY / G-FINAL_NOT_REQUESTED`
 依赖：PRR-000～069 已集成并经独立审阅；PRR-069C-R2-F1 阶段 B 三轮原生预检与再次独立审阅通过；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
+
+当前执行卡：[PRR-070 阶段 A：唯一候选与完整原生矩阵](./prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。下文保留完整协议；冲突时以该独立任务卡为准。
 
 ### 目标
 

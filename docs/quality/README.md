@@ -1,6 +1,6 @@
 # Quality
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过（12 项源码门全绿 + 3 轮真实 `hdiutil` 装配，`cleanupMs=0` 无残留挂载），执行侧报告见[阶段 B 报告](./prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞；当前无待执行任务卡，等待独立审阅。旧路线与本更新冲突时，以本更新为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B 已独立接受，见[阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](../planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)；通过后停在 `WAITING_FOR_OWNER_G_FINAL`，不得自行进入阶段 B 或 PRR-080/090。
 
 记录可测量的非功能标准，包括启动耗时、空闲内存、安装包体积、大型脑图响应、崩溃恢复、可访问性和 macOS/Windows 兼容矩阵。
 
@@ -24,6 +24,7 @@
 - [PRR-070 `.DS_Store` STOP 独立审阅](./prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)：source `b45dc0c` 的第二次独立 clean build 再次进入 Finder 无上限等待；虽然后来自然完成且 DMG 字节有效，仍因预先 STOP 规则作废，退回 [PRR-069C](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)。
 - [PRR-069C-R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)：R2-01～04 处置、红/绿矩阵与历史三轮正式预检证据（source `885d877`，DMG 24284033/24284017/24284025B）；其后审阅要求由 R2-F1 收口，不是当前发布输入。
 - [PRR-069C-R2-F1 阶段 A 独立审阅](./prr-069c-r2-f1-independent-review-2026-09-12.md)：最终代码 source `0da0d40`，P0～P3 无剩余项，仅解锁[阶段 B 三轮原生预检](../planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)。
+- [PRR-069C-R2-F1 阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)：source `225923f` 三轮真实 ULMO 预检接受；旧预检 DMG 不复用，仅解锁 [PRR-070 阶段 A](../planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）

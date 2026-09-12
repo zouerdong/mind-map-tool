@@ -1,8 +1,8 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED`。阶段 B 三轮原生预检已在 frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 全部通过（12 项源码门全绿 + 3 轮真实 `hdiutil` 装配，`cleanupMs=0` 无残留挂载），执行侧报告见[阶段 B 报告](./prr-069c-r2-f1-stage-b-report-2026-09-12.md)。阶段 B 独立审阅接受前，本清单不放行 PRR-070/080/090 或 G-FINAL。
+2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 的三轮真实 ULMO 预检已独立接受，见[阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前只放行[PRR-070 阶段 A](../planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)，未放行 G-FINAL 记录、PRR-070 阶段 B、PRR-080/090。
 
-状态：**IN_PROGRESS / R2-F1_STAGE_B_EXECUTED / STOP_FOR_INDEPENDENT_REVIEW / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。阶段 B 已执行、待独立审阅，本清单仍未放行。
+状态：**IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED / NOT_READY_TO_RELEASE**。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -10,22 +10,22 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
-| TypeScript / Rust 常规检查 | PASS ON PRR-069C-R2 SOURCE `885d877` / PENDING INDEPENDENT REVIEW | R2 全量门通过：format/typecheck/lint/unit 635/integration 94/icon/build/cargo test 210/clippy -D warnings/diff --check；PRR-070 仍须从独立审阅通过后的新 clean source 全部重跑 |
+| TypeScript / Rust 常规检查 | PASS ON R2-F1 STAGE B SOURCE `225923f` | 12 项门通过：release-runners 132、unit 654、integration 94、cargo 210 及 format/typecheck/lint/icon/build/clippy/diff-check；PRR-070 仍须从新 clean HEAD 全部重跑 |
 | 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
-| `.dmg` ≤ 25,000,000B | PASS ON PRR-069C-R2 SOURCE `885d877` / PENDING INDEPENDENT REVIEW | R2 三轮 DMG 为 24,284,033/017/025B（预算内，ULMO + CRC32 VALID）；R1 attempts 仅作历史事实 |
+| `.dmg` ≤ 25,000,000B | PASS AT R2-F1 STAGE B PRECHECK / FINAL CANDIDATE PENDING | 三轮为 24,284,017/073/017B，均 ULMO + CRC32 VALID；仅作装配预检，PRR-070 必须生成唯一新 DMG |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
 | `.mindmap` bundle 文件关联 | PASS AT DIAGNOSTIC BUNDLE | `CFBundleDocumentTypes`、UTI、MIME 与 Editor 角色齐备；PRR-070 执行 LaunchServices 实测 |
 | 最低 macOS 版本一致性 | PASS AT DIAGNOSTIC BUNDLE | Info.plist 与 Mach-O 均为 macOS 11.0；PRR-070 同源复算 |
-| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON VALID CANDIDATE | PRR-067 协议保持有效；待 PRR-069C-R2 独立审阅通过后由新 PRR-070 同源重测 |
+| 原生启动 / RSS / dense canvas / edit / save / PNG | NOT RUN ON FINAL CANDIDATE | PRR-067 协议保持有效；由已派发 PRR-070 对唯一新 candidate 同源重测 |
 | 原生安装、打开 `.mindmap` 与应用身份 | NOT YET RUN ON NEW CANDIDATE | G2 已授权受控安装和 LaunchServices；由 PRR-070 在唯一候选上执行并恢复状态 |
 | 字体切换几何事务 | PASS AT SOURCE REVIEW | PRR-040/066 已覆盖原子重测、并发 join、失败回队和保存屏障；PRR-070 原生矩阵复核 |
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| DMG 装配可重复性 | STAGE A ACCEPTED ON `0da0d40` / STAGE B READY | R2-F1 阶段 A 已独立接受；阶段 B 三轮原生预检尚未执行，PRR-070 继续阻塞 |
-| source/evidence 时间拓扑 | PASS ON PRR-069C-R1 ATTEMPTS / HISTORICAL / R2 REQUIRED | R1 三轮证据为机器生成 UTC 且阈值未放宽（120000/180000 精确）；`b45dc0c` 与原 PRR-069C attempts 仍只读作废；PRR-070 从新 clean HEAD 重新取证 |
-| G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
+| DMG 装配可重复性 | R2-F1 STAGE B ACCEPTED ON `225923f` | 三轮真实 `hdiutil` 正常路径全部通过、cleanupMs=0、无残留；只解锁 PRR-070 阶段 A |
+| source/evidence 时间拓扑 | PASS WITH NON-BLOCKING EVIDENCE NOTES | 三轮 source/inventory/report 次序成立；旧 manifest 混用两种路径基准且 attempt-01 验证文件曾后续追加，已在独立审阅披露；PRR-070 要求统一 repo-relative manifest 且文件生成后不追加 |
+| G-FINAL | MISSING / EXPECTED | 尚未生成请求；只有 PRR-070 阶段 A 全绿后才可生成请求并等待负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
 | 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |
 

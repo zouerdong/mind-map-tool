@@ -1,5 +1,9 @@
 # PRR-069C-R2-F1 阶段 B 实施报告（三轮原生预检）
 
+> 2026-09-12 独立审阅更新：阶段 B 已 `ACCEPT`，仅解锁 PRR-070 阶段 A。独立复算、证据限制与
+> 审阅修正见[阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。下文保留执行侧
+> 交回时的原始状态；三个预检 DMG 不得作为 PRR-070 候选或 G-FINAL 输入。
+
 状态：**执行完成，等待独立审阅**（`STOP_FOR_INDEPENDENT_REVIEW`）。本报告是执行侧自述，不构成独立验收；
 PRR-070 / G-FINAL / PRR-080 / PRR-090 继续阻塞。
 
@@ -89,8 +93,9 @@ env -u MINDMAP_DMG_CLEANUP_GRACE_MS node scripts/quality/bundle-gate.mjs \
 - **挂载前后**：装配前挂载表无该轮 mountpoint；每轮结束后 `mount | grep "Mind Map"` 为空、
   `hdiutil info` 无 image 条目（独立复核，见 `attempt-0N-independent-verify.txt`）。
 - **独立复算**：DMG/LICENSE/ICNS/runner SHA-256 与字节数、app 递归字节数（28067488）由执行侧在
-  每轮结束后用 `shasum`/`stat`/`find` 复算，与 runner 报告一致；attempt-01 的 DMG 复算发生在
-  attempt-02 启动之前（01:35:58Z < 01:36:20Z），对应关系无歧义。
+  每轮结束后用 `shasum`/`stat`/`find` 复算，与 runner 报告一致；attempt-01 文件中的 hash/size 块产生于
+  attempt-02 启动之前（01:35:58Z < 01:36:20Z），但该文件随后追加了 attempt-02 EULA cross-check，
+  因此不能把整个文件的最终状态描述成 01:35:58Z 已冻结。
 
 ### 3.3 三轮一致性与 DMG 字节差异说明
 
@@ -135,6 +140,8 @@ PRR-070 / performance matrix / 安装 / LaunchServices / G-FINAL / PRR-080 / PRR
 2. 执行侧独立复算依赖 candidate-root 共享输出路径，前轮 DMG 实体会被后轮覆盖，仅存哈希记录
   （attempt-01/02 的 DMG 文件本体已被后轮构建覆盖，各自 hash 与字节以当轮报告 + 当轮后即时复算为准）。
 3. 阶段 A 遗留未变：`assemble-dmg.mjs` 含一个裸控制字节（`rg --text` 可读）；不属本卡修改范围。
+4. evidence manifest 的 `./...` 以 evidence 目录为基准，而 `.tmp/...` 以仓库根为基准；不能在单一 cwd 直接
+   `shasum -c`。独立审阅按两种明确基准复算 31/31 一致；PRR-070 起统一使用仓库相对路径。
 
 ## 8. 红线确认（Redlines）
 
