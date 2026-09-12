@@ -1,6 +1,6 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人首次实用复现字体切换后整页 `projection drift`；根因为上下文工具条绕过统一 commit/version 通道，以及 ready 字体屏障延迟版本通知。审阅者已在 `9483634` 原子化提交与通知，并在 `f6d4e6d` 移除无数据保护作用的生产 render 崩溃断言；45 项相关测试、typecheck、lint 通过。旧 DMG `21d2…b1ed` 作废，不得继续试用或进入发布。另确认 ADR 0012 把“干净画布”过度实现为删除创建提示和显式整理入口；视觉/命令面需负责人决定修订方向后再实现。此前不生成新 DMG，不申请 G-FINAL、不执行 PRR-080/090、不签名、公证、上传或发布。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人首次实用复现字体切换后整页 `projection drift`；根因为上下文工具条绕过统一 commit/version 通道，以及 ready 字体屏障延迟版本通知。审阅者已在 `9483634` 原子化提交与通知，并在 `f6d4e6d` 移除无数据保护作用的生产 render 崩溃断言；`12f8f92` 又修复新建/编辑仍使用旧 `measureNodeBox` 而产生微型节点的问题，恢复 G-VIS 完整卡片几何与双击后直接输入。90 项定向测试、typecheck、lint 通过。旧 DMG `21d2…b1ed` 作废，不得继续试用或进入发布。另确认 ADR 0012 把“干净画布”过度实现为删除创建提示和显式整理入口；视觉/命令面需负责人决定修订方向后再实现。此前不生成新 DMG，不申请 G-FINAL、不执行 PRR-080/090、不签名、公证、上传或发布。
 
 ## 项目阶段
 
