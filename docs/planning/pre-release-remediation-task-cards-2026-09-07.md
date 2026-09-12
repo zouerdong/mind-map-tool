@@ -1,9 +1,9 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。Graph JSON 桌面导出及审阅修复已完成，当前无 Coding 任务；负责人从最终 unsigned DMG 开始本机试用。下文旧 PRR-070 完整矩阵仅保留历史协议，不再作为当前派发指令。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人首次实用发现确定性崩溃及整理入口/视觉偏差；运行时根因已修，旧 DMG 作废。界面方向确认前不派发新实现卡；下文旧 PRR-070 完整矩阵仅保留历史协议。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`
+状态：`IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)

@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。Graph JSON 第四格式已接入桌面并通过独立审阅；审阅者已补修 pending 编辑不能静默导出旧快照的边界。最终 unsigned dogfood 候选绑定 clean source `c3b4c8c9262d536d22526aa4d16157289f77e43a`。当前无 Coding 任务，等待负责人本机安装试用和实际反馈。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人实用复现字体切换后的 `projection drift` 整页崩溃，并指出整理入口不可发现、实际画面偏离既定感觉。运行时根因已由审阅者在 `9483634` / `f6d4e6d` 修复并通过 45 项相关测试；旧 DMG 作废。下一步先修订 ADR 0012 的命令面方案，经负责人确认后再实现和生成新试用件。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
@@ -13,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；原 PRR-070/R1/R2 执行候选与证据继续只读保留，最终 dogfood 候选以审阅修复后的 source/hash 为准。
+当前整改批次状态为 `IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；原 PRR-070/R1/R2 候选与证据只读保留且不得作为发布输入。
 
 ## 2026-09-07 发布前收口批次（历史）
 

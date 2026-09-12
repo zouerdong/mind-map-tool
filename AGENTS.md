@@ -1,10 +1,10 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。Graph JSON 第四导出格式已接入桌面并通过独立审阅；审阅者补修“字体失败且存在待提交编辑时可能导出旧快照”的边界，现在无 pending 时保持字体独立，有 pending 时先收敛、失败则明确阻止，绝不静默丢内容。最终 clean source 为 `c3b4c8c9262d536d22526aa4d16157289f77e43a`，unsigned dogfood DMG SHA-256 为 `21d2d0525bccd4ee87a1055d00a48df8b9f52c3a16ed6cdab06c7efcc9c0b1ed`。当前无 Coding 任务；由负责人本机安装试用。收到负责人试用结论前，不申请 G-FINAL、不执行 PRR-080/090、不签名、公证、上传或发布。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人首次实用复现字体切换后整页 `projection drift`；根因为上下文工具条绕过统一 commit/version 通道，以及 ready 字体屏障延迟版本通知。审阅者已在 `9483634` 原子化提交与通知，并在 `f6d4e6d` 移除无数据保护作用的生产 render 崩溃断言；45 项相关测试、typecheck、lint 通过。旧 DMG `21d2…b1ed` 作废，不得继续试用或进入发布。另确认 ADR 0012 把“干净画布”过度实现为删除创建提示和显式整理入口；视觉/命令面需负责人决定修订方向后再实现。此前不生成新 DMG，不申请 G-FINAL、不执行 PRR-080/090、不签名、公证、上传或发布。
 
 ## 项目阶段
 
-当前处于发布前本机试用阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 视觉导出（SVG/2x PNG/PDF）及独立 Graph JSON Agent 导出，字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～070-R2 已完成当前范围实现与独立审阅；负责人选定的 C 方案图标、四格式导出和 ULMO DMG 均已进入当前 dogfood 候选。下一步不是继续开发，而是负责人真实使用并反馈；发现问题再按实际风险定向修复。
+当前处于发布前首次实用返修阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈与四格式导出不变，但 2026-09-12 dogfood 已由负责人以确定性运行时崩溃和命令可发现性/视觉偏差为由拒绝。运行时根因修复已提交；下一步先收口“启动干净”与“整理可发现”的产品界面，再构建新的本机试用件。不得把自动测试通过等同于 dogfood 完成。
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 

@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。Graph JSON 桌面导出及审阅修复已完成；当前无 Coding 任务，等待负责人本机安装试用。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。首次实用发现确定性 `projection drift` 崩溃及命令可发现性/视觉偏差；运行时根因修复已提交，旧 DMG 作废，等待界面方向确认后再生成试用件。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`
+状态：`IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
