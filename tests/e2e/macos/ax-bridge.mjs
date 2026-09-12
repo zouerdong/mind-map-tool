@@ -15,9 +15,12 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 const execFileP = promisify(execFile);
 const PROCESS_NAME = "mindmap-desktop"; // 可执行文件名（AX process 名），非显示名
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const AX_DRIVER = path.join(REPO_ROOT, "scripts", "quality", "ax-driver.swift");
 
 const scriptDir = mkdtempSync(path.join(tmpdir(), "mindmap-e2e-jxa-"));
 
@@ -237,30 +240,17 @@ export async function doubleClickAt(x, y) {
   if (!Number.isFinite(x) || !Number.isFinite(y)) {
     throw new Error(`doubleClickAt: 坐标非法（${x},${y}）——AX position 解析失败`);
   }
-  // 双击必须在单脚本内完成：跨 osascript 进程的两击间隔（200-400ms 开销）
-  // 实测超出系统双击时窗 → dblclick 不派发。脚本内忙等 ~120ms 控制间隔。
-  const script = `
-ObjC.import("CoreGraphics");
-ObjC.import("Foundation");
-function clickAt(state) {
-  const pt = $.CGPointMake(${x}, ${y});
-  const d = $.CGEventCreateMouseEvent(null, $.kCGEventLeftMouseDown, pt, $.kCGMouseButtonLeft);
-  const u = $.CGEventCreateMouseEvent(null, $.kCGEventLeftMouseUp, pt, $.kCGMouseButtonLeft);
-  $.CGEventSetIntegerValueField(d, $.kCGMouseEventClickState, state);
-  $.CGEventSetIntegerValueField(u, $.kCGMouseEventClickState, state);
-  $.CGEventPost($.kCGSessionEventTap, d);
-  $.CGEventPost($.kCGSessionEventTap, u);
-}
-function wait(sec) {
-  // JXA 无参方法一律属性访问：NSDate.date / timeIntervalSince1970
-  const end = $.NSDate.date.timeIntervalSince1970 + sec;
-  while ($.NSDate.date.timeIntervalSince1970 < end) {}
-}
-clickAt(1);
-wait(0.12);
-clickAt(2);
-"OK";`;
-  await jxa(script);
+  // Swift CGEvent 双击（scripts/quality/ax-driver.swift dblclick）：本机
+  // osascript/JXA 的 CGEventPost 会被系统过滤（PRR-070 实测：JXA 双击不达
+  // app，swift 进程直连可用）；两击时序由 helper 单进程控制，不再维护
+  // 第二份 JXA 内嵌 CoreGraphics 实现。失败带 exit/stderr 抛错，不吞错。
+  try {
+    await execFileP("swift", [AX_DRIVER, "dblclick", String(Math.round(x)), String(Math.round(y))]);
+  } catch (e) {
+    throw new Error(
+      `doubleClickAt: ax-driver dblclick 失败（exit ${e.code ?? "?"}）: ${String(e.message).slice(0, 300)}`,
+    );
+  }
 }
 
 /** 真实鼠标：在 AX 元素中心双击（descMatch 精确匹配 description）。 */

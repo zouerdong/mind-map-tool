@@ -862,8 +862,8 @@ async function main() {
     rmSync(closeSavePath, { force: true });
 
     // 7b dirty Cancel：main dirty → 红按钮 → 取消关闭 → 窗口与 dirty 保持
-    //（顺序说明：工具条「新建」建窗+关窗之后 modal 按钮点击会失效——
-    //  W2R 实测 probe2；modal 分支全部排在该序列之前/新进程内。）
+    //（顺序说明：先建窗后关窗的序列之后 modal 按钮点击会失效——W2R 实测
+    //  probe2；modal 分支全部排在 clean 分支之前/新进程内。）
     {
       await launchApp();
       await waitFor(async () => (await windowCount()) === 1, { label: "S7b main ready" });
@@ -922,14 +922,16 @@ async function main() {
       });
     }
 
-    // 7a clean：activation 空白窗直接放行（无 modal、窗口关闭）
+    // 7a clean：warm activation 新窗直接放行（无 modal、窗口关闭）。
+    // 第二空白窗用原生 warm activation 准备（open -a 无文件 → Reopen(warm)
+    // → 新空白窗，S6 同语义）；PRR-065（ADR 0012 零 chrome）已移除画布内
+    // 「新建」按钮，原生 activation/菜单为当前受支持的新窗路径。
     {
       await launchApp();
       await waitFor(async () => (await windowCount()) === 1, { label: "S7a main ready" });
       await placeAtOrFail(SLOT_MAIN, "main");
-      await activate();
-      await clickByContent("新建");
-      await waitFor(async () => (await windowCount()) === 2, { label: "S7a 新窗" });
+      await execFileP("open", ["-a", bundlePath]);
+      await waitFor(async () => (await windowCount()) === 2, { label: "S7a activation 新窗" });
       // activation 新窗 spawn 于 (215,95)（main 已分摆腾空）——按 spawn 位直接关闭
       const before = await windowCount();
       await redButton({ x: 215, y: 95 });
@@ -976,10 +978,11 @@ async function main() {
       });
     }
 
-    // 7e pending save：dirty → 工具条另存为打开系统面板（保存链挂起 =
-    // pending）→ 红按钮 → awaiting-save 受控等待（不销毁可能提交文件的
+    // 7e pending save：dirty → 原生「另存为…」菜单打开系统面板（保存链挂起
+    // = pending）→ 红按钮 → awaiting-save 受控等待（不销毁可能提交文件的
     // 窗口）→ 取消关闭（窗口保留）。面板清理由下一场景的进程重启承担
-    //（面板确认在本环境不可驱动，见 S9 note）。
+    //（面板确认在本环境不可驱动，见 S9 note）。PRR-065 移除画布内「另存为」
+    // 按钮后，原生菜单为当前受支持入口。
     {
       await launchApp();
       await waitFor(() => logText().includes("冷启动 main 确认 Blank"), {
@@ -989,11 +992,12 @@ async function main() {
       await makeDirty(f);
       const before = await windowCount();
       await focusFrame(f);
-      const saveEntry = await waitForAx("另存为");
-      await axClick(
-        saveEntry.frame.x + saveEntry.frame.w / 2,
-        saveEntry.frame.y + saveEntry.frame.h / 2,
-      );
+      await activate();
+      await sleep(300);
+      await execFileP("osascript", [
+        "-e",
+        'tell application "System Events" to tell process "mindmap-desktop" to click menu item "另存为…" of menu 1 of menu bar item "文件" of menu bar 1',
+      ]);
       const panelShownE = await waitFor(
         async () => (await appRows()).some((r) => r.title === "Save"),
         { label: "S7e Save 面板出现（保存 pending）", timeoutMs: 8000 },

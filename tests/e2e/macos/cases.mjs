@@ -104,7 +104,8 @@ async function processAlive(b) {
 }
 
 /** 画布空白处真实双击建一个节点（dirty）。React Flow 节点在 WKWebView
- * 的 AX 树懒暴露（MM-090 已知边界），dirty 判定改用状态指示的 AX value。 */
+ * 的 AX 树懒暴露（MM-090 已知边界），dirty 判定用 document.title 的
+ * ● 前缀（PRR-065 零 chrome 移除了状态指示条后，dirty 由 title 承载）。 */
 async function createDirtyNode(b) {
   const frame = await b.windowFrame();
   // 画布区域右下象限空白点（避开中心种子/引导提示）
@@ -117,14 +118,14 @@ async function createDirtyNode(b) {
   ]) {
     await b.doubleClickAt(Math.round(frame.x + frame.w * fx), Math.round(frame.y + frame.h * fy));
     const dirty = await b
-      .axWaitFor(`v.includes("未保存")`, {
-        label: "状态指示转为未保存（双击建点 → dirty）",
+      .axWaitFor(`v.includes("●") || d.includes("●")`, {
+        label: "文档 title 出现 ● 未保存前缀（双击建点 → dirty）",
         timeoutMs: 5000,
       })
       .catch(() => null);
     if (dirty !== null) return;
   }
-  throw new Error("双击建点失败：状态指示未转为未保存");
+  throw new Error("双击建点失败：文档 title 未出现 ● 前缀");
 }
 
 const closeCases = [
@@ -171,8 +172,8 @@ const closeCases = [
       assert(await windowAlive(b), "取消后窗口保持");
       const modalGone = await b.axFind(`d === "关闭确认"`);
       assert(modalGone === null, "取消后 modal 清除");
-      const status = await b.axFind(`v.includes("未保存")`);
-      assert(status !== null, "dirty 状态保持（零副作用）");
+      const status = await b.axFind(`v.includes("●") || d.includes("●")`);
+      assert(status !== null, "dirty 状态保持（● title 前缀仍在，零副作用）");
     },
   },
   {
