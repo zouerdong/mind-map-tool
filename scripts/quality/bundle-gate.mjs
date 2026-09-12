@@ -37,6 +37,7 @@ import {
   SYSTEM_TOOL_PATHS,
   DMG_TOOL_NAMES,
   DMG_CLEANUP_GRACE_MS,
+  DMG_CLEANUP_GRACE_ENV,
   DMG_PRODUCTION_WORK_DIR_SHAPE,
   validateInjectionPath,
   validateInjectedToolSet,
@@ -152,6 +153,11 @@ if (assembleDmg && !workDir) {
 
 // ---------------- PRR-069C-R1：模式边界与注入隔离（先于 G2/git/build，无副作用） ----------------
 if (IS_PRODUCTION) {
+  if (assembleDmg && process.env[DMG_CLEANUP_GRACE_ENV]) {
+    gateBlocked(
+      `正式仓库禁止环境变量覆盖清理宽限（固定 ${DMG_CLEANUP_GRACE_MS}ms）: ${DMG_CLEANUP_GRACE_ENV}`,
+    );
+  }
   for (const injectFlag of [
     "assembler-script",
     "assembler-tool-dir",

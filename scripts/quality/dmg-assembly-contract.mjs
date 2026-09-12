@@ -42,6 +42,9 @@ export const DMG_TOOL_NAMES = Object.freeze(Object.keys(SYSTEM_TOOL_PATHS));
  */
 export const DMG_CLEANUP_GRACE_MS = 60_000;
 
+/** fixture 只可调小清理宽限；正式 gate 与 assembler 都拒绝该变量。 */
+export const DMG_CLEANUP_GRACE_ENV = "MINDMAP_DMG_CLEANUP_GRACE_MS";
+
 /** 正式工作树的任务根前缀：`.tmp/prr-069c-<run-id>`（`.tmp/` 的直接子目录）。 */
 export const DMG_TASK_ROOT_PREFIX = "prr-069c-";
 /** 正式工作树的末级目录名。 */

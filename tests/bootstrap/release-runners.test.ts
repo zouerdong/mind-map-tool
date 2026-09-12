@@ -28,12 +28,15 @@ function fileSha256(path: string) {
 }
 
 function runNode(script: string, args: string[], env: Record<string, string> = {}) {
+  const inheritedEnv = { ...process.env };
+  // 测试不能被开发机偶然设置的 fixture-only 变量隐式改写；只有单个用例显式传入才恢复。
+  delete inheritedEnv.MINDMAP_DMG_CLEANUP_GRACE_MS;
   try {
     const stdout = execFileSync(process.execPath, [script, ...args], {
       cwd: ROOT,
       encoding: "utf8",
       stdio: "pipe",
-      env: { ...process.env, ...env },
+      env: { ...inheritedEnv, ...env },
     });
     return { status: 0, stdout, stderr: "" };
   } catch (err: any) {
@@ -3567,6 +3570,36 @@ describe("PRR-069C-R2-F1 进程结果分类与清理预算（纯函数）", () =
     expect(timeoutFor(ctx, 0)).toBe(0);
     expect(timeoutFor(ctx, 120_000)).toBe(0);
   });
+
+  it("F2-U5 装配与清理时段互不重叠，总耗时只计算一次", async () => {
+    const { createBudgetContext, splitRunTimings } = await loadDmgBudget();
+    let now = 0;
+    const run = createBudgetContext({ budgetMs: 180_000, nowMono: () => now });
+    now = 1_000;
+    const cleanup = createBudgetContext({ budgetMs: 60_000, nowMono: () => now });
+    now = 3_000;
+    expect(splitRunTimings(run, cleanup)).toEqual({
+      assemblyMs: 1_000,
+      cleanupMs: 2_000,
+      totalElapsedMs: 3_000,
+    });
+    expect(splitRunTimings(run, null)).toEqual({
+      assemblyMs: 3_000,
+      cleanupMs: 0,
+      totalElapsedMs: 3_000,
+    });
+
+    now = 0;
+    const fractionalRun = createBudgetContext({ budgetMs: 100, nowMono: () => now });
+    now = 0.6;
+    const fractionalCleanup = createBudgetContext({ budgetMs: 100, nowMono: () => now });
+    now = 1.2;
+    expect(splitRunTimings(fractionalRun, fractionalCleanup)).toEqual({
+      assemblyMs: 1,
+      cleanupMs: 0,
+      totalElapsedMs: 1,
+    });
+  });
 });
 
 describe("PRR-069C-R2-F1 EULA 探针进程异常、共享清理预算与任务根原子创建", () => {
@@ -3683,9 +3716,9 @@ describe("PRR-069C-R2-F1 EULA 探针进程异常、共享清理预算与任务�
     expect(readMockMounts(toolDir)).toEqual({});
   }, 30000);
 
-  it("F2-a 清理前查询消耗同一宽限：detach 上限收紧，耗尽后不再启动清理查询", () => {
+  it("F2-a 完整 assembler 清理接线：前查、detach、后查共用 cleanup 预算", () => {
     const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-shared-cleanup-budget");
-    const grace = 4000;
+    const grace = 6000;
     const res = runAssembler(
       repoDir,
       regPath,
@@ -3693,9 +3726,9 @@ describe("PRR-069C-R2-F1 EULA 探针进程异常、共享清理预算与任务�
       { "timeout-ms": "6000" },
       {
         MOCK_ATTACH_HANG_AFTER_MOUNT: "rw",
-        // 清理前查询真实消耗约 2 秒（单命令上限 6000ms，留足并发运行时的启动余量）
-        MOCK_MOUNT_DELAY_MS: "2000",
-        MOCK_DETACH_DELAY_MS: "60000",
+        // 真实子进程用例只验证调用链接线，不承担精确毫秒边界（精确预算由 F2-U1..U5 假时钟验证）。
+        MOCK_MOUNT_DELAY_MS: "250",
+        MOCK_DETACH_DELAY_MS: "250",
         MINDMAP_DMG_CLEANUP_GRACE_MS: String(grace),
       },
     );
@@ -3706,23 +3739,105 @@ describe("PRR-069C-R2-F1 EULA 探针进程异常、共享清理预算与任务�
       (c: any) => c.tool === "hdiutil" && c.args?.[0] === "detach",
     );
     expect(detach).toBeTruthy();
-    // detach 只能用"宽限 − 前查询已耗"，而不是完整宽限，也不是单命令上限
+    // 三个清理动作必须共用 cleanup 标签；机器调度造成的毫秒差异不进入断言。
     expect(detach.timeoutMs).toBeGreaterThan(0);
-    expect(detach.timeoutMs).toBeLessThanOrEqual(grace - 1000);
-    expect(detach.timeoutMs).toBeLessThan(6000);
-    // 预算耗尽后不得再启动 mount 子进程；挂载责任保留，不得写 CLEAN
-    const mounts = failure.commands.filter((c: any) => c.tool === "mount");
-    expect(mounts.length).toBeGreaterThan(0);
-    expect(mounts[mounts.length - 1].skipped).toContain("budget-exhausted");
-    expect(failure.mountState).not.toBe("CLEAN");
-    expect(failure.residualMount).toBeTruthy();
-    expect(Object.keys(readMockMounts(toolDir)).length).toBeGreaterThan(0);
-    // 清理耗时是真实终值（不是 0，也不是只到 detach 前的耗时）
-    expect(failure.cleanup.elapsedMs).toBeGreaterThanOrEqual(2500);
-    expect(failure.cleanup.elapsedMs).toBeLessThanOrEqual(grace + 3000);
+    expect(detach.budget).toBe("cleanup");
+    const cleanupMounts = failure.commands.filter(
+      (c: any) => c.tool === "mount" && c.budget === "cleanup",
+    );
+    expect(cleanupMounts.length).toBeGreaterThanOrEqual(2);
+    expect(cleanupMounts.every((c: any) => !c.skipped && c.timeoutMs > 0)).toBe(true);
+    expect(failure.mountState).toBe("CLEAN");
+    expect(failure.residualMount).toBeNull();
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(failure.cleanup.elapsedMs).toBeGreaterThan(0);
     expect(failure.timings?.totalElapsedMs).toBe(failure.elapsedMs);
     expect(failure.timings?.cleanupMs).toBe(failure.cleanup.elapsedMs);
+    expect(failure.timings.totalElapsedMs).toBe(
+      failure.timings.assemblyMs + failure.timings.cleanupMs,
+    );
   }, 60000);
+
+  it("F2-c attach 用尽装配预算后：清理宽限接管 pending、卸载后仍整体失败", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-pending-handover");
+    const res = runAssembler(
+      repoDir,
+      regPath,
+      toolDir,
+      // 给装配前置步骤足够余量；只有 attach 的受控 hang 才应耗尽 deadline。
+      { "timeout-ms": "8000", "deadline-ms": "8000" },
+      {
+        MOCK_ATTACH_HANG_AFTER_MOUNT: "rw",
+        MINDMAP_DMG_CLEANUP_GRACE_MS: "6000",
+      },
+    );
+    expect(res.status).toBe(1);
+    const failure = readFailure(res.stderr);
+    expect(failure.error).toMatch(/预算|deadline/);
+    expect(failure.commands.some((c: any) => c.budget === "assembly" && c.skipped)).toBe(true);
+    expect(
+      failure.commands.some((c: any) => c.tool === "mount" && c.budget === "cleanup" && !c.skipped),
+    ).toBe(true);
+    expect(
+      failure.commands.some(
+        (c: any) => c.tool === "hdiutil" && c.args?.[0] === "detach" && c.budget === "cleanup",
+      ),
+    ).toBe(true);
+    expect(failure.pendingMount).toBeNull();
+    expect(failure.activeMount).toBeNull();
+    expect(failure.mountState).toBe("CLEAN");
+    expect(readMockMounts(toolDir)).toEqual({});
+    expect(failure.timings.totalElapsedMs).toBe(
+      failure.timings.assemblyMs + failure.timings.cleanupMs,
+    );
+  }, 30000);
+
+  it("F2-d fixture 清理宽限只可调小；正式 assembler 与 gate 均在副作用前拒绝", () => {
+    const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-cleanup-env-contract");
+    for (const invalid of ["0", "-1", "1.5", "invalid", "60000", "60001"]) {
+      const res = runAssembler(
+        repoDir,
+        regPath,
+        toolDir,
+        {},
+        {
+          MINDMAP_DMG_CLEANUP_GRACE_MS: invalid,
+        },
+      );
+      expect(res.status).toBe(1);
+      expect(res.stderr).toMatch(/MINDMAP_DMG_CLEANUP_GRACE_MS|清理宽限/);
+    }
+    expect(readMockCalls(toolDir)).toEqual([]);
+
+    const formalWork = `.tmp/prr-069c-env-guard-${process.pid.toString(36)}/work`;
+    const formalAssembler = runNode(
+      ASSEMBLE_DMG,
+      [...CANONICAL_ASM_BASE, "--work-dir", formalWork],
+      { MINDMAP_DMG_CLEANUP_GRACE_MS: "1000" },
+    );
+    expect(formalAssembler.status).toBe(1);
+    expect(formalAssembler.stderr).toMatch(/正式模式禁止覆盖清理宽限/);
+
+    const formalGate = runNode(
+      BUNDLE_GATE,
+      [
+        "--host",
+        "tauri",
+        "--assemble-dmg",
+        "--dmg-format",
+        "ULMO",
+        "--work-dir",
+        formalWork,
+        "--",
+        ...R2_APP_ONLY_COMMAND,
+      ],
+      { MINDMAP_DMG_CLEANUP_GRACE_MS: "1000" },
+    );
+    expect(formalGate.status).toBe(1);
+    expect(formalGate.stderr).toMatch(/正式仓库禁止环境变量覆盖清理宽限/);
+    expect(formalGate.stdout).not.toContain("bundle-gate: PASS");
+    expect(existsSync(join(ROOT, dirname(formalWork)))).toBe(false);
+  }, 30000);
 
   it("F2-b 清理阶段一次成功即可：正常全流程 cleanupMs 为 0 且不启动清理子进程", () => {
     const { repoDir, regPath, toolDir } = createAssemblyFixture("f2-no-cleanup");

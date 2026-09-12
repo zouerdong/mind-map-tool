@@ -78,6 +78,7 @@ import {
   SYSTEM_TOOL_PATHS,
   DMG_TOOL_NAMES,
   DMG_CLEANUP_GRACE_MS,
+  DMG_CLEANUP_GRACE_ENV,
   validateInjectionPath,
   validateInjectedToolSet,
   validateDmgWorkDir,
@@ -87,7 +88,7 @@ import {
   createTaskRootAtomically,
   classifyProcessResult,
 } from "./dmg-assembly-contract.mjs";
-import { createBudgetContext, elapsedMs, timeoutFor, remainingMs } from "./dmg-budget.mjs";
+import { createBudgetContext, splitRunTimings, timeoutFor, remainingMs } from "./dmg-budget.mjs";
 import { RELEASE_BUDGETS } from "./release-budgets.mjs";
 import {
   buildLicenseResourceXmlFromFile,
@@ -115,7 +116,6 @@ const DEFAULT_DEADLINE_MS = 180_000;
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_DEADLINE_MS = 180_000;
 // PRR-069C-R2-F1：fixture 专用的清理宽限缩短入口（正式模式设置即 fail-closed）。
-const ENV_CLEANUP_GRACE = "MINDMAP_DMG_CLEANUP_GRACE_MS";
 
 const TOOLS = SYSTEM_TOOL_PATHS;
 
@@ -199,10 +199,6 @@ function cleanupBudget() {
   return cleanupCtx;
 }
 
-function cleanupElapsedMs() {
-  return cleanupCtx === null ? 0 : elapsedMs(cleanupCtx);
-}
-
 /** 清理阶段可用的预算上下文：失败接管与清理一律用 cleanup，正常流程用 assembly。 */
 function budgetContext(kind) {
   return kind === "cleanup" ? cleanupBudget() : assemblyCtx;
@@ -213,16 +209,16 @@ function budgetContext(kind) {
  * 以便在不真实等待 60 秒的前提下验证"预算耗尽即不启动子进程"；正式模式设置即失败。
  */
 function resolveCleanupGraceMs() {
-  const raw = process.env[ENV_CLEANUP_GRACE];
+  const raw = process.env[DMG_CLEANUP_GRACE_ENV];
   if (!raw) return DMG_CLEANUP_GRACE_MS;
   if (IS_PRODUCTION) {
     fail(
-      `正式模式禁止覆盖清理宽限（固定 ${DMG_CLEANUP_GRACE_MS}ms，不得放大或调小）: ${ENV_CLEANUP_GRACE}`,
+      `正式模式禁止覆盖清理宽限（固定 ${DMG_CLEANUP_GRACE_MS}ms，不得放大或调小）: ${DMG_CLEANUP_GRACE_ENV}`,
     );
   }
   const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value <= 0 || value > DMG_CLEANUP_GRACE_MS) {
-    fail(`${ENV_CLEANUP_GRACE} 必须是不超过 ${DMG_CLEANUP_GRACE_MS} 的正整数：${raw}`);
+  if (!Number.isSafeInteger(value) || value <= 0 || value >= DMG_CLEANUP_GRACE_MS) {
+    fail(`${DMG_CLEANUP_GRACE_ENV} 必须是小于 ${DMG_CLEANUP_GRACE_MS} 的正整数：${raw}`);
   }
   return value;
 }
@@ -240,8 +236,7 @@ function fail(message) {
     cleanupOnFailure();
   }
   // 序列化时才取真实终值：清理未开始才是 0，UNKNOWN 也必须记录已花费时间。
-  const cleanupMs = cleanupElapsedMs();
-  const assemblyMs = elapsedMs(assemblyCtx);
+  const timings = splitRunTimings(assemblyCtx, cleanupCtx);
   const record = {
     status: "failed",
     runner: "assemble-dmg.mjs",
@@ -251,14 +246,12 @@ function fail(message) {
     startedAt: new Date(assemblyStartedMs).toISOString(),
     finishedAt: new Date().toISOString(),
     // 总耗时 = 装配段 + 清理段（同一单调时钟基准），由两段现算得出。
-    elapsedMs: assemblyMs + cleanupMs,
+    elapsedMs: timings.totalElapsedMs,
     // 装配预算固定值：失败记录同样声明，证明清理宽限没有放宽或顶替装配预算。
     timeoutMs,
     deadlineMs,
     timings: {
-      assemblyMs,
-      cleanupMs,
-      totalElapsedMs: assemblyMs + cleanupMs,
+      ...timings,
       cleanupGraceMs,
       cleanupStarted: cleanupCtx !== null,
       cleanupStatus,
@@ -273,7 +266,7 @@ function fail(message) {
     mountState,
     cleanup: {
       graceMs: cleanupGraceMs,
-      elapsedMs: cleanupMs,
+      elapsedMs: timings.cleanupMs,
       status: cleanupStatus,
       attempts: cleanupAttempts,
     },
@@ -337,25 +330,82 @@ function cleanupOnFailure() {
       );
     }
   } else if (mountpoint) {
-    // 只有 pending 登记（未能在 mount table 中确认归属）：不执行未证明归属的卸载，
-    // 保留 pending/residual 结构化证据并 STOP，绝不能把“无法确认”报告成已清理。
-    mountState = "UNKNOWN";
-    cleanupStatus = "UNKNOWN";
-    residualMount = residualMount ?? {
-      device,
-      mountpoint,
-      reason: "cleanup: 仅有 pending 登记，未能在 mount table 中确认归属",
-    };
-    console.error(
-      `assemble-dmg: STOP — 失败清理时无法确认挂载归属（仅有 pending 登记 ${mountpoint}），` +
-        "不执行未证明归属的卸载，保留 pending/active/residual 结构化证据与现场，等待人工检查",
-    );
+    // attach 可能恰好用尽装配预算：此时正常对账无法启动，但清理宽限仍必须用于
+    // exact mountpoint 的归属确认。确认属于本轮才接管并卸载；查不到则证明该挂载点
+    // 当前不存在；表不可用时保持 UNKNOWN，绝不盲目卸载。
+    const outcome = reconcilePendingMountDuringCleanup(mountpoint);
+    mountState = outcome;
+    cleanupStatus = outcome;
+    if (outcome === "CLEAN") {
+      residualMount = null;
+    } else {
+      residualMount = residualMount ?? {
+        device,
+        mountpoint,
+        reason: `cleanup: pending 挂载归属确认/回收未能证明无残留（${outcome}）`,
+      };
+    }
   }
   // 失败时保留本轮运行目录（staging/临时镜像/命令日志现场），供独立复算；
   // 该目录只位于本卡授权的任务临时范围内，不会成为下一次装配的输入。
   if (activeRunDir) {
     console.error(`assemble-dmg: 失败现场保留在 ${relative(ROOT, activeRunDir)}（仅本轮创建）`);
   }
+}
+
+/**
+ * 用唯一 cleanup context 接管尚未完成正常对账的 pending mount。
+ * 该路径只负责确认与回收，不会把原装配失败转换为成功。
+ */
+function reconcilePendingMountDuringCleanup(mountpoint) {
+  const ctx = cleanupBudget();
+  const attempt = {
+    stage: "cleanup-reconcile-pending",
+    mountpoint,
+    device: null,
+    budget: ctx.label,
+    startedAt: new Date().toISOString(),
+  };
+  let table;
+  try {
+    table = mountTable(ctx, "cleanup-reconcile-pending");
+  } catch (err) {
+    const exhausted =
+      err instanceof MountTableUnavailable && err.evidence?.budgetExhausted === true;
+    attempt.result = exhausted ? "RESIDUAL" : "UNKNOWN";
+    attempt.reason = exhausted
+      ? "清理预算耗尽，未能确认 pending 挂载归属"
+      : "mount table 不可用，未能确认 pending 挂载归属";
+    cleanupAttempts.push(attempt);
+    console.error(
+      `assemble-dmg: ${exhausted ? "RESIDUAL_MOUNT" : "STOP"} — ${attempt.reason}，` +
+        `保留 pending 与现场等待人工检查: ${mountpoint}`,
+    );
+    return attempt.result;
+  }
+
+  const entry = findExactMountInLines(table, mountpoint);
+  if (!entry) {
+    attempt.result = "CLEAN";
+    attempt.reason = "清理宽限内确认 exact mountpoint 不存在";
+    cleanupAttempts.push(attempt);
+    pendingMount = null;
+    return "CLEAN";
+  }
+
+  mountedDevice = entry.device;
+  mountedAt = mountpoint;
+  pendingMount = null;
+  attempt.device = entry.device;
+  attempt.result = "ACTIVE_CONFIRMED";
+  attempt.reason = "清理宽限内确认 pending 挂载属于本轮，转 active 后受控卸载";
+  cleanupAttempts.push(attempt);
+  return detachAndVerify({
+    mountpoint,
+    device: entry.device,
+    stage: "cleanup-pending-detach",
+    budget: "cleanup",
+  });
 }
 
 /** mount table 查询不可用（spawn 异常/超时/非零退出）时的结构化证据。 */
@@ -1350,11 +1400,9 @@ if (gitAfter.head !== gitBefore.head || gitAfter.status.length > 0) {
 const finishedMs = Date.now();
 // PRR-069C-R2-F1：耗时一律由单调时钟上下文给出，墙钟只用于审计时间戳。
 // 成功路径没有清理动作，因此 cleanupMs 恒为 0，assemblyMs 即总耗时。
-const assemblyMs = elapsedMs(assemblyCtx);
-const cleanupMs = cleanupElapsedMs();
-const elapsedMsTotal = assemblyMs + cleanupMs;
-if (assemblyMs > deadlineMs) {
-  fail(`装配阶段耗时 ${assemblyMs}ms 超过 deadline ${deadlineMs}ms`);
+const successTimings = splitRunTimings(assemblyCtx, cleanupCtx);
+if (successTimings.assemblyMs > deadlineMs) {
+  fail(`装配阶段耗时 ${successTimings.assemblyMs}ms 超过 deadline ${deadlineMs}ms`);
 }
 
 currentStage = "report";
@@ -1366,7 +1414,7 @@ const report = {
   sourceWorktree: "clean",
   startedAt: new Date(assemblyStartedMs).toISOString(),
   finishedAt: new Date(finishedMs).toISOString(),
-  elapsedMs: elapsedMsTotal,
+  elapsedMs: successTimings.totalElapsedMs,
   timeoutMs,
   deadlineMs,
   workDir: runDirRel,
@@ -1395,10 +1443,10 @@ const report = {
   // R2-01 / R2-F1：装配段与清理段分开声明（同一单调时钟基准）；
   // 成功路径没有清理动作，cleanupMs 恒为 0，totalElapsedMs 即 assemblyMs。
   timings: {
-    assemblyMs,
+    assemblyMs: successTimings.assemblyMs,
     cleanupGraceMs,
-    cleanupMs,
-    totalElapsedMs: elapsedMsTotal,
+    cleanupMs: successTimings.cleanupMs,
+    totalElapsedMs: successTimings.totalElapsedMs,
     cleanupStarted: cleanupCtx !== null,
     cleanupStatus,
   },

@@ -40,6 +40,25 @@ export function elapsedMs(ctx) {
   return Math.max(0, Math.round(ctx.nowMono() - ctx.startMono));
 }
 
+/**
+ * 把一次运行切成互不重叠的装配段与清理段。cleanupCtx 的起点就是两段边界；
+ * 只读取 runCtx 的同一单调时钟一次，避免分别取时造成毫秒级漂移或把清理重复计入总时长。
+ */
+export function splitRunTimings(runCtx, cleanupCtx = null) {
+  const endMono = Math.max(runCtx.startMono, runCtx.nowMono());
+  const boundaryMono = cleanupCtx
+    ? Math.min(endMono, Math.max(runCtx.startMono, cleanupCtx.startMono))
+    : endMono;
+  const totalElapsedMs = Math.max(0, Math.round(endMono - runCtx.startMono));
+  const assemblyMs = cleanupCtx
+    ? Math.min(totalElapsedMs, Math.max(0, Math.round(boundaryMono - runCtx.startMono)))
+    : totalElapsedMs;
+  // 只对总区间和边界前区间取整，余数归入 cleanup，避免两个子区间分别
+  // 四舍五入后出现 assembly + cleanup !== rounded(total) 的 1ms 漂移。
+  const cleanupMs = totalElapsedMs - assemblyMs;
+  return { assemblyMs, cleanupMs, totalElapsedMs };
+}
+
 /** 预算是否已耗尽（启动子进程前的显式判断，语义比 timeout === 0 更清楚）。 */
 export function isExhausted(ctx) {
   return remainingMs(ctx) < 1;
