@@ -73,9 +73,11 @@ class HoldingFilePort extends CountingFilePort {
   }
 }
 
-function setup(filePort: CountingFilePort = new CountingFilePort()) {
+function setup(
+  filePort: CountingFilePort = new CountingFilePort(),
+  renderer: InstanceType<typeof FakeExportRenderer> = new FakeExportRenderer(),
+) {
   const preferences = new FakePreferencesPort();
-  const renderer = new FakeExportRenderer();
   filePort.writeFile("/docs/a.json", encodeDocument(docWithNode("打开的文档")));
   filePort.nextOpenDialog = "/docs/a.json";
   const utils = render(
@@ -269,6 +271,74 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     );
     await waitFor(() => expect(screen.getByText(/空文档/)).toBeTruthy());
     expect(filePort.saveDialogCalls).toBe(calls); // buildScene 前置失败 → 不弹授权
+  });
+});
+
+describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）", () => {
+  it("面板显示四种格式且 Graph JSON 首位；导出落盘可解析（§3.6）", async () => {
+    const { filePort } = setup();
+    await createNodeViaCanvas();
+
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    const panel = await screen.findByTestId("export-panel");
+    const ids = [...panel.querySelectorAll("button[data-testid]")].map((b) =>
+      b.getAttribute("data-testid"),
+    );
+    expect(ids).toEqual(["export-graph-json", "export-svg", "export-png", "export-pdf"]);
+    expect(panel.textContent).toContain("Graph JSON（供 Agent）");
+
+    filePort.nextSaveDialog = "/out/map.graph.json";
+    fireEvent.click(screen.getByTestId("export-graph-json"));
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.graph\.json/)).toBeTruthy());
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.graph.json")!));
+    expect(g.format).toBe("mindmap-graph-json");
+    expect(g.version).toBe(1);
+    expect(g.meta.nodeCount).toBeGreaterThanOrEqual(1);
+    expect(g.graph.nodes.length).toBe(g.meta.nodeCount);
+    // 面板成功后关闭
+    expect(screen.queryByTestId("export-panel")).toBeNull();
+  });
+
+  it("编辑中的文字先 flush 再进 Graph JSON snapshot（§3.5：未提交输入不丢失）", async () => {
+    const { filePort } = setup();
+    await createNodeViaCanvas();
+    // 面板保持打开（非模态 overlay），同时节点进入编辑态留有未提交文字
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    await screen.findByTestId("export-panel");
+    fireEvent.doubleClick(screen.getAllByTestId(/^rf-node-/)[0]!);
+    const editor = await screen.findByLabelText("编辑节点文本");
+    fireEvent.change(editor, { target: { value: "编辑中的未提交文字" } });
+
+    filePort.nextSaveDialog = "/out/flush.graph.json";
+    fireEvent.click(screen.getByTestId("export-graph-json"));
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/flush\.graph\.json/)).toBeTruthy());
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/flush.graph.json")!));
+    expect(g.graph.nodes.some((n: { text: string }) => n.text === "编辑中的未提交文字")).toBe(true);
+  });
+
+  it("字体资源失败：Graph JSON 仍可导出，视觉格式仍被 barrier 阻断（§3.4）", async () => {
+    const filePort = new CountingFilePort();
+    const renderer = new FakeExportRenderer();
+    renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
+    setup(filePort, renderer);
+    await createNodeViaCanvas();
+
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    filePort.nextSaveDialog = "/out/nofont.graph.json";
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector(
+        '[data-testid="export-graph-json"]',
+      )!,
+    );
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.graph\.json/)).toBeTruthy());
+    expect(renderer.rendered.length).toBe(0); // 渲染管线零调用
+
+    // 同一状态下视觉格式不回归：字体失败仍阻断并给出 notice
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    fireEvent.click(
+      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!,
+    );
+    await waitFor(() => expect(screen.getByText(/字体资源加载失败，无法导出/)).toBeTruthy());
   });
 });
 

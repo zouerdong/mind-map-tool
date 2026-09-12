@@ -397,6 +397,16 @@ export function AppHeader({
               style={menuItemStyle}
               onClick={() => {
                 setViewMenuOpen(false);
+                onExport("graph-json");
+              }}
+            >
+              <span>导出 Graph JSON（供 Agent）</span>
+            </button>
+            <button
+              type="button"
+              style={menuItemStyle}
+              onClick={() => {
+                setViewMenuOpen(false);
                 onExport("svg");
               }}
             >

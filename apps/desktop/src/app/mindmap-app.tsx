@@ -47,7 +47,7 @@ import {
   saveFlow,
   whenSavesSettled,
 } from "./file-commands.js";
-import { exportFlow, type ExportFormat } from "./export-commands.js";
+import { EXPORT_PANEL_FORMATS, exportFlow, type ExportFormat } from "./export-commands.js";
 import { normalizeShortcut } from "./keyboard.js";
 
 type Notice = { tone: "info" | "error"; text: string } | null;
@@ -534,15 +534,21 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, [applyCloseState, closePort]);
   const onExport = useCallback(
     async (format: ExportFormat) => {
-      try {
-        activeEditorRef.current?.flush();
-        await geometryBarrier.flush();
-      } catch (e) {
-        setNotice({
-          tone: "error",
-          text: `字体资源加载失败，无法导出：${e instanceof Error ? e.message : String(e)}`,
-        });
-        return;
+      // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
+      // 必须包含未提交的编辑中文字）。
+      activeEditorRef.current?.flush();
+      // 字体/geometry barrier 只约束三种视觉导出；Graph JSON 不进渲染管线，
+      // 字体资源失败不得阻断该格式（PRR-070-R2 §2.5）。
+      if (format !== "graph-json") {
+        try {
+          await geometryBarrier.flush();
+        } catch (e) {
+          setNotice({
+            tone: "error",
+            text: `字体资源加载失败，无法导出：${e instanceof Error ? e.message : String(e)}`,
+          });
+          return;
+        }
       }
       const result = await exportFlow(
         session,
@@ -1136,14 +1142,14 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           }}
         >
           <strong>导出当前脑图</strong>
-          {(["svg", "png", "pdf"] as const).map((f) => (
+          {EXPORT_PANEL_FORMATS.map(({ format: f, label }) => (
             <button
               key={f}
               type="button"
               onClick={() => void onExport(f)}
               data-testid={`export-${f}`}
             >
-              {f.toUpperCase()}
+              {label}
             </button>
           ))}
           <button type="button" onClick={() => setExportPanel(false)}>

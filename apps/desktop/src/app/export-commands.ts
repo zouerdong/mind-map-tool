@@ -1,12 +1,22 @@
 // 导出流（MM-080 ⑤）：唯一 renderer owner = web-ts-wasm（G1）。
-// 一次性 export 授权 → buildScene → 三格式之一 → commitExport 落盘。
+// 一次性 export 授权 → buildScene → 三视觉格式之一 → commitExport 落盘。
 // 不含 UI overlay（selection/onboarding/viewport 绝不进导出，ADR/MM-040 契约）。
+// Graph JSON（PRR-070-R2）：第四格式，纯数据序列化（encodeGraphJson），
+// 不进渲染管线——不 buildScene、不依赖字体/WASM/画布截图。
 
 import type { DocumentSession } from "@mindmap/core";
 import { PlatformError, type FilePort } from "@mindmap/platform";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 
-export type ExportFormat = "svg" | "png" | "pdf";
+export type ExportFormat = "graph-json" | "svg" | "png" | "pdf";
+
+/** 导出面板展示顺序与文案（PRR-070-R2 §2.4：Graph JSON 固定首位）。 */
+export const EXPORT_PANEL_FORMATS: ReadonlyArray<{ format: ExportFormat; label: string }> = [
+  { format: "graph-json", label: "Graph JSON（供 Agent）" },
+  { format: "svg", label: "SVG" },
+  { format: "png", label: "PNG（2x）" },
+  { format: "pdf", label: "PDF" },
+];
 
 /** renderer 接口（@mindmap/export ExportRenderer 的结构子集；测试用 fake）。 */
 export interface ExportRendererLike {
@@ -53,6 +63,8 @@ export class ExportRendererError extends Error {
 export function exportSuggestedName(session: DocumentSession, format: ExportFormat): string {
   const display = session.displayPath;
   const base = (display?.split(/[\\/]/).pop() ?? "未命名").replace(/\.[^.]*$/, "");
+  // graph-json 的稳定扩展名是 .graph.json（双段），不是裸 format 拼接
+  if (format === "graph-json") return `${base}.graph.json`;
   return `${base}.${format}`;
 }
 
@@ -61,9 +73,25 @@ export async function exportFlow(
   deps: { filePort: FilePort; renderer: ExportRendererLike },
   format: ExportFormat,
 ): Promise<ExportResult> {
-  const sceneResult = await deps.renderer.buildScene(session.current.document);
-  if (!sceneResult.ok)
-    return { kind: "error", code: sceneResult.error.code, message: sceneResult.error.message };
+  // 目标选择前冻结导出内容（授权对话框期间文档可继续变化，本次导出保持
+  // 打开面板那一刻的快照）：
+  // - graph-json：直接 encodeGraphJson，不触碰 renderer（buildScene/字体/
+  //   WASM/几何全不依赖——renderer 或字体资源不可用时该格式仍可导出）；
+  // - 视觉三格式：buildScene 前置（PRR-066 结构化失败在授权前返回）。
+  let frozenBytes: Uint8Array | null = null;
+  let scene: unknown;
+  if (format === "graph-json") {
+    // 动态导入与 ports.ts 的 LazyTauriExportRenderer 同模式（ADR 0011：
+    // 导出栈不占首屏 entry）；这里只加载纯序列化模块代码——字体/WASM
+    // 资源由 renderer 实例在视觉格式路径才加载，本分支零依赖。
+    const { encodeGraphJson } = await import("@mindmap/export");
+    frozenBytes = encodeGraphJson(session.current.document);
+  } else {
+    const sceneResult = await deps.renderer.buildScene(session.current.document);
+    if (!sceneResult.ok)
+      return { kind: "error", code: sceneResult.error.code, message: sceneResult.error.message };
+    scene = sceneResult.scene;
+  }
 
   let grant;
   try {
@@ -78,13 +106,11 @@ export async function exportFlow(
 
   let bytes: Uint8Array;
   try {
-    if (format === "svg") bytes = await deps.renderer.renderSvg(sceneResult.scene);
+    if (frozenBytes !== null) bytes = frozenBytes;
+    else if (format === "svg") bytes = await deps.renderer.renderSvg(scene);
     else if (format === "png")
-      bytes = await deps.renderer.renderPng(
-        await deps.renderer.renderSvg(sceneResult.scene),
-        sceneResult.scene,
-      );
-    else bytes = await deps.renderer.renderPdf(sceneResult.scene);
+      bytes = await deps.renderer.renderPng(await deps.renderer.renderSvg(scene), scene);
+    else bytes = await deps.renderer.renderPdf(scene);
   } catch (e) {
     return toError(e);
   }
