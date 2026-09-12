@@ -1,9 +1,9 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B 已独立接受，见[阶段 B 独立审阅](../quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](./prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。
+2026-09-12 当前派发更新：`PRR-070_STOPPED / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`。原 PRR-070 的 VoiceOver 自动化门已由负责人决定精简；当前唯一执行入口为 [PRR-070-R1](./prr-070-r1-lean-release-validation-task-card-2026-09-12.md)。下文旧 PRR-070 完整矩阵仅保留历史协议，不再作为当前派发指令。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`
+状态：`IN_PROGRESS / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)

@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B 已独立接受，见[阶段 B 独立审阅](../quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前唯一执行入口为[PRR-070 阶段 A 任务卡](./prr-070-native-candidate-stage-a-task-card-2026-09-12.md)。
+2026-09-12 当前派发更新：`PRR-070_STOPPED / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`。负责人已要求按小型本地工具的真实风险精简发布验收，不再要求 VoiceOver 自动化权限。当前唯一执行入口为 [PRR-070-R1](./prr-070-r1-lean-release-validation-task-card-2026-09-12.md)。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`
+状态：`IN_PROGRESS / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)

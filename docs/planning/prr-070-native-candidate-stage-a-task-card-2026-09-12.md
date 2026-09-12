@@ -1,6 +1,9 @@
 # PRR-070 阶段 A：唯一候选与完整原生矩阵
 
-状态：`READY_FOR_EXECUTION / G-FINAL_NOT_REQUESTED`。优先级 P0。
+状态：`STOPPED / SUPERSEDED_BY_PRR-070-R1 / G-FINAL_NOT_REQUESTED`。
+
+2026-09-12：本卡执行到 VoiceOver 自动化权限门后停止。负责人随后要求按小型本地工具的真实风险精简发布验收，且不再要求打开 VoiceOver。本卡不得继续执行；唯一后继入口为
+[PRR-070-R1 精简发布验收与原生测试修正](./prr-070-r1-lean-release-validation-task-card-2026-09-12.md)。下文只保留历史执行协议，不再作为当前指令。
 
 这是当前唯一可执行任务。前置 [PRR-069C-R2-F1 阶段 B 独立审阅](../quality/prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)
 已经 `ACCEPT`。执行时以包含本卡和独立审阅的最新 clean HEAD 为 `SourceCommit`；必须是
