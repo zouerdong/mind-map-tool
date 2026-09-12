@@ -1,6 +1,8 @@
 # PRR-070-R2：接通 Graph JSON 桌面导出
 
-状态：`READY_FOR_EXECUTION / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`。优先级 P0。
+状态：`ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。
+
+2026-09-12 独立审阅：实施 commit `621091b` 的桌面接线、Graph JSON 契约和四格式冒烟接受。审阅发现并直接修复一项数据正确性边界：字体失败且仍有 pending geometry intent 时，原实现可能成功导出旧 session/空图；review commit `c3b4c8c` 改为无 pending 时保持字体独立，有 pending 时先 flush，失败则明确阻止，并补充 21 项定向测试通过。最终 clean source `c3b4c8c9262d536d22526aa4d16157289f77e43a`；最终 unsigned app SHA-256 `83c36977cc9b5343844eb076d4298eb6d6b2ac434cd8977e2538370bc9c9b224`，ULMO DMG SHA-256 `21d2d0525bccd4ee87a1055d00a48df8b9f52c3a16ed6cdab06c7efcc9c0b1ed`。当前停在负责人本机 dogfood，不进入 G-FINAL/PRR-080/090。
 
 ## 1. 根因与目标
 
@@ -97,4 +99,3 @@ NotRun: advisory / performance / full native matrix / G-FINAL / PRR-080/090 / si
 Risks: <真实遗留；无则 none>
 Next: STOP_FOR_INDEPENDENT_REVIEW
 ```
-

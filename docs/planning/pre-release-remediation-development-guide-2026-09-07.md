@@ -1,9 +1,9 @@
 # 发布前终审整改开发指南（PRR 批次）
 
-2026-09-12 当前派发更新：`PRR-070-R1_ACCEPTED / PRR-070-R2_READY / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`。R1 测试修正已接受；当前唯一执行入口为 [PRR-070-R2](./prr-070-r2-graph-json-desktop-integration-task-card-2026-09-12.md)，只接通遗漏的 Graph JSON 桌面导出并做四格式定向冒烟。
+2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`。Graph JSON 桌面导出及审阅修复已完成；当前无 Coding 任务，等待负责人本机安装试用。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / PRR-070-R2_READY / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`
+状态：`IN_PROGRESS / PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_READY / G-FINAL_NOT_REQUESTED`
 适用范围：PRC-000～PRC-090 执行后、公开发布动作前  
 输入：[发布前全面代码审阅](../quality/pre-release-code-review-2026-09-07.md)  
 任务卡：[pre-release-remediation-task-cards-2026-09-07.md](./pre-release-remediation-task-cards-2026-09-07.md)
