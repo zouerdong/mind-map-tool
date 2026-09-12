@@ -7,9 +7,9 @@
 // - selection 与 viewport 是 session-only，绝不进入命令或文件。
 // 命令失败（CommandError）返回 false：core 状态未变，投影保持一致。
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Command, DocumentSession } from "@mindmap/core";
-import { projectDocument, projectionIsStable } from "../projection/projection.js";
+import { projectDocument } from "../projection/projection.js";
 
 export interface CanvasSessionApi {
   /** 自增版本号：core 状态变化（内部 commit/undo/redo 或外部 revision）的信号。 */
@@ -33,16 +33,11 @@ export function useCanvasSession(session: DocumentSession, externalRevision = 0)
   const versionRef = useRef(0);
   const documentVersion = internalVersion + externalRevision;
 
-  const projected = useMemo(
-    () => projectDocument(session.current.document),
-    // documentVersion 显式驱动重投影（session 是可变容器，identity 不变）。
-    [session, documentVersion],
-  );
-
-  // 契约自检：core 投影必须始终自洽（contract tests 持续锁定同一断言）。
-  if (!projectionIsStable(session.current.document, projected)) {
-    throw new Error("projection drift: core document 与投影不一致");
-  }
+  // 投影纯函数的自洽性由 projection contract tests 锁定。不要在生产 render
+  // 路径把可变 session 与上一版本的缓存投影比较并抛错：外部命令与 React
+  // state 通知之间即使只存在一个微任务窗口，也会把整张画布替换成错误页，
+  // 对用户数据没有任何保护作用。所有正式变更仍必须经下方 commit/undo/redo
+  // 或 externalRevision 驱动重投影。
 
   const bump = useCallback(() => {
     versionRef.current += 1;
