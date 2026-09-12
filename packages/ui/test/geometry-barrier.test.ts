@@ -469,14 +469,22 @@ describe("PRR-040 set-document-font 意图", () => {
 
   it("ready 后用目标字体重测全部节点并作为单条命令提交；一步 undo 恢复旧字体与全部旧 size", async () => {
     const session = seededSession();
+    const onCommitted = vi.fn();
     const barrier = new GeometryBarrier({
       session,
       getMetricsState: () => "ready",
       whenMetricsReady: () => Promise.resolve(NOTO_FONTS),
       getFallbackFonts: () => NOTO_FONTS,
+      onCommitted,
     });
 
-    await barrier.enqueue({ kind: "set-document-font", font: "lxgw-wenkai" });
+    const pending = barrier.enqueue({ kind: "set-document-font", font: "lxgw-wenkai" });
+
+    // 回归真实 WebView 竞态：core commit 与 React 版本信号不能隔一个
+    // Promise 微任务，否则 selection state 先重渲染会触发 projection drift。
+    expect(session.current.document.document.font).toBe("lxgw-wenkai");
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    await pending;
 
     expect(session.current.document.document.font).toBe("lxgw-wenkai");
     // 目标字体 advance=25：两字宽度 50 + 20 padding（measureNodeVisual 口径）

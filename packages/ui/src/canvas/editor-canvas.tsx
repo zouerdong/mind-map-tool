@@ -829,7 +829,7 @@ export function EditorCanvas({
                   const measured = node
                     ? measureNodeVisual({ ...node, kicker: command.kicker }, fontId, fonts)
                     : undefined;
-                  session.commit({
+                  api.commit({
                     ...command,
                     ...(measured !== undefined ? { measured } : {}),
                   });
@@ -845,7 +845,7 @@ export function EditorCanvas({
                 } else {
                   const fontId = documentDefaults(session.current.document).font;
                   const box = measureNodeBox(command.text, command.runs, fontId, fonts);
-                  session.commit({
+                  api.commit({
                     ...command,
                     size: { width: box.width, height: box.height },
                   });
@@ -859,10 +859,10 @@ export function EditorCanvas({
                 if (geometryBarrier) {
                   void geometryBarrier.enqueue({ kind: "set-document-font", font: command.font });
                 } else {
-                  session.commit(command);
+                  api.commit(command);
                 }
               } else {
-                session.commit(command); // 版本号驱动重投影（useCanvasSession）
+                api.commit(command); // commit 与版本信号必须走同一原子通道
               }
             }}
           />

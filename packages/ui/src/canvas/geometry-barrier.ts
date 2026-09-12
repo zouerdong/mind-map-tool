@@ -79,9 +79,18 @@ export class GeometryBarrier {
     if (this.disposed) return Promise.resolve();
     const state = this.options.getMetricsState();
     if (state === "ready") {
-      return this.commitIntent(intent, this.options.getFallbackFonts()).then(() => {
+      // ready 分支必须在同一调用栈内同时完成 core commit 与版本通知。
+      // DocumentSession 是可变容器；若把 onCommitted 延迟到 Promise 微任务，
+      // React Flow 可能先因 selection 等 UI state 重渲染，形成“core 已变、
+      // projection version 未变”的短暂窗口并触发 projection drift。
+      try {
+        this.commitIntent(intent, this.options.getFallbackFonts());
         this.options.onCommitted?.();
-      });
+        return Promise.resolve();
+      } catch (error) {
+        this.options.onError?.(error);
+        return Promise.reject(error);
+      }
     }
 
     // pending/failed 态：都只记录意图，不允许 fallback 几何进入 session。
@@ -193,7 +202,7 @@ export class GeometryBarrier {
         const intent = this.queue.shift();
         if (!intent) break;
         try {
-          await this.commitIntent(intent, fonts);
+          this.commitIntent(intent, fonts);
           committedAny = true;
         } catch (error) {
           if (!this.disposed) this.queue.unshift(intent);
@@ -207,7 +216,7 @@ export class GeometryBarrier {
     }
   }
 
-  private async commitIntent(intent: GeometryIntent, fonts: FontResolver): Promise<void> {
+  private commitIntent(intent: GeometryIntent, fonts: FontResolver): void {
     if (this.disposed) return;
     const doc = this.options.session.current.document;
     const fontId = documentDefaults(doc).font;

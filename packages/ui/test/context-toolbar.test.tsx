@@ -99,6 +99,18 @@ describe("上下文工具条（VRA-050）", () => {
     });
   });
 
+  it("工具条命令提交后立即重投影，不留下会触发 projection drift 的旧版本", async () => {
+    const { session } = renderCanvas();
+    await selectNode("a");
+
+    fireEvent.click(screen.getByTitle("文档字体切换（当前 noto-sans-sc）"));
+
+    await waitFor(() => {
+      expect(session.current.document.document.font).toBe("lxgw-wenkai");
+      expect(screen.getByTitle("文档字体切换（当前 lxgw-wenkai）")).toBeTruthy();
+    });
+  });
+
   it("眉题输入（失焦提交）→ SetNodeKicker；清空 = 移除眉题", async () => {
     const { session } = renderCanvas();
     await selectNode("b");
