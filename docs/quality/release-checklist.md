@@ -1,8 +1,8 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-2026-09-11 当前派发更新：`R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2-F1 阶段 A 已按修复指南实施：进程结果与 EULA 语义分离（超时/信号/spawn error 不再被当作正常拒绝）、清理共用单一单调时钟截止时间并记录真实耗时、正式任务根由 assembler 原子创建（历史任务根一律拒绝）。红灯先行后修复，源码门全绿（release-runners 129/129、unit 651）。执行侧自述见[阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)，等待独立代码审阅；完整卡与协议见[R2-F1 修复指南与任务卡](../planning/prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。阶段 B 三轮原生预检不因阶段 A 通过而自动解锁；PRR-070/080/090 与 G-FINAL 保持阻塞。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](./prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](../planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，本清单不放行 PRR-070/080/090 或 G-FINAL。
 
-状态：**IN_PROGRESS / R2_REVISE / R2-F1_STAGE_A_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。R2 已按页首任务卡完成实现与三轮预检；R2-F1 阶段 A 已按修复指南完成返修（source `3214809`，源码门全绿），等待独立代码审阅；阶段 B 原生预检未执行，本清单仍未放行。
+状态：**IN_PROGRESS / R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED / NOT_READY_TO_RELEASE**。阶段 B 原生预检尚未执行，本清单仍未放行。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -23,7 +23,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | active document handle | PASS AT SOURCE REVIEW | PRR-050 已实现 handle 回收与生命周期测试；PRR-070 原生矩阵复核 |
 | CSP / 网络端点 | PASS AT PRR-066 REVIEW | production CSP 只增加 `'wasm-unsafe-eval'`；network scan 为0 endpoint；PRR-070 同源复核 |
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
-| DMG 装配可重复性 | STAGE A EXECUTED ON `3214809` / STOP_FOR_CODE_REVIEW | R2-F1 阶段 A 已闭合进程异常分类、清理单一截止时间与任务根原子创建；阶段 B 三轮原生预检未执行、不因阶段 A 自动解锁 |
+| DMG 装配可重复性 | STAGE A ACCEPTED ON `0da0d40` / STAGE B READY | R2-F1 阶段 A 已独立接受；阶段 B 三轮原生预检尚未执行，PRR-070 继续阻塞 |
 | source/evidence 时间拓扑 | PASS ON PRR-069C-R1 ATTEMPTS / HISTORICAL / R2 REQUIRED | R1 三轮证据为机器生成 UTC 且阈值未放宽（120000/180000 精确）；`b45dc0c` 与原 PRR-069C attempts 仍只读作废；PRR-070 从新 clean HEAD 重新取证 |
 | G-FINAL | MISSING / EXPECTED | 本轮在步骤 4 STOP，未生成请求；只有新 PRR-070 阶段 A 全绿后才可请求负责人原文 |
 | Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |

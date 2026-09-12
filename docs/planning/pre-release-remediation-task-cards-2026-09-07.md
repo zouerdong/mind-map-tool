@@ -1,9 +1,9 @@
 # 发布前终审整改任务卡（PRR-000～PRR-090）
 
-2026-09-11 当前派发更新：`R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2-F1 阶段 A 已按修复指南实施：进程结果与 EULA 语义分离（超时/信号/spawn error 不再被当作正常拒绝）、清理共用单一单调时钟截止时间并记录真实耗时、正式任务根由 assembler 原子创建（历史任务根一律拒绝）。红灯先行后修复，源码门全绿（release-runners 129/129、unit 651）。执行侧自述见[阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)，等待独立代码审阅；完整卡与协议见[R2-F1 修复指南与任务卡](./prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。阶段 B 三轮原生预检不因阶段 A 通过而自动解锁；PRR-070/080/090 与 G-FINAL 保持阻塞。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](../quality/prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](./prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。
 
 日期：2026-09-07  
-状态：`IN_PROGRESS / R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`
+状态：`IN_PROGRESS / R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`
 指南：[pre-release-remediation-development-guide-2026-09-07.md](./pre-release-remediation-development-guide-2026-09-07.md)  
 审阅输入：[pre-release-code-review-2026-09-07.md](../quality/pre-release-code-review-2026-09-07.md)
 当前审阅：[prr-000-050-implementation-review-2026-09-07.md](../quality/prr-000-050-implementation-review-2026-09-07.md)
@@ -552,7 +552,7 @@ Coding Agent 已停止并等待 PRR-065；请建立任务卡后再开始。
 类型：候选构建 / 原生验收  
 优先级：P0  
 状态：`BLOCKED_BY_PRR-069C-R2`（PRR-069C 独立审阅结论为 `REVISE`；原三轮预检不得作为 PRR-070 输入）
-依赖：PRR-000～069 已集成并经独立审阅；PRR-069C-R2 实现与再次独立审阅通过；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
+依赖：PRR-000～069 已集成并经独立审阅；PRR-069C-R2-F1 阶段 B 三轮原生预检与再次独立审阅通过；包含全部收口的新 clean source commit；G2 `approved`（ErDong Zou，2026-09-08）
 后继：阶段 A 证据齐备后停在 `WAITING_FOR_OWNER_G_FINAL`；负责人明确批准后完成阶段 B，再单独派发 PRR-080
 
 ### 目标

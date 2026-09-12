@@ -1,8 +1,12 @@
 # PRR-069C-R2-F1：修复指南与分阶段任务卡
 
-状态：`STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW`；优先级 P1；阶段 B 未派发。
+状态：`STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`；优先级 P1。
 
-阶段 A 执行结果：source `32148097aaf9f7a9da0a7de8996de8583ad3c2d0`（clean），实施报告 [阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)；源码门全绿（release-runners 129/129、unit 651、integration/icon/build/cargo/clippy/diff-check）。本卡 §7 阶段 B 与 PRR-070 仍未解锁，需独立代码审阅接受并给出新 clean 基线。
+阶段 A 执行结果：原 source `32148097aaf9f7a9da0a7de8996de8583ad3c2d0`；独立审阅后局部修复 source
+`0da0d406a3d9b9041921d470363d7db52d5f59f9`。源码门全绿（release-runners 132/132、unit 654、
+integration/icon/build/cargo/clippy/diff-check），见[阶段 A 报告](../quality/prr-069c-r2-f1-stage-a-report-2026-09-11.md)
+与[独立审阅](../quality/prr-069c-r2-f1-independent-review-2026-09-12.md)。阶段 B 已通过
+[独立任务卡](./prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)派发；PRR-070 仍未解锁。
 
 基线：包含本文及状态同步的新 clean HEAD，必须为 `7d496a849a06c3149be706f4febe675f8503885f` 的后代。不得回退源码。
 
@@ -137,9 +141,10 @@ gate和直接assembler分别测：旧任务根仅logs、仅文件、空、已有
 
 允许文件：上述明确的runner/helper/test、package.json限定参数、README、当前规划与状态文档、R2报告勘误、新阶段报告。`g2-scope.mjs`无需继续改动。超过此范围说明必要性并停下。
 
-## 7. 任务卡 B：三轮原生预检（暂不派发）
+## 7. 任务卡 B：三轮原生预检（已转独立任务卡派发）
 
-前置：阶段A独立代码审阅明确接受并给出新的clean基线；不能凭自身测试通过解锁。
+前置已满足。执行以 [2026-09-12 阶段 B 独立任务卡](./prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)
+为唯一准绳；本节保留原协议概要，不再单独构成执行入口。
 
 接受后从同一clean source独立build+装配三轮，使用 `.tmp/prr-069c-r2-f1-<完整source>-attempt-01/work` 等全新任务根；日志和inventory/report放入 `.tmp/release-candidate/prr-069c-r2-f1-<完整source>-attempt-01/`，不得预建工作树。02/03同构。
 

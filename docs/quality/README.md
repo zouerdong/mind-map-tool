@@ -1,6 +1,6 @@
 # Quality
 
-2026-09-11 当前派发更新：`R2-F1_STAGE_A_EXECUTED / STOP_FOR_CODE_REVIEW / PRR-070_BLOCKED`。R2-F1 阶段 A 已按修复指南实施：进程结果与 EULA 语义分离（超时/信号/spawn error 不再被当作正常拒绝）、清理共用单一单调时钟截止时间并记录真实耗时、正式任务根由 assembler 原子创建（历史任务根一律拒绝）。红灯先行后修复，源码门全绿（release-runners 129/129、unit 651）。执行侧自述见[阶段 A 报告](./prr-069c-r2-f1-stage-a-report-2026-09-11.md)，等待独立代码审阅；完整卡与协议见[R2-F1 修复指南与任务卡](../planning/prr-069c-r2-f1-repair-guide-and-task-card-2026-09-11.md)。阶段 B 三轮原生预检不因阶段 A 通过而自动解锁；PRR-070/080/090 与 G-FINAL 保持阻塞。下文 R2 执行报告与正常预检保留历史事实，不表示独立验收通过；旧路线与本更新冲突时，以本更新为准。
+2026-09-12 当前派发更新：`R2-F1_STAGE_A_ACCEPTED / STAGE_B_READY / PRR-070_BLOCKED`。阶段 A 最终 source `0da0d406a3d9b9041921d470363d7db52d5f59f9` 已独立接受，见[独立审阅](./prr-069c-r2-f1-independent-review-2026-09-12.md)。当前唯一执行入口为[阶段 B 三轮原生预检任务卡](../planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)；阶段 B 再次独立审阅接受前，PRR-070/080/090 与 G-FINAL 保持阻塞。旧路线与本更新冲突时，以本更新与阶段 B 卡为准。
 
 记录可测量的非功能标准，包括启动耗时、空闲内存、安装包体积、大型脑图响应、崩溃恢复、可访问性和 macOS/Windows 兼容矩阵。
 
@@ -22,7 +22,8 @@
 - [PRR-070 DMG 体积失败审阅](./prr-070-stage-a-dmg-size-review-2026-09-10.md)：source `58003c0` 在步骤 5 因 DMG 25153239B 超过 25000000B 正确 STOP；独立复算确认双份 ICNS 增量与 UTC 时间拓扑缺口，退回 [PRR-069](../planning/prr-069-dmg-compression-remediation-task-card-2026-09-10.md)。
 - [PRR-069 独立审阅](./prr-069-independent-review-2026-09-10.md)：ULMO same-run 转换、最终 artifact 绑定和 UTC/clean fail-closed 已接受；其后第二次独立 bundle 再次复现 Finder `.DS_Store` 挂起，故该代码结论保留但派发关系已由 PRR-069C 取代。
 - [PRR-070 `.DS_Store` STOP 独立审阅](./prr-070-stage-a-ds-store-blocked-review-2026-09-10.md)：source `b45dc0c` 的第二次独立 clean build 再次进入 Finder 无上限等待；虽然后来自然完成且 DMG 字节有效，仍因预先 STOP 规则作废，退回 [PRR-069C](../planning/prr-069c-deterministic-dmg-assembly-task-card-2026-09-10.md)。
-- [PRR-069C-R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)：R2-01～04 处置、红/绿矩阵与三轮正式预检证据（source `885d877`，DMG 24284033/24284017/24284025B）；执行侧自述，等待 [独立审阅](../planning/prr-069c-r2-attach-and-path-safety-task-card-2026-09-11.md)。
+- [PRR-069C-R2 实施报告](./prr-069c-r2-implementation-report-2026-09-11.md)：R2-01～04 处置、红/绿矩阵与历史三轮正式预检证据（source `885d877`，DMG 24284033/24284017/24284025B）；其后审阅要求由 R2-F1 收口，不是当前发布输入。
+- [PRR-069C-R2-F1 阶段 A 独立审阅](./prr-069c-r2-f1-independent-review-2026-09-12.md)：最终代码 source `0da0d40`，P0～P3 无剩余项，仅解锁[阶段 B 三轮原生预检](../planning/prr-069c-r2-f1-stage-b-native-precheck-task-card-2026-09-12.md)。
 - [发布前检查清单](./release-checklist.md)：当前真实门禁状态；只有新候选的同源原生证据与负责人 G-FINAL 齐备后才能改为可发布。
 
 ## VRA-090 后收口（历史证据）
