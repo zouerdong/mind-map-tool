@@ -1,6 +1,8 @@
 # PRR-070-R1：精简发布验收与原生测试修正
 
-状态：`READY_FOR_EXECUTION / PRR-070_STOPPED / G-FINAL_NOT_REQUESTED`。优先级 P0。
+状态：`ACCEPTED / SUPERSEDED_BY_PRR-070-R2 / LOCAL_DOGFOOD_BLOCKED`。
+
+2026-09-12 独立审阅：R1 的三项测试修正和精简验证通过；但审阅发现本卡沿用三格式冒烟，未覆盖 PRD 已要求且底层已实现、却尚未接到桌面端的 Graph JSON 第四格式。R1 代码结论保留接受，其候选不再作为最终 dogfood 输入；后继只执行 [PRR-070-R2](./prr-070-r2-graph-json-desktop-integration-task-card-2026-09-12.md)。
 
 负责人 2026-09-12 指令：本项目是本地优先的小型工具，发布前验收应按真实风险精简；不得为了形式完整反复执行已经通过且与本次改动无关的重型矩阵。VoiceOver 不作为 v0.1.0 自动化发布硬门，也不得为了本卡开启 VoiceOver、语音播报或 AppleScript 控制权限。
 

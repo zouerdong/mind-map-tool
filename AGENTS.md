@@ -1,10 +1,10 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`PRR-070_STOPPED / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`。原 PRR-070 在 VoiceOver 自动化权限门停止；负责人明确要求按小型本地工具的真实风险精简验收，不再要求开启 VoiceOver 或其 AppleScript 控制权限。当前唯一执行入口为 [PRR-070-R1](docs/planning/prr-070-r1-lean-release-validation-task-card-2026-09-12.md)：只修正过期 S7a 与失效 JXA 双击驱动，执行定向验证、一次候选构建和核心用户流程冒烟，随后停在 `READY_FOR_INDEPENDENT_REVIEW`。PRR-080/090 与 G-FINAL 记录仍阻塞；冲突时以本更新与新卡为准。
+2026-09-12 当前派发更新：`PRR-070-R1_ACCEPTED / PRR-070-R2_READY / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`。R1 的原生测试修正已独立接受，但审阅发现 PRD 要求且 serializer 已实现的第四格式 Graph JSON 未接入桌面导出面板；当前候选不得作为 dogfood 最终件。唯一执行入口为 [PRR-070-R2](docs/planning/prr-070-r2-graph-json-desktop-integration-task-card-2026-09-12.md)：只接通 Graph JSON 桌面导出并做四格式定向冒烟，不重启完整发布矩阵。VoiceOver 不属于本卡，也不得开启。PRR-080/090 与 G-FINAL 记录仍阻塞；冲突时以本更新与新卡为准。
 
 ## 项目阶段
 
-当前处于发布前本机试用候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 导出（SVG/2x PNG/PDF），字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `58003c0` 的超预算候选、source `b45dc0c` 命中 `.DS_Store` STOP 后自然完成的候选及全部历史证据继续只读作废。source `5978e49` 的 PRR-070 已完成构建、性能、DMG 与部分原生矩阵，但因过重的 VoiceOver 自动化门停止；当前按页首 PRR-070-R1 做最小测试修正与精简候选验收。
+当前处于发布前本机试用候选验收阶段：G0/G1 已于 2026-08-26、G2 已于 2026-09-08 由项目负责人批准；G-FINAL 尚未申请。技术栈已定：Tauri 2 + React/TypeScript + React Flow 画布 + web-ts-wasm 视觉导出（SVG/2x PNG/PDF）及独立 Graph JSON Agent 导出，字体 Noto Sans SC（基础）+ LXGW WenKai（手写可选）；v1 发布平台为 macOS（Apple Silicon），Windows 为后续专门版本（移植就绪约束见 PRD §1.1）。PRR-000～069 已完成并独立验收；ADR 0006 v1.1.0 采用负责人批准的双指标 cold 协议，ADR 0013 v1.1.0 采用 ULMO 与无 Finder 依赖的确定性 DMG 装配；负责人选定的 C 方案图标保持完整。source `5978e49` 的 PRR-070 因过重的 VoiceOver 自动化门停止；R1 已完成测试修正，但其同字节候选仍缺桌面 Graph JSON 入口。当前按页首 PRR-070-R2 完成该产品缺口后再生成 dogfood 候选。
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 

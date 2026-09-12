@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-12 当前派发更新：`PRR-070_STOPPED / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`。原 PRR-070 在 VoiceOver 自动化权限门停止；负责人已要求按小型本地工具的真实风险精简验收，不再把 VoiceOver 自动化作为发布硬门。当前唯一执行入口为 [PRR-070-R1](./prr-070-r1-lean-release-validation-task-card-2026-09-12.md)：修正两项原生测试债，执行一次定向验证和核心用户流程冒烟，随后停在 `READY_FOR_INDEPENDENT_REVIEW`。
+2026-09-12 当前派发更新：`PRR-070-R1_ACCEPTED / PRR-070-R2_READY / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`。R1 测试修正已独立接受，但桌面端遗漏了 PRD 已要求、底层 serializer 已实现的 Graph JSON 第四导出格式。当前唯一执行入口为 [PRR-070-R2](./prr-070-r2-graph-json-desktop-integration-task-card-2026-09-12.md)：只接通 Graph JSON 并完成四格式定向冒烟，不重跑完整发布矩阵。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
 
@@ -13,7 +13,7 @@ PRC-000～PRC-090 已由执行 Agent 回报完成，但 2026-09-07 的独立复�
 - [终审整改开发指南](./pre-release-remediation-development-guide-2026-09-07.md)：新候选的完成定义、技术路线与验收协议。
 - [终审整改任务卡](./pre-release-remediation-task-cards-2026-09-07.md)：PRR-000～PRR-090；PRR-000～080 供执行 Agent，PRR-090 保留给独立验收；涉及生产配置、许可证、删除或发布动作时仍受负责人 Gate 约束。
 
-当前整改批次状态为 `IN_PROGRESS / PRR-070-R1_READY / G-FINAL_NOT_REQUESTED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；原 PRR-070 候选与证据继续只读保留。
+当前整改批次状态为 `IN_PROGRESS / PRR-070-R2_READY / LOCAL_DOGFOOD_BLOCKED / G-FINAL_NOT_REQUESTED`。PRR-067 协议、PRR-068 C 方案图标和 ULMO 确定性装配方向保持不变；原 PRR-070/R1 候选与证据继续只读保留。
 
 ## 2026-09-07 发布前收口批次（历史）
 
