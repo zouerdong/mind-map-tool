@@ -117,7 +117,18 @@ export function onboardingReducer(
       if (next === null) {
         return { ...state, completedSteps, status: "completed", currentStep: null, visible: false };
       }
-      return { ...state, completedSteps, ...beginStep(next) };
+      // DFR-030（路径扩展经负责人 2026-09-13 批准）：后台恢复/暂时隐藏的
+      // 引导在步骤推进时不得重新弹出遮挡画布（ADR 0012 §7：中断状态仅后台
+      // 恢复）——beginStep 的 visible: true 只服务显式打开的流程，此处保留
+      // 当前显隐状态。显式打开的引导本来 visible 为 true，行为不变。
+      const begun = beginStep(next);
+      return {
+        ...state,
+        completedSteps,
+        currentStep: begun.currentStep,
+        stepProgress: begun.stepProgress,
+        visible: state.visible,
+      };
     }
     default:
       return state;

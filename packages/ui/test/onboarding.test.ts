@@ -138,6 +138,32 @@ describe("步骤推进（只认真实命令/动作）", () => {
     expect(s.currentStep).toBe("create-first");
     expect(s.visible).toBe(true);
   });
+
+  it("DFR-030：后台恢复/暂时隐藏的引导在步骤推进时不得重新弹出（ADR 0012 §7）", () => {
+    // 启动恢复 in-progress 但不呈现（presentRestoredState=false）
+    let s = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "in-progress",
+      present: false,
+    });
+    expect(s.currentStep).toBe("create-first");
+    expect(s.visible).toBe(false);
+    // 用户在不知情下完成第 1 步的真实动作：步骤后台推进，但不得弹出
+    for (const o of [CREATE, EDIT]) s = onboardingReducer(s, { type: "observe", observation: o });
+    expect(s.currentStep).toBe("second-connect"); // 进度保留（后台恢复语义）
+    expect(s.visible).toBe(false); // 不遮挡画布
+    // 暂时隐藏（hide）同理：推进下一步也不重新弹出
+    let h = started();
+    h = onboardingReducer(h, { type: "hide" });
+    expect(h.visible).toBe(false);
+    for (const o of [CREATE, EDIT]) h = onboardingReducer(h, { type: "observe", observation: o });
+    expect(h.currentStep).toBe("second-connect");
+    expect(h.visible).toBe(false);
+    // 显式打开的引导不受影响：started() 即 visible，推进保持可见
+    let v = started();
+    for (const o of [CREATE, EDIT]) v = onboardingReducer(v, { type: "observe", observation: o });
+    expect(v.visible).toBe(true);
+  });
 });
 
 describe("偏好 port（只写本机，键集受控）", () => {
