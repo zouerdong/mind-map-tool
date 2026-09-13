@@ -33,4 +33,4 @@
 
 ## 权威尺寸约定
 
-`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeVisual({ text, runs, kicker }, fontId, fonts)`（`@mindmap/export` 共享完整视觉契约）计算——包含 G-VIS 卡片最小宽度与内距，并与 exporter 使用同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。
+`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeVisual({ text, runs, kicker }, fontId, fonts)`（`@mindmap/export` 共享完整视觉契约）计算——包含 G-VIS 卡片最小宽度与内距，并与 exporter 使用同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。DFR-020：正文编辑（textarea / `commitEditText`）必须传入节点当前眉题参与测量（眉题高度不被正文编辑压掉）；不携带 runs 的命令按纯文本测量（与 core 清除 runs 语义一致）。

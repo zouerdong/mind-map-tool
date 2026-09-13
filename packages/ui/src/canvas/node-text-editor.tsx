@@ -7,7 +7,7 @@
 // - 自动聚焦与全选，中/英/日输入法行为一致。
 
 import { useEffect, useRef, useState } from "react";
-import { LAYOUT } from "@mindmap/export/src/layout.js";
+import { VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
 
 export interface NodeTextEditorProps {
   initialText: string;
@@ -19,7 +19,9 @@ export interface NodeTextEditorProps {
   fontSize?: number;
   textColor?: string;
   background?: string;
-  /** 传入时编辑框随输入实时增长——与提交后渲染同一测量源（measureNodeBox），
+  /** 正文块顶内距（含眉题占位；默认 VISUAL_TYPOGRAPHY.paddingTop）。 */
+  paddingTop?: number;
+  /** 传入时编辑框随输入实时增长——与提交后渲染同一测量源（measureNodeVisual），
    *  提交瞬间无跳变。文档尺寸仍在提交时由 core 权威写入，此处只是视觉先行。 */
   measureBox?: (text: string) => { width: number; height: number };
   /** 每次测量结果上报（节点外框同步跟随增长）。 */
@@ -34,6 +36,7 @@ export function NodeTextEditor({
   fontSize,
   textColor,
   background,
+  paddingTop,
   measureBox,
   onMeasure,
 }: NodeTextEditorProps) {
@@ -42,7 +45,10 @@ export function NodeTextEditor({
   const ref = useRef<HTMLTextAreaElement>(null);
   const committedRef = useRef(false);
 
-  const effectiveFontSize = fontSize ?? LAYOUT.baseFontSize;
+  // DFR-020：编辑态排版与提交后渲染同一契约（VISUAL_TYPOGRAPHY §1.3）——
+  // 16px 正文 / 1.4 行高 / 16px 左右 + 12px 顶内距；不再用旧 LAYOUT（14px/1.5/10/8）。
+  const effectiveFontSize = fontSize ?? VISUAL_TYPOGRAPHY.bodyFontSize;
+  const effectivePaddingTop = paddingTop ?? VISUAL_TYPOGRAPHY.paddingTop;
   const box = measureBox?.(value);
 
   // 每次输入把测量框上报给节点外框（含首帧：空节点也要让外框知道编辑尺寸）。
@@ -120,9 +126,9 @@ export function NodeTextEditor({
         outline: "none",
         background: background ?? "transparent",
         fontSize: effectiveFontSize,
-        lineHeight: `${effectiveFontSize * LAYOUT.lineHeightFactor}px`,
+        lineHeight: `${effectiveFontSize * VISUAL_TYPOGRAPHY.bodyLineHeightFactor}px`,
         fontFamily,
-        padding: `${LAYOUT.paddingY}px ${LAYOUT.paddingX}px`,
+        padding: `${effectivePaddingTop}px ${VISUAL_TYPOGRAPHY.paddingX}px`,
         color: textColor ?? "inherit",
         caretColor: textColor,
         // 与提交后渲染一致：只按 \n 分行，不软换行（layoutNodeText 语义）

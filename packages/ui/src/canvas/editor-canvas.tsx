@@ -231,7 +231,12 @@ export function EditorCanvas({
       createInteractionController({
         nextNodeId: nextNodeId ?? (() => defaultId("n")),
         nextEdgeId: nextEdgeId ?? (() => defaultId("e")),
-        measure: (text, fontId) => measureNodeVisual({ text }, fontId, fonts), // 完整视觉 size：与 UI/exporter 同源
+        measure: (text, fontId, kicker) =>
+          measureNodeVisual(
+            { text, ...(kicker !== undefined && kicker.length > 0 ? { kicker } : {}) },
+            fontId,
+            fonts,
+          ), // 完整视觉 size（含眉题高度）：与 UI/exporter 同源
         currentFont: () => documentDefaults(session.current.document).font,
       }),
     [fonts, nextNodeId, nextEdgeId, session],
@@ -384,7 +389,23 @@ export function EditorCanvas({
       view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
     );
     setRfNodes(applyPendingAndOverrides(view.nodes));
-    setRfEdges(view.edges);
+    // DFR-020 规整态驻留：整理完成后再次编辑/单节点拖动不得把连线掉回
+    // 贝塞尔（导出始终为规整态，画布应所见即所得）；散乱态走投影默认曲线。
+    const settledPaths = coordinatorRef.current.settledEdgePaths(doc);
+    if (settledPaths && settledPaths.size > 0) {
+      setRfEdges(
+        view.edges.map((e) => {
+          const geom = settledPaths.get(e.id);
+          if (!geom || !e.data) return e;
+          return {
+            ...e,
+            data: { lineStyle: e.data.lineStyle, theme: e.data.theme, pathD: geom.pathD, arrowD: geom.arrowD },
+          };
+        }),
+      );
+    } else {
+      setRfEdges(view.edges);
+    }
   }, [
     applyPendingAndOverrides,
     docVersion,
@@ -697,7 +718,8 @@ export function EditorCanvas({
         void geometryBarrier.enqueue({ kind: "edit-text", id, text });
         setTextOverrides((prev) => new Map(prev).set(id, text));
       } else {
-        const cmd = controller.commitEditText(id, text, current);
+        const node = session.current.document.document.nodes.find((n) => n.id === id);
+        const cmd = controller.commitEditText(id, text, current, node?.kicker);
         if (cmd) api.commit(cmd);
       }
     },

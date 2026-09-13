@@ -379,6 +379,29 @@ export class MotionCoordinator {
     if (this.phase === "running") this.phase = "interrupted";
   }
 
+  /** 当前线形态参数（0 = 散乱曲线，1 = 规整正交；整理/undo 动画终态驻留）。 */
+  public getLineMorph(): number {
+    return this.currentLineMorph;
+  }
+
+  /**
+   * 规整态驻留（DFR-020）：整理完成后再次编辑/单节点拖动走的是普通重投影，
+   * 不能把连线掉回贝塞尔——用最新 doc（位置/尺寸已变）按驻留 lineMorph
+   * 重算整态连线几何。散乱态（morph ≤ 0）返回 null，走投影默认曲线。
+   */
+  public settledEdgePaths(
+    doc: MindMapDocumentV1,
+  ): Map<string, { pathD: string; arrowD: string }> | null {
+    if (this.currentLineMorph <= 0) return null;
+    this.activeDoc = doc;
+    const positions = new Map<string, Point>(
+      doc.document.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
+    );
+    this.currentPositions = new Map(positions);
+    const frame = this.calculateFrame(positions, this.currentLineMorph, "completed");
+    return frame.edgePaths;
+  }
+
   /** rAF 帧更新步进 */
   public tick(now: number): void {
     if (this.phase !== "running" || !this.activeDoc) return;

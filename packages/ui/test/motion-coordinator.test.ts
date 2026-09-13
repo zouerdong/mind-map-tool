@@ -271,3 +271,40 @@ describe("MotionCoordinator 运行生命周期与帧驱动", () => {
     expect(coordinator.getCurrentLineMorph()).toBe(0); // 彻底回退至曲线形态
   });
 });
+
+describe("DFR-020 规整态驻留（settledEdgePaths）", () => {
+  it("整理完成后：再次编辑/拖动按驻留 lineMorph 重算整态连线；散乱态返回 null", () => {
+    const coordinator = new MotionCoordinator();
+    const doc = makeDoc(3);
+    const from = new Map(doc.document.nodes.map((n) => [n.id, { ...n.position }]));
+    const to = new Map([
+      ["n1", { x: 0, y: 0 }],
+      ["n2", { x: 300, y: 0 }],
+      ["n3", { x: 600, y: 0 }],
+    ]);
+
+    // 散乱态（未整理）：无驻留几何
+    expect(coordinator.settledEdgePaths(doc)).toBeNull();
+
+    coordinator.start(doc, from, to, { reducedMotion: true });
+    expect(coordinator.getLineMorph()).toBe(1);
+
+    // 整理后文档发生普通编辑（节点尺寸变化），驻留几何必须按最新 doc 重算
+    const edited = makeDoc(3);
+    edited.document.nodes = edited.document.nodes.map((n, i) => ({
+      ...n,
+      position: to.get(n.id)!,
+      size: { width: 120 + i * 40, height: 40 },
+    }));
+    const paths = coordinator.settledEdgePaths(edited);
+    expect(paths).not.toBeNull();
+    expect(paths!.size).toBe(2);
+    expect(paths!.get("e1")!.pathD.length).toBeGreaterThan(0);
+    expect(paths!.get("e1")!.arrowD.length).toBeGreaterThan(0);
+
+    // undo 回散乱态（reverseTo 终态 morph=0）后不再驻留
+    coordinator.reverseTo(edited, from, { reducedMotion: true });
+    expect(coordinator.getLineMorph()).toBe(0);
+    expect(coordinator.settledEdgePaths(edited)).toBeNull();
+  });
+});

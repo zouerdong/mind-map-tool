@@ -82,8 +82,29 @@ describe("EditorCanvas 编辑流（中文提交 + 权威 size）", () => {
     await waitFor(() => {
       expect(session.current.document.document.nodes[0]?.text).toBe("中心主题");
     });
-    // 权威 size：共享 layout 假字体 4 字 ×140 + 20 padding
-    expect(session.current.document.document.nodes[0]?.size.width).toBe(4 * 140 + 20);
+    // 权威 size：共享视觉契约假字体（advance = size×10）：4 字 × 160 + 32 padding
+    expect(session.current.document.document.nodes[0]?.size.width).toBe(4 * 160 + 32);
+  });
+
+  it("DFR-020：带眉题节点正文编辑后保留眉题高度（ready 路径）", async () => {
+    const doc = makeDoc();
+    doc.document.nodes[0]!.kicker = "IDEA";
+    const session = new DocumentSession(makeStateNode(doc).document);
+    render(<EditorCanvas session={session} fonts={fakeFonts} />);
+    const nodeText = await screen.findByText("根节点");
+    fireEvent.doubleClick(nodeText);
+    const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    // 编辑态 textarea 顶内距含眉题占位（12 + 14.3 + 6 = 32.3），与提交后一致
+    expect(editor.style.paddingTop).toBe("32.3px");
+    fireEvent.change(editor, { target: { value: "改后正文" } });
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    await waitFor(() => {
+      expect(session.current.document.document.nodes[0]?.text).toBe("改后正文");
+    });
+    const node = session.current.document.document.nodes[0]!;
+    expect(node.kicker).toBe("IDEA"); // 眉题保留
+    // 高度含眉题行：12 + 14.3 + 6 + 22.4 + 12 = 66.7（不得量成无眉题的 46.4）
+    expect(node.size.height).toBeCloseTo(66.7, 3);
   });
 
   it("Escape 取消后文本不变", async () => {

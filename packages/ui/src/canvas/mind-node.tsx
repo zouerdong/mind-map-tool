@@ -52,9 +52,12 @@ function MindNodeViewImpl({
   );
   const t = themeTokens(data.theme);
   const accent = data.emphasis === true;
-  const fill = accent ? t.cardAccentFill : t.cardNormalFill;
-  const text = accent ? t.cardAccentText : t.cardNormalText;
-  const kicker = accent ? t.cardAccentKicker : t.cardNormalKicker;
+  // DFR-020：隐藏框线（framesVisible=false）必须实际隐藏填充并切换到画布
+  // 墨色/眉题色（与 export nodeColorsOf 同语义），此前 UI 忽略该字段。
+  const frameless = data.framesVisible === false;
+  const fill = frameless ? "transparent" : accent ? t.cardAccentFill : t.cardNormalFill;
+  const text = frameless ? t.canvasInk : accent ? t.cardAccentText : t.cardNormalText;
+  const kicker = frameless ? t.canvasKicker : accent ? t.cardAccentKicker : t.cardNormalKicker;
   const isEllipse = data.shape === "ellipse";
   const primary = selected || focused; // 主选/焦点：角标记
   // 编辑态实时尺寸（用户实测 2026-08-29：编辑框长大了、节点框没长，文字溢出框外）。
@@ -117,6 +120,14 @@ function MindNodeViewImpl({
           fontFamily={fontFamily(data.font)}
           textColor={text}
           background={fill}
+          // 眉题存在时正文起始位置与提交后渲染一致（paddingTop + 眉题行高 + gap）
+          paddingTop={
+            layout.kicker
+              ? VISUAL_TYPOGRAPHY.paddingTop +
+                VISUAL_TYPOGRAPHY.kickerLineHeight +
+                VISUAL_TYPOGRAPHY.kickerBodyGap
+              : VISUAL_TYPOGRAPHY.paddingTop
+          }
           // 实时增长与提交后渲染同一测量源（所见即所得；runs 在编辑态按纯文本计）
           measureBox={(txt) =>
             measureNodeVisual(

@@ -36,6 +36,17 @@ function renderCanvas(extra?: { revision?: number }) {
 }
 
 describe("EditorCanvas", () => {
+  it("DFR-020：framesVisible=false 实际隐藏卡片填充并切换画布墨色", async () => {
+    const doc = makeDoc();
+    doc.document.framesVisible = false;
+    const session = new DocumentSession(makeStateNode(doc).document);
+    render(<EditorCanvas session={session} fonts={fakeFonts} />);
+    const card = (await screen.findByLabelText("节点：根节点")) as HTMLElement;
+    expect(card.style.background).toBe("transparent"); // 不再渲染近黑卡底
+    // 正文/眉题落到画布墨色（墨纸互换，与 export nodeColorsOf 同语义）
+    expect(screen.getByText("根节点").getAttribute("fill")).toBe("#141412");
+  });
+
   it("渲染 core 投影的节点（经自定义节点组件）", async () => {
     renderCanvas();
     expect(await screen.findByTestId("rf-node-n1")).toBeTruthy();
