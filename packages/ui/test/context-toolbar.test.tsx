@@ -111,6 +111,34 @@ describe("上下文工具条（VRA-050）", () => {
     });
   });
 
+  it("DFR-010 显示同步回归：字体切换后节点正文 font-family 真实翻转，一次 ⌘Z 同时恢复显示字体与尺寸", async () => {
+    const { session } = renderCanvas();
+    await selectNode("a");
+
+    // 切换前：真实 DOM 渲染为 Noto
+    expect(screen.getByText("起点").getAttribute("font-family")).toContain("Noto Sans SC");
+    const widthBefore = session.current.document.document.nodes.find((n) => n.id === "a")?.size
+      .width;
+
+    fireEvent.click(screen.getByTitle("文档字体切换（当前 noto-sans-sc）"));
+
+    // 显示层（svg text 的 font-family）与 core 同步翻转——不是只读 session 判断
+    await waitFor(() => {
+      expect(screen.getByText("起点").getAttribute("font-family")).toContain("LXGW WenKai");
+    });
+
+    // 一次撤销：core 单条原子命令同时恢复旧字体与全部旧 size，显示随之恢复
+    const canvasHost = screen.getByRole("application");
+    fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });
+    await waitFor(() => {
+      expect(session.current.document.document.font).toBe("noto-sans-sc");
+      expect(screen.getByText("起点").getAttribute("font-family")).toContain("Noto Sans SC");
+      expect(
+        session.current.document.document.nodes.find((n) => n.id === "a")?.size.width,
+      ).toBe(widthBefore);
+    });
+  });
+
   it("眉题输入（失焦提交）→ SetNodeKicker；清空 = 移除眉题", async () => {
     const { session } = renderCanvas();
     await selectNode("b");

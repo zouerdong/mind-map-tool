@@ -87,8 +87,10 @@ export class GeometryBarrier {
         this.options.onCommitted?.();
         return Promise.resolve();
       } catch (error) {
+        // 调用方大量使用 `void enqueue(...)`：commit 失败经 onError 呈现，
+        // 不得返回 rejected promise 制造未处理拒绝（与 pending 分支同约束）。
         this.options.onError?.(error);
-        return Promise.reject(error);
+        return Promise.resolve();
       }
     }
 
@@ -171,8 +173,9 @@ export class GeometryBarrier {
   }
 
   cancelPendingNode(id: string): void {
-    // 文档级意图（set-document-font）没有节点 id，不受单节点取消影响。
-    this.queue = this.queue.filter((q) => q.kind !== "set-document-font" && q.id !== id);
+    // 文档级意图（set-document-font）没有节点 id，必须保留——单节点取消
+    // 不得误删用户已表达的字体切换意图。
+    this.queue = this.queue.filter((q) => q.kind === "set-document-font" || q.id !== id);
   }
 
   async flush(): Promise<void> {
@@ -190,10 +193,10 @@ export class GeometryBarrier {
   }
 
   private async drainQueue(): Promise<void> {
+    let committedAny = false;
     try {
       const fonts = await this.options.whenMetricsReady();
       if (this.disposed) return;
-      let committedAny = false;
       // 先把当前 intent 从队列中取出再提交：若提交期间同节点继续编辑，新的
       // edit 会作为后续 intent 入队，不会把已提交的 create 合并后重复创建。
       // 提交失败则把原 intent 放回队首，保证用户输入不丢失。
@@ -208,11 +211,15 @@ export class GeometryBarrier {
           throw error;
         }
       }
-      if (committedAny) this.options.onCommitted?.();
     } catch (error) {
+      // 队列部分提交后失败：已提交内容必须立即通知 UI 重投影（否则 core
+      // 已变而画布停留在旧版本，形成陈旧画面）；失败意图保留在队首，
+      // 用户文本不丢失。
+      if (committedAny) this.options.onCommitted?.();
       this.options.onError?.(error);
       throw error;
     }
+    if (committedAny) this.options.onCommitted?.();
   }
 
   private commitIntent(intent: GeometryIntent, fonts: FontResolver): void {
@@ -242,11 +249,14 @@ export class GeometryBarrier {
     } else if (intent.kind === "edit-text") {
       const node = doc.document.nodes.find((n) => n.id === intent.id);
       if (node && (node.text !== intent.text || intent.runs !== undefined)) {
+        // runs 语义必须与 core EditNodeText 一致：命令不携带 runs 时 core
+        // 会清除旧 runs，测量同样不得用旧 runs 量出的几何写入新纯文本；
+        // 眉题独立于正文编辑，始终保留并参与高度测量。
         const box = measureNodeVisual(
           {
-            ...node,
             text: intent.text,
             ...(intent.runs !== undefined ? { runs: intent.runs } : {}),
+            ...(node.kicker !== undefined ? { kicker: node.kicker } : {}),
           },
           fontId,
           fonts,

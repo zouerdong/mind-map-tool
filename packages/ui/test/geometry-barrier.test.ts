@@ -618,3 +618,150 @@ describe("PRR-040 set-document-font 意图", () => {
     expect(barrier.hasPendingIntents()).toBe(false);
   });
 });
+
+describe("DFR-010 状态同步复核（指南 §1）", () => {
+  it("队列部分提交后失败：已提交内容立即 onCommitted 通知 UI，失败意图回队首保留", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const onCommitted = vi.fn();
+    const onError = vi.fn();
+    const barrier = new GeometryBarrier({
+      session,
+      getMetricsState: () => "pending",
+      whenMetricsReady: () => Promise.resolve(REAL_FONTS),
+      getFallbackFonts: () => FALLBACK_FONTS,
+      onCommitted,
+      onError,
+    });
+
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "ok-1",
+      position: { x: 0, y: 0 },
+      text: "会成功",
+    });
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "dup-1",
+      position: { x: 200, y: 0 },
+      text: "会失败",
+    });
+
+    // drain 前外部已存在同 id 节点 → 第二条 commit 必失败（NODE_ALREADY_EXISTS）
+    const direct = session.commit({
+      kind: "CreateNode",
+      id: "dup-1",
+      text: "外部",
+      position: { x: 9, y: 9 },
+      size: { width: 120, height: 50 },
+    });
+    expect(direct.ok).toBe(true);
+
+    await expect(barrier.flush()).rejects.toThrow();
+
+    // 部分提交必须通知：core 已含第一条，若跳过 onCommitted 画布将停留旧版本
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(session.current.document.document.nodes.map((n) => n.id).sort()).toEqual([
+      "dup-1",
+      "ok-1",
+    ]);
+    // 失败意图保留在队首，用户文本不丢失
+    const pending = barrier.getPendingIntents();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ kind: "create-node", id: "dup-1", text: "会失败" });
+  });
+
+  it("cancelPendingNode 保留文档级 set-document-font 意图，只移除目标节点意图", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const barrier = new GeometryBarrier({
+      session,
+      getMetricsState: () => "pending",
+      whenMetricsReady: () => new Promise<FontResolver>(() => {}),
+      getFallbackFonts: () => FALLBACK_FONTS,
+    });
+
+    await barrier.enqueue({ kind: "set-document-font", font: "lxgw-wenkai" });
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "cancel-me",
+      position: { x: 0, y: 0 },
+      text: "",
+    });
+    await barrier.enqueue({ kind: "edit-text", id: "cancel-me", text: "打字中" });
+
+    barrier.cancelPendingNode("cancel-me");
+
+    const pending = barrier.getPendingIntents();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ kind: "set-document-font", font: "lxgw-wenkai" });
+  });
+
+  it("ready 分支提交失败：onError 呈现且返回已消化 promise（void 调用不留未处理拒绝）", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const onCommitted = vi.fn();
+    const onError = vi.fn();
+    const barrier = new GeometryBarrier({
+      session,
+      getMetricsState: () => "ready",
+      whenMetricsReady: () => Promise.resolve(REAL_FONTS),
+      getFallbackFonts: () => REAL_FONTS,
+      onCommitted,
+      onError,
+    });
+    const direct = session.commit({
+      kind: "CreateNode",
+      id: "dup",
+      text: "已有",
+      position: { x: 0, y: 0 },
+      size: { width: 120, height: 50 },
+    });
+    expect(direct.ok).toBe(true);
+
+    // 调用方形态即 `void enqueue(...)`：resolve 而非 reject
+    await expect(
+      barrier.enqueue({ kind: "create-node", id: "dup", position: { x: 1, y: 1 }, text: "冲突" }),
+    ).resolves.toBeUndefined();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onCommitted).not.toHaveBeenCalled();
+  });
+});
+
+describe("DFR-020 edit-text 测量与 core runs 清除语义一致", () => {
+  // 字号差异字体：advance = fontSize（1px/pt/字），让 runs 有无产生可区分几何
+  const SIZE_SENSITIVE_FONTS: FontResolver = {
+    regular: () => ({ advance: (_ch: string, fs: number) => fs, ascentRatio: 0.8 }),
+    bold: () => ({ advance: (_ch: string, fs: number) => fs, ascentRatio: 0.8 }),
+  };
+
+  it("不携带 runs 的 edit-text 按纯文本测量（core 会清除旧 runs）；眉题高度保留", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const text = "一二三四五六七八九十"; // 10 字
+    const created = session.commit({
+      kind: "CreateNode",
+      id: "n1",
+      text,
+      position: { x: 0, y: 0 },
+      size: { width: 352, height: 46.4 }, // 旧 runs（32px）量出的宽
+      runs: [{ start: 0, end: text.length, fontSize: 32 }],
+    });
+    expect(created.ok).toBe(true);
+    session.commit({ kind: "SetNodeKicker", id: "n1", kicker: "分类" });
+
+    const barrier = new GeometryBarrier({
+      session,
+      getMetricsState: () => "pending",
+      whenMetricsReady: () => Promise.resolve(SIZE_SENSITIVE_FONTS),
+      getFallbackFonts: () => FALLBACK_FONTS,
+    });
+    await barrier.enqueue({ kind: "edit-text", id: "n1", text: "abcdefghij" }); // 纯文本编辑，无 runs
+    await barrier.flush();
+
+    const node = session.current.document.document.nodes[0]!;
+    expect(node.runs).toBeUndefined(); // core 语义：无 runs 命令清除旧 runs
+    // 纯文本 16px 测量：10 × 16 + 32 内距 = 192，不得沿用旧 runs 的 352
+    expect(node.size.width).toBe(192);
+    // 眉题保留并参与高度：12 + 14.3 + 6 + 22.4 + 12 = 66.7
+    expect(node.kicker).toBe("分类");
+    expect(node.size.height).toBeCloseTo(66.7, 3);
+  });
+});
