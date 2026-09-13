@@ -160,6 +160,17 @@ function AnchoredPanel({
 }) {
   const barRef = useRef<HTMLDivElement>(null);
   const [clamped, setClamped] = useState<{ left: number; top: number } | null>(null);
+  // 窗口尺寸纳入夹紧输入：原生实测发现仅依赖 anchor 时，窗口缩小后夹紧
+  // 值停留在旧视口宽度，工具条右侧溢出。
+  const [viewportSize, setViewportSize] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 800,
+    h: typeof window !== "undefined" ? window.innerHeight : 600,
+  }));
+  useEffect(() => {
+    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useLayoutEffect(() => {
     if (!anchor) {
@@ -169,13 +180,13 @@ function AnchoredPanel({
     const el = barRef.current;
     const w = el?.offsetWidth ?? 0;
     const h = el?.offsetHeight ?? 0;
-    const vw = typeof window !== "undefined" ? window.innerWidth : 800;
-    const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+    const vw = viewportSize.w;
+    const vh = viewportSize.h;
     const left = Math.min(Math.max(anchor.x - w / 2, 8), Math.max(8, vw - w - 8));
     const top = Math.min(Math.max(anchor.y - h - 8, 8), Math.max(8, vh - h - 8));
     // 值相等时保留旧引用，避免 children 每渲染新引用导致的 effect/setState 循环
     setClamped((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
-  }, [anchor, children]);
+  }, [anchor, children, viewportSize]);
 
   if (!anchor) {
     return (
