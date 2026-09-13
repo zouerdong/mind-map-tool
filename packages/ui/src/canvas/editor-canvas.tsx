@@ -272,6 +272,103 @@ export function EditorCanvas({
     }
   }, [organizeSignal, organizeDirection, onOrganizeResult, api, session]);
 
+  // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。
+  // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
+  const selectionRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
+    nodes: new Set(),
+    edges: new Set(),
+  });
+  // VRA-050：工具条需要响应选中（ref 不触发渲染）——同步一份 state；
+  // primary = 最后选中的节点（主选：角标记 + 工具条目标）。
+  const [uiSelection, setUiSelection] = useState<{
+    nodes: string[];
+    edges: string[];
+    primary: string | null;
+  }>({
+    nodes: [],
+    edges: [],
+    primary: null,
+  });
+  const primaryRef = useRef<string | null>(null);
+  const trackSelection = useCallback(
+    (source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
+      let touched = false;
+      for (const c of changes) {
+        if (c.type !== "select" || !("id" in c)) continue;
+        const selected = (c as { selected?: boolean }).selected;
+        if (selected === undefined) continue;
+        const id = (c as { id: string }).id;
+        if (selected) {
+          selectionRef.current[source].add(id);
+          if (source === "nodes") primaryRef.current = id;
+          touched = true;
+        } else if (selectionRef.current[source].delete(id)) {
+          if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
+          touched = true;
+        }
+      }
+      if (touched) {
+        setUiSelection({
+          nodes: [...selectionRef.current.nodes],
+          edges: [...selectionRef.current.edges],
+          primary: primaryRef.current,
+        });
+      }
+    },
+    [],
+  );
+
+  // DFR-010（R1 选择态一致性）：core 驱动的重投影用全新节点数组覆盖受控
+  // view-model，selected 标志会丢——但 selectionRef/uiSelection 不会自动收到
+  // deselect 事件，形成“看不见却在选择集里”的幽灵选择（实测：undo/redo 后
+  // 工具条退化为多选形态、眉题输入框消失；删除命令可能波及不可见 id）。
+  // 重投影时把选择状态一并权威化：仍存在 id 的选中保留回 view-model，
+  // 不存在 id 从选择集剪除。
+  const preserveSelection = useCallback(
+    (
+      nodes: MindFlowNode[],
+      edges: MindFlowEdge[] | null,
+    ): { nodes: MindFlowNode[]; edges?: MindFlowEdge[] } => {
+      const sel = selectionRef.current;
+      const nodeIds = new Set(nodes.map((n) => n.id));
+      const edgeIds = edges ? new Set(edges.map((e) => e.id)) : null;
+      let pruned = false;
+      for (const id of [...sel.nodes]) {
+        if (!nodeIds.has(id)) {
+          sel.nodes.delete(id);
+          if (primaryRef.current === id) primaryRef.current = null;
+          pruned = true;
+        }
+      }
+      if (edgeIds) {
+        for (const id of [...sel.edges]) {
+          if (!edgeIds.has(id)) {
+            sel.edges.delete(id);
+            pruned = true;
+          }
+        }
+      }
+      if (primaryRef.current === null && sel.nodes.size > 0) {
+        primaryRef.current = [...sel.nodes][sel.nodes.size - 1]!;
+        pruned = true;
+      }
+      if (pruned) {
+        setUiSelection({
+          nodes: [...sel.nodes],
+          edges: [...sel.edges],
+          primary: primaryRef.current,
+        });
+      }
+      const nextNodes = nodes.map((n) => (sel.nodes.has(n.id) ? { ...n, selected: true } : n));
+      if (!edges) return { nodes: nextNodes };
+      return {
+        nodes: nextNodes,
+        edges: edges.map((e) => (sel.edges.has(e.id) ? { ...e, selected: true } : e)),
+      };
+    },
+    [],
+  );
+
   // core 重投影同步
   // VRA-060：由 MotionCoordinator 统一接管整理/undo 动画；彻底移除旧 MM-085 的全局 CSS transition。
   // 拖动、文本编辑、节点增删等普通操作无过渡直接更新。
@@ -296,8 +393,9 @@ export function EditorCanvas({
       displayPositionsRef.current = new Map(
         view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
       );
-      setRfNodes(applyPendingAndOverrides(view.nodes));
-      setRfEdges(view.edges);
+      const preserved = preserveSelection(applyPendingAndOverrides(view.nodes), view.edges);
+      setRfNodes(preserved.nodes);
+      if (preserved.edges) setRfEdges(preserved.edges);
       return;
     }
 
@@ -388,24 +486,24 @@ export function EditorCanvas({
     displayPositionsRef.current = new Map(
       view.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
     );
-    setRfNodes(applyPendingAndOverrides(view.nodes));
     // DFR-020 规整态驻留：整理完成后再次编辑/单节点拖动不得把连线掉回
     // 贝塞尔（导出始终为规整态，画布应所见即所得）；散乱态走投影默认曲线。
     const settledPaths = coordinatorRef.current.settledEdgePaths(doc);
-    if (settledPaths && settledPaths.size > 0) {
-      setRfEdges(
-        view.edges.map((e) => {
-          const geom = settledPaths.get(e.id);
-          if (!geom || !e.data) return e;
-          return {
-            ...e,
-            data: { lineStyle: e.data.lineStyle, theme: e.data.theme, pathD: geom.pathD, arrowD: geom.arrowD },
-          };
-        }),
-      );
-    } else {
-      setRfEdges(view.edges);
-    }
+    const preserved = preserveSelection(
+      applyPendingAndOverrides(view.nodes),
+      settledPaths && settledPaths.size > 0
+        ? view.edges.map((e) => {
+            const geom = settledPaths.get(e.id);
+            if (!geom || !e.data) return e;
+            return {
+              ...e,
+              data: { lineStyle: e.data.lineStyle, theme: e.data.theme, pathD: geom.pathD, arrowD: geom.arrowD },
+            };
+          })
+        : view.edges,
+    );
+    setRfNodes(preserved.nodes);
+    if (preserved.edges) setRfEdges(preserved.edges);
   }, [
     applyPendingAndOverrides,
     docVersion,
@@ -413,6 +511,7 @@ export function EditorCanvas({
     reducedMotion,
     organizeDirection,
     onOrganizeComplete,
+    preserveSelection,
     setRfNodes,
     setRfEdges,
     session,
@@ -421,54 +520,9 @@ export function EditorCanvas({
   useEffect(() => {
     if (pendingNodes.size === 0 && textOverrides.size === 0) return;
     const view = projectNowRef.current();
-    setRfNodes(applyPendingAndOverrides(view.nodes));
-  }, [pendingNodes, textOverrides, applyPendingAndOverrides, setRfNodes]);
-
-  // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。
-  // 节点/边靠流来源区分（onNodesChange ↔ onEdgesChange），id 不混入对方集合。
-  const selectionRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
-    nodes: new Set(),
-    edges: new Set(),
-  });
-  // VRA-050：工具条需要响应选中（ref 不触发渲染）——同步一份 state；
-  // primary = 最后选中的节点（主选：角标记 + 工具条目标）。
-  const [uiSelection, setUiSelection] = useState<{
-    nodes: string[];
-    edges: string[];
-    primary: string | null;
-  }>({
-    nodes: [],
-    edges: [],
-    primary: null,
-  });
-  const primaryRef = useRef<string | null>(null);
-  const trackSelection = useCallback(
-    (source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
-      let touched = false;
-      for (const c of changes) {
-        if (c.type !== "select" || !("id" in c)) continue;
-        const selected = (c as { selected?: boolean }).selected;
-        if (selected === undefined) continue;
-        const id = (c as { id: string }).id;
-        if (selected) {
-          selectionRef.current[source].add(id);
-          if (source === "nodes") primaryRef.current = id;
-          touched = true;
-        } else if (selectionRef.current[source].delete(id)) {
-          if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
-          touched = true;
-        }
-      }
-      if (touched) {
-        setUiSelection({
-          nodes: [...selectionRef.current.nodes],
-          edges: [...selectionRef.current.edges],
-          primary: primaryRef.current,
-        });
-      }
-    },
-    [],
-  );
+    const selNodes = preserveSelection(applyPendingAndOverrides(view.nodes), null).nodes;
+    setRfNodes(selNodes);
+  }, [pendingNodes, textOverrides, applyPendingAndOverrides, preserveSelection, setRfNodes]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<MindFlowNode>[]) => {

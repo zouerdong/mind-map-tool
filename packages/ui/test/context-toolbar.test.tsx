@@ -139,6 +139,36 @@ describe("上下文工具条（VRA-050）", () => {
     });
   });
 
+  it("DFR-010 选择态一致性：命令提交重投影后选择保留，不产生幽灵选择", async () => {
+    const { session } = renderCanvas();
+    await selectNode("a");
+    expect(screen.getByTestId("kicker-input")).toBeTruthy(); // 单选形态
+
+    // 提交一次命令（强调）→ core 驱动重投影
+    fireEvent.click(screen.getByTitle("普通/强调角色"));
+    await waitFor(() => {
+      const n = session.current.document.document.nodes.find((x) => x.id === "a");
+      expect(n?.emphasis).toBe(true);
+    });
+
+    // 选择与单选工具条形态必须随重投影保留（此前 selected 被静默丢弃，
+    // selectionRef 与视图脱节形成幽灵选择，眉题输入框消失）
+    await waitFor(() => {
+      expect(screen.getByTestId("context-toolbar")).toBeTruthy();
+      expect(screen.getByTestId("kicker-input")).toBeTruthy();
+    });
+
+    // undo/redo 后仍然保持
+    const canvasHost = screen.getByRole("application");
+    fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });
+    await waitFor(() => {
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "a")?.emphasis,
+      ).toBeUndefined();
+    });
+    await waitFor(() => expect(screen.getByTestId("kicker-input")).toBeTruthy());
+  });
+
   it("DFR-030：工具条定位主选节点附近并夹紧视口（不再固定顶部居中）", async () => {
     renderCanvas();
     await selectNode("a");
