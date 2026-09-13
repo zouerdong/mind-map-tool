@@ -1,10 +1,11 @@
 # ADR 0012: 零 WebView Chrome 画布与 macOS 原生命令承载
 
 - Status: Accepted
-- ADR-Version: 1.0.0
-- Date: 2026-09-08
+- ADR-Version: 1.1.0
+- Date: 2026-09-08（v1.1.0 修订 2026-09-13）
 - Owners: ErDong Zou（产品决定）/ 执行 Agent（工程实现）
 - 任务来源: PRR-065（[from-user 2026-09-08]："用户一打开这个程序，就是一张全干净的画布。看不到任何菜单。"）
+- 修订来源: DFR-030（[from-user 2026-09-13]：负责人批准 [首次试用修复开发指南](../planning/dogfood-repair-development-guide-2026-09-13.md) §3 轻量界面方案——空白画布底部创建提示、≥2 节点浮动整理按钮、选中工具条靠近节点）
 
 ## Context
 
@@ -14,8 +15,8 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
 
 ## Decision Drivers
 
-1. 打开即"全干净"画布：内容区零常驻 chrome（菜单、顶栏、按钮、状态文字、自动遮罩）。
-2. 命令可发现性与可访问性：鼠标、键盘、VoiceOver 都能到达全部命令。
+1. 打开即"全干净"画布：内容区**零常驻** chrome（菜单、顶栏、按钮、状态文字、自动遮罩）。v1.1.0 明确："零常驻"不排除**状态依赖的轻量画布内元素**（见 Decision 3a）。
+2. 命令可发现性与可访问性：鼠标、键盘、VoiceOver 都能到达全部命令。v1.1.0：首次试用证明仅靠系统菜单不足以让"整理"可发现（2026-09-12 dogfood 拒绝项），需要画布内的状态化入口。
 3. 不破坏既有语义：dirty 确认、handle/token 保存、IME 隔离、textarea 原生编辑、React Flow attribution（G1 决定）。
 4. 多窗口正确性：app-wide 菜单命令必须定向到最近聚焦窗口，主题/布局 check state 按窗口隔离。
 5. 平台约束：macOS 先行（ADR 0001）；Windows 只保持可移植契约。
@@ -36,6 +37,12 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
    - `编辑`：predefined 撤销/重做/剪切/复制/粘贴/全选（textarea 原生文本语义；画布态 undo/redo 继续由 WebView 键位层处理，不重复派发）
    - `视图`：适应画布、整理 `⇧⌘L`、横向布局 ✓ / 纵向布局 ✓（check）、暖白 ✓ / 黑板 ✓（check）
    - `帮助`：开始/重放引导 `⇧⌘H`
+
+3a. **[v1.1.0] 状态依赖的轻量画布内元素**（DFR-030，[from-user 2026-09-13] 批准）：
+   - **空白创建提示**：文档无节点时，画布底部居中显示一行低对比但可读的非交互提示「双击创建 · ⌥Space」；出现节点后即消失。不遮挡输入、不是遮罩、不携带按钮。
+   - **浮动整理入口**：文档有 **2 个及以上**节点时，画布右上角显示浮动按钮「整理 ⇧⌘L」；0/1 节点不显示。按钮与系统菜单「视图 → 整理」调用**同一 dispatcher**（Decision 4），不产生第二份业务逻辑。
+   - **上下文工具条定位**：选中态上下文工具条（Decision 8 保留项）定位到主选节点附近（上方 8px 起），贴边时夹紧在视口内，小窗口（800×600）不溢出；节点文本输入期间工具条不抢焦点。
+   - 以上元素都是状态驱动的瞬态呈现，不构成常驻 chrome；不恢复整条常驻顶栏（v1.0 决定不变）。
 4. **单一 typed command dispatcher**：renderer 定义 `AppCommandId`；原生菜单事件（host 定向 emit）、应用级快捷键（浏览器 dev keydown）与既有回调都只调用同一 dispatcher，业务逻辑零复制。
 5. **定向与 exactly-once**：带 accelerator 的菜单命令由 macOS 菜单拦截按键并产生唯一 menu event，定向发给最近聚焦且仍存在的 WebView；Tauri 生产环境下 WebView keydown 不再派发应用级快捷键（浏览器 dev 仍走 keydown）。`⌥Space` 全局热键与画布级键位不变。
 6. **菜单状态同步**：renderer 仅向 host 上报非敏感的 enable/check 状态（主题、布局方向）；host 按 per-window 缓存，窗口聚焦时刷新 app-wide 菜单 check state。不轮询、不联网、不持久化。
@@ -56,7 +63,10 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
 - macOS 原生菜单的 check/enable 同步增加了一条 renderer→host 轻量 IPC 与 per-window 状态缓存。
 - `app-header.tsx` 成为无生产引用的遗留文件（无删除授权），登记为后续清理债务。
 - Windows 版本需要单独的原生命令表实现（契约已就位，实现 deferred，R-013）。
+- [v1.1.0] 浮动整理按钮与空白提示引入两条状态化 UI 分支（节点数 0 / 1 / ≥2），需要四态界面测试锁定；整理入口变为两处（菜单 + 浮钮），exactly-once 由共享 dispatcher 保证。
 
 ## Validation
 
 PRR-065 任务卡验收：两主题首次空白视觉证据（无 WebView 顶栏/菜单/按钮/onboarding、attribution 保留）、AX 树无隐藏 `主工具条`、原生菜单命令矩阵（鼠标/键盘/VoiceOver 可达、exactly-once、多窗口定向、check state 窗口隔离）、首启无 onboarding 且 `⌘⇧H` 可显式启动、`document.title` dirty 语义、全量源码门、`initial entry ≤ 500,000B`、无新增依赖。
+
+DFR-030 任务卡验收（v1.1.0）：空白 / 单节点 / 多节点 / 选中四态符合指南 §3（空态仅底部提示、单节点无浮钮、≥2 节点显示浮钮、选中工具条在主选节点附近且夹紧视口）；800×600 可操作；浮钮点击与 `⇧⌘L` 快捷键均恰好产生一次布局命令；输入/IME 不误触；暖白/黑板两主题可读。
