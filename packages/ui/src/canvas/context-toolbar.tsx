@@ -1,14 +1,16 @@
 // 上下文工具条（VRA-050 ③；tokens §4 极简 App Shell 的画布侧）：
 // 选中节点 → 节点操作（强调/眉题/字体/字号/粗体/下划线/形状/框线/删除）；
 // 选中边 → 线型工具（实/虚/点/删除）。全部经 session.commit 的既有命令系统，
-// 不存任何 UI-only 样式。位置为 RF Panel 顶部居中浮层（精确跟随主选卡上方
-// 属 VRA-070 壳接入时的坐标精调——本卡保证可发现与可达，位置语义已对）。
+// 不存任何 UI-only 样式。
+// DFR-030 / ADR 0012 v1.1.0：定位到主选节点附近（卡上方 8px），贴边夹紧
+// 在视口内，小窗口（800×600）不溢出；无主选节点（仅边选中）时回退顶部居中。
+// 输入期间不抢焦点：bar 上 mousedown preventDefault（眉题输入框除外）。
 //
 // runs 说明：本卡字号/粗体/下划线作用于**整节点**（无选区交互时以全区间 runs
 // 提交，与 EditNodeText 的 runs 通道同源、可 undo）；编辑器内**文字选区级**
 // runs 工具随 VRA-050 后续编辑器选区增强补齐（已在交付记录标注）。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Panel } from "@xyflow/react";
 import type {
   Command,
@@ -25,12 +27,20 @@ export interface ContextToolbarSelection {
   edges: string[];
 }
 
+/** 主选节点的屏幕锚点（卡上方中心，相对 RF 容器）。 */
+export interface ContextToolbarAnchor {
+  x: number;
+  y: number;
+}
+
 interface ContextToolbarProps {
   selection: ContextToolbarSelection;
   document: MindMapDocumentV1;
   onCommand(command: Command): void;
   /** 主选节点 id（selection.nodes 最后选中者）；无节点选中时为 null。 */
   primaryNodeId: string | null;
+  /** 主选节点屏幕锚点；缺省回退顶部居中。 */
+  anchor?: ContextToolbarAnchor | null;
 }
 
 export function ContextToolbar({
@@ -38,6 +48,7 @@ export function ContextToolbar({
   document: doc,
   onCommand,
   primaryNodeId,
+  anchor = null,
 }: ContextToolbarProps) {
   const theme = doc.document.theme;
   const t = themeTokens(theme);
@@ -100,45 +111,110 @@ export function ContextToolbar({
   if (nothing) return null;
 
   return (
+    <AnchoredPanel anchor={anchor} barStyle={barStyle}>
+      {primary !== null ? (
+        <NodeTools
+          key={primary.id}
+          nodeId={primary.id}
+          node={primary}
+          doc={doc}
+          onCommand={onCommand}
+          render={{ btn, sep, t }}
+          selectionCount={nodeSel.length}
+        />
+      ) : null}
+      {primary !== null && primaryEdge !== null ? sep("mid") : null}
+      {primaryEdge !== null ? (
+        <EdgeTools
+          edgeId={primaryEdge.id}
+          lineStyle={primaryEdge.lineStyle ?? "solid"}
+          onCommand={onCommand}
+          render={{ btn, t }}
+        />
+      ) : null}
+      {nodeSel.length > 0
+        ? btn(
+            "删除",
+            () =>
+              onCommand({
+                kind: "DeleteSelection",
+                nodeIds: [...nodeSel],
+                edgeIds: [...edgeSel],
+              }),
+            { title: "删除选中（⌫）" },
+          )
+        : null}
+    </AnchoredPanel>
+  );
+}
+
+/** 锚定浮层面板：主选卡上方 8px，实测尺寸后夹紧在视口内（800×600 不溢出）。 */
+function AnchoredPanel({
+  anchor,
+  barStyle,
+  children,
+}: {
+  anchor: ContextToolbarAnchor | null;
+  barStyle: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [clamped, setClamped] = useState<{ left: number; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!anchor) {
+      setClamped(null);
+      return;
+    }
+    const el = barRef.current;
+    const w = el?.offsetWidth ?? 0;
+    const h = el?.offsetHeight ?? 0;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 800;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+    const left = Math.min(Math.max(anchor.x - w / 2, 8), Math.max(8, vw - w - 8));
+    const top = Math.min(Math.max(anchor.y - h - 8, 8), Math.max(8, vh - h - 8));
+    // 值相等时保留旧引用，避免 children 每渲染新引用导致的 effect/setState 循环
+    setClamped((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
+  }, [anchor, children]);
+
+  if (!anchor) {
+    return (
+      <Panel
+        position="top-center"
+        data-testid="context-toolbar"
+        role="toolbar"
+        aria-label="上下文工具"
+      >
+        <div ref={barRef} style={barStyle}>
+          {children}
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
     <Panel
-      position="top-center"
+      position="top-left"
       data-testid="context-toolbar"
       role="toolbar"
       aria-label="上下文工具"
+      style={
+        clamped
+          ? { left: clamped.left, top: clamped.top }
+          : { left: anchor.x, top: anchor.y, transform: "translate(-50%, calc(-100% - 8px))" }
+      }
     >
-      <div style={barStyle}>
-        {primary !== null ? (
-          <NodeTools
-            key={primary.id}
-            nodeId={primary.id}
-            node={primary}
-            doc={doc}
-            onCommand={onCommand}
-            render={{ btn, sep, t }}
-            selectionCount={nodeSel.length}
-          />
-        ) : null}
-        {primary !== null && primaryEdge !== null ? sep("mid") : null}
-        {primaryEdge !== null ? (
-          <EdgeTools
-            edgeId={primaryEdge.id}
-            lineStyle={primaryEdge.lineStyle ?? "solid"}
-            onCommand={onCommand}
-            render={{ btn, t }}
-          />
-        ) : null}
-        {nodeSel.length > 0
-          ? btn(
-              "删除",
-              () =>
-                onCommand({
-                  kind: "DeleteSelection",
-                  nodeIds: [...nodeSel],
-                  edgeIds: [...edgeSel],
-                }),
-              { title: "删除选中（⌫）" },
-            )
-          : null}
+      {/* mousedown preventDefault：点击工具不抢画布/编辑器焦点（眉题输入框除外） */}
+      <div
+        ref={barRef}
+        style={barStyle}
+        onMouseDown={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest("input, textarea")) return;
+          e.preventDefault();
+        }}
+      >
+        {children}
       </div>
     </Panel>
   );

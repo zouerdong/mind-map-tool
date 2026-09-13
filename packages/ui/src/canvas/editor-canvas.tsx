@@ -761,6 +761,20 @@ export function EditorCanvas({
     }
   }, [activeEditorRef, flushActiveEditor]);
 
+  // DFR-030 / ADR 0012 v1.1.0：上下文工具条锚点——主选节点的屏幕坐标
+  //（卡上方中心），供 ContextToolbar 定位到节点附近并夹紧视口。
+  const toolbarAnchor = useMemo(() => {
+    const pid = uiSelection.primary;
+    if (!pid) return null;
+    const node = rfNodes.find((n) => n.id === pid);
+    if (!node) return null;
+    const w = node.width ?? 0;
+    return {
+      x: viewport.x + (node.position.x + w / 2) * viewport.zoom,
+      y: viewport.y + node.position.y * viewport.zoom,
+    };
+  }, [uiSelection.primary, rfNodes, viewport]);
+
   const editingValue = useMemo<EditingContextValue>(
     () => ({
       editingId,
@@ -837,6 +851,7 @@ export function EditorCanvas({
             selection={{ nodes: uiSelection.nodes, edges: uiSelection.edges }}
             document={session.current.document}
             primaryNodeId={uiSelection.primary}
+            anchor={toolbarAnchor}
             onCommand={(command) => {
               if (command.kind === "SetNodeKicker") {
                 if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
@@ -902,6 +917,28 @@ export function EditorCanvas({
             }}
           />
         </ReactFlow>
+        {/* DFR-030 / ADR 0012 v1.1.0：空白画布（无节点且无待提交节点）底部
+            居中创建提示——非交互、低对比可读、不遮挡输入；出现节点即消失。 */}
+        {session.current.document.document.nodes.length === 0 && pendingNodes.size === 0 ? (
+          <div
+            data-testid="empty-canvas-hint"
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              bottom: 24,
+              left: "50%",
+              transform: "translateX(-50%)",
+              pointerEvents: "none",
+              color: themeTokens(session.current.document.document.theme).shellSubtle,
+              fontSize: 13,
+              letterSpacing: "0.02em",
+              userSelect: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            双击创建 · ⌥Space
+          </div>
+        ) : null}
         {overlay}
       </div>
     </EditingContext.Provider>

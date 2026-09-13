@@ -55,7 +55,7 @@ async function createNodeAt(x: number, y: number) {
 }
 
 describe("一键整理（AC-15）", () => {
-  it("乱序节点 → 整理 → 垂直树对位；undo 完整恢复；redo 重放", async () => {
+  it("乱序节点 → 整理 → 横向分层对位；undo 完整恢复；redo 重放", async () => {
     setup();
     // 三个节点故意散乱放置
     await createNodeAt(700, 10);

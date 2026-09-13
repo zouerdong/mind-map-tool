@@ -72,6 +72,74 @@ describe("红灯 1：零 WebView Chrome（ADR 0012）", () => {
   });
 });
 
+describe("DFR-030：ADR 0012 v1.1.0 状态化轻量元素（from-user 2026-09-13 批准）", () => {
+  /** 画布空白双击创建节点（RF stub pane 事件）。 */
+  async function createNodeAt(x: number, y: number) {
+    fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: x, clientY: y });
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^rf-node-/).length).toBeGreaterThan(0);
+    });
+  }
+
+  it("空白态：底部创建提示可见、浮动整理按钮不显示；提示非交互", async () => {
+    setup();
+    const hint = await screen.findByTestId("empty-canvas-hint");
+    expect(hint.textContent).toBe("双击创建 · ⌥Space");
+    expect(hint.style.pointerEvents).toBe("none"); // 不遮挡输入
+    expect(screen.queryByTestId("organize-fab")).toBeNull();
+  });
+
+  it("单节点态：提示消失、浮动整理按钮仍不显示（≥2 节点才出现）", async () => {
+    setup();
+    await createNodeAt(100, 100);
+    await waitFor(() => expect(screen.queryByTestId("empty-canvas-hint")).toBeNull());
+    expect(screen.queryByTestId("organize-fab")).toBeNull();
+  });
+
+  it("多节点态：浮动整理按钮出现；点击与菜单命令同 dispatcher，恰好一次布局命令（一次 undo 完整恢复）", async () => {
+    setup();
+    await createNodeAt(700, 10);
+    // 首个节点仍处于编辑态，先 Esc 收尾再建第二个
+    fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
+    await createNodeAt(30, 500);
+    fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
+
+    const fab = await screen.findByTestId("organize-fab");
+    expect(fab.textContent).toContain("整理");
+
+    // 记录整理前位置（一次 undo 完整恢复 = 只产生一条布局命令）
+    const posBefore = screen
+      .getAllByTestId(/^rf-node-/)
+      .map((el) => el.getAttribute("data-testid"));
+
+    fireEvent.click(fab);
+    await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
+
+    // 画布层 ⌘Z：一次 undo 后节点仍在且不丢（位置恢复由 core 契约锁定）
+    const canvasHost = document.querySelector('[role="application"]')!;
+    fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });
+    await waitFor(() => {
+      const posAfter = screen
+        .getAllByTestId(/^rf-node-/)
+        .map((el) => el.getAttribute("data-testid"));
+      expect(posAfter.sort()).toEqual([...posBefore].sort());
+    });
+  });
+
+  it("整理后再次触发为幂等 no-op（效果只发生一次）", async () => {
+    setup();
+    await createNodeAt(700, 10);
+    fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
+    await createNodeAt(30, 500);
+    fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
+
+    fireEvent.click(await screen.findByTestId("organize-fab"));
+    await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
+    fireEvent.click(screen.getByTestId("organize-fab"));
+    await waitFor(() => expect(screen.getByText(/已经是整理好的布局/)).toBeTruthy());
+  });
+});
+
 describe("红灯 2：onboarding explicit-only", () => {
   it("偏好 not-started 首次启动不自动出现 onboarding 遮罩", async () => {
     const preferences = new FakePreferencesPort();

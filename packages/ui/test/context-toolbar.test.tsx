@@ -139,6 +139,15 @@ describe("上下文工具条（VRA-050）", () => {
     });
   });
 
+  it("DFR-030：工具条定位主选节点附近并夹紧视口（不再固定顶部居中）", async () => {
+    renderCanvas();
+    await selectNode("a");
+    const panel = screen.getByTestId("context-toolbar");
+    // 节点 a 位于 (0,0)、宽 100 → 锚点 x = 50；jsdom 测量高为 0，顶部夹紧 8px
+    expect(panel.style.left).toBe("50px");
+    expect(panel.style.top).toBe("8px");
+  });
+
   it("眉题输入（失焦提交）→ SetNodeKicker；清空 = 移除眉题", async () => {
     const { session } = renderCanvas();
     await selectNode("b");

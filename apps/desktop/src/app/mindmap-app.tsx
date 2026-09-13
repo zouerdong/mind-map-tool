@@ -971,6 +971,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, [handleBootstrapAction, refreshLaunchErrors, refreshRecovery]);
 
   const theme = session.current.document.document.theme;
+  // DFR-030 / ADR 0012 v1.1.0：≥2 节点时显示浮动整理入口（0/1 节点不显示）；
+  // 与系统菜单「视图 → 整理 ⇧⌘L」共用同一 dispatcher，不产生第二份业务逻辑。
+  const nodeCount = session.current.document.document.nodes.length;
 
   // PRR-065：菜单 check 状态同步（非敏感：主题/布局方向）。挂载与变化时
   // 上报 host；host 按窗口缓存并在聚焦切换时刷新 app-wide 菜单。失败
@@ -1001,6 +1004,32 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       />
 
       <AppNotice notice={notice} theme={theme} onDismiss={() => setNotice(null)} />
+
+      {nodeCount >= 2 ? (
+        <button
+          type="button"
+          data-testid="organize-fab"
+          title="整理（⇧⌘L）"
+          onClick={() => dispatchCommand("view.organize")}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 25,
+            font: "inherit",
+            fontSize: 13,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: `1px solid ${theme === "dark" ? "#35312A" : "#E3DFD5"}`,
+            background: theme === "dark" ? "#201D17" : "#FFFDF9",
+            color: theme === "dark" ? "#EFEAE0" : "#3B372F",
+            boxShadow: "0 6px 18px rgba(0,0,0,.12)",
+            cursor: "pointer",
+          }}
+        >
+          整理 ⇧⌘L
+        </button>
+      ) : null}
 
       {/* bootstrap report-pending（W2R R3）：动作已完成但终态回报未送达
             host——显式一次重报；不自动 timer、不重跑 action。 */}
