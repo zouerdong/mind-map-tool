@@ -180,8 +180,11 @@ function AnchoredPanel({
     const el = barRef.current;
     const w = el?.offsetWidth ?? 0;
     const h = el?.offsetHeight ?? 0;
-    const vw = viewportSize.w;
-    const vh = viewportSize.h;
+    // 夹紧基准 = RF 容器实测尺寸（原生实测：window.innerWidth 与容器可布
+    // 局宽度可差十余 px——按 innerWidth 夹紧会在小窗口溢出）。
+    const container = el?.closest(".react-flow");
+    const vw = (container instanceof HTMLElement && container.clientWidth) || viewportSize.w;
+    const vh = (container instanceof HTMLElement && container.clientHeight) || viewportSize.h;
     const left = Math.min(Math.max(anchor.x - w / 2, 8), Math.max(8, vw - w - 8));
     const top = Math.min(Math.max(anchor.y - h - 8, 8), Math.max(8, vh - h - 8));
     // 值相等时保留旧引用，避免 children 每渲染新引用导致的 effect/setState 循环
