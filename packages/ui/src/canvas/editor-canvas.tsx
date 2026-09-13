@@ -922,7 +922,7 @@ export function EditorCanvas({
         {session.current.document.document.nodes.length === 0 && pendingNodes.size === 0 ? (
           <div
             data-testid="empty-canvas-hint"
-            aria-hidden="true"
+            role="note"
             style={{
               position: "absolute",
               bottom: 24,
