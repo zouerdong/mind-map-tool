@@ -153,3 +153,29 @@ PRD §5.1 既定"文楷无真粗体用描边模拟"，scene/SVG/PDF 模拟分支
 - 新候选（见 §一）+ 证据目录 `.tmp/dogfood-2026-09-13/`（驱动、证据 JSON、截图、导出件、inventory）。
 - 提交链：`0458634`（文档）→ `af86d4a`（DFR-010）→ `d5dd5bd`（DFR-020）→ `24fe172`+`b63c361`（DFR-030）→ `dea33ed`（onboarding，范围扩展已批）→ `5544adf`（选择态）→ `e132a22`→`8384007`→`5b221f6`→`b1f04f4`（夹紧终案）。
 - **STOP_FOR_INDEPENDENT_REVIEW**：请 DFR-090 独立审阅核对缺陷↔修复一一对应、关键边界未被删除校验掩盖、截图符合原视觉方向、候选与源码一致；ACCEPT 后交负责人决定是否恢复试用。G-FINAL 未申请。
+
+## 十、OFR-2026-09-14 负责人第二次实用反馈收口（2026-09-15 追加）
+
+负责人第二次实用反馈 7 项（OFR-2026-09-14 #1～#7）：#1 全选后单击放置光标、#2 整理后拖动连线跟随、#3 保存格式选择、#4 新文档默认文楷、#5 菜单撤销/重做、#6 文楷粗体长文本裁剪、#7 首启自动引导。修复提交链：`7f8b1ec`（#1/#2）→ `c867d99`（#6）→ `8629a3c`（#4）→ `86c2614`（#5）→ `f17af44`（#7）→ `4ff5c7d`（#3 初修）→ `91a0e97`（PRD/ADR 0012 v1.2.0/快捷键表同步）。
+
+### R1 原生验证（2026-09-15 00:19，候选 source `91a0e97`）
+
+26 项路径中 12 项通过后 **S5 #3 红灯**：保存面板无任何格式控件（证据 `ZZ-失败现场.png` / `ZZ-ax-texts.json`，面板 AX 树仅 Save As/Tags/Where/Cancel/Save）。根因经 vendored 源码证实：rfd 0.16（tauri-plugin-dialog 2.7.2）在 macOS 把全部 filter 合并进 `NSSavePanel allowedFileTypes`（`panel_ffi.rs add_filters`），系统不会因此显示格式 popup——`4ff5c7d` 的双 filter 修复在用户层面无效。
+
+### R2 修复（`bd1fdae`）
+
+macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/src-tauri/src/ipc/save_panel.rs`）：「格式：」label + NSPopUpButton（Mind Map 文档 (.mindmap) / JSON (.json)），切换实时联动 name field 扩展名（覆盖确认与最终文件名一致；用户手改扩展名仍以输入为准）；sheet 呈现与旧路径一致。objc2 0.6.4 / objc2-app-kit 0.3.2 / objc2-foundation 0.3.2 / block2 0.6.2 均已在依赖图（rfd/wry 相同版本），仅声明直接依赖+feature，lockfile 零新增 crate。非 macOS 保持 rfd 路径（Windows 通用对话框原生显示 filter 下拉）。两格式写入同一份 canonical JSON，host 不做扩展名策略（与 open 接受范围一致）。
+
+### R2 验证
+
+- 自动门：cargo test 212 passed（含新增 swap_extension 2 例）；`pnpm typecheck` / `lint` / `test:unit` 714 passed 全绿。
+- 新候选：source `bd1fdae`（ofr-src clean worktree），DMG sha256 `570e10b2f7864abb5d4cea046d63b514a5af5450a80dbd5ec6ca63294fbd4f42`（24,304,089B），.app sha256 `71937dd0dbb95623…`；inventory `.tmp/dogfood-2026-09-14/r2/bundle-inventory.json`。
+- 原生全路径 **26 项断言全 PASS**（`r2/ofr-native-evidence.json`）：首启引导（#7）、默认文楷（#4）、单击放光标（#1）、整理/拖动连线跟随（#2）、焦点不在画布时菜单 ⌘Z/⇧⌘Z 双向可达（#5）、保存面板格式选择 + 选 JSON 扩展名联动 + JSON 落盘可解析 + 重开三节点完整（#3）、字体持久化（#4）、Graph JSON meta.font=lxgw-wenkai、长文本与粗体 runs 完整、导出 SVG 文楷描边模拟（#6）。截图 01–08 齐全，`07-保存面板-格式选择.png` 可见原生格式 popup。
+- 驱动修正（诚实披露，非产品改动）：S5 点击机制改为点可见 popup 本体再点 JSON 项（原逻辑会命中隐藏菜单项的失效坐标）；S6 字体断言路径修正为契约路径 `meta.font`（`graph-json.ts GraphJsonMeta`，旧断言检查不存在的 `document.font`/`graph.font`）。
+- 环境干扰记录（非产品缺陷）：① 跑批前机器自动锁屏阻断 AX（进程存活但窗口无 frame，同 §七/§八 既有记录），解锁后 caffeinate 保持唤醒完成；② 一次 drag-repro 探针在引导遮罩未关闭时创建节点，导致偏好被写为 `in-progress`（S0 前置破坏），已复位为 `not-started` 后重跑；③ 首轮 r2 跑批连线/拖动拖拽全部未生效（点击/键入正常），同构建同坐标隔离复现全部成功，判定为解锁后首次跑批的合成 HID 投递抖动，重跑即恢复。
+- 未运行项（按既定轻量验收口径）：Windows 实机（PRD 延后）、advisory、20 轮性能、VoiceOver、完整发布矩阵。
+
+### 交接
+
+- 新候选 DMG + 证据目录 `.tmp/dogfood-2026-09-14/r2/`（驱动、证据 JSON、截图、导出件、inventory）；R1 失败现场保留在同名上级目录供审计。
+- **STOP_FOR_INDEPENDENT_REVIEW**：请独立审阅核对 #1～#7 缺陷↔修复一一对应、S5/S6 驱动修正未掩盖产品问题、候选与源码一致；ACCEPT 后交负责人决定是否恢复试用。旧 DMG 全部继续作废；G-FINAL 未申请。
