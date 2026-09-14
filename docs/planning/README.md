@@ -1,5 +1,9 @@
 # Planning
 
+2026-09-14 执行回报：`DFR-010～040 EXECUTED / STOP_FOR_INDEPENDENT_REVIEW`。新候选 source `b1f04f4`（clean worktree），DMG sha256 `00f353a259917228…`，原生 38 项断言全过，四张要求截图齐全。报告：[dogfood-repair-report-2026-09-13.md](../quality/dogfood-repair-report-2026-09-13.md)。停等 DFR-090 独立审阅；旧 DMG 继续作废；G-FINAL 未申请。
+
+2026-09-13 规划交付：[首次试用修复开发指南](./dogfood-repair-development-guide-2026-09-13.md)与[完整任务卡 DFR-010～090](./dogfood-repair-task-cards-2026-09-13.md)。负责人转发整卡并要求执行后，Coding Agent 顺序完成 DFR-010～040，停等独立审阅；界面方案采用、既有补丁复核、允许路径、风险与 STOP 规则以整卡为准。下方为上一轮状态历史，旧 DMG 继续作废。
+
 2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人实用复现字体切换后的 `projection drift` 整页崩溃，并指出整理入口不可发现、实际画面偏离既定感觉。运行时根因已由审阅者在 `9483634` / `f6d4e6d` 修复；`12f8f92` 进一步恢复 G-VIS 卡片几何和双击直接输入，90 项定向测试、typecheck、lint 通过。旧 DMG 作废。下一步先修订 ADR 0012 的命令面方案，经负责人确认后再实现和生成新试用件。
 
 本目录是经过规划审阅的开发交付入口，保存架构提案、开发指导和任务卡。每个批次分别记录审阅方式、用户批准状态和可派发条件。
