@@ -394,7 +394,12 @@ pub async fn platform_request_target_authorization(
     }
     let mut builder = app.dialog().file();
     if matches!(&kind, TargetKind::Document) {
-        builder = builder.add_filter("Mind Map", &["mindmap"]);
+        // OFR-2026-09-14 #3（负责人 dogfood）：保存时提供格式选择——正式
+        // `.mindmap` 文档与兼容 `.json`（与 open 对话框的接受范围一致；
+        // 两种扩展名写入同一份 canonical JSON，host 不做扩展名策略）。
+        builder = builder
+            .add_filter("Mind Map 文档", &["mindmap"])
+            .add_filter("JSON", &["json"]);
     }
     if !suggested_name.is_empty() {
         builder = builder.set_file_name(&suggested_name);
