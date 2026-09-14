@@ -99,7 +99,31 @@
   4. 测试产物位于 `~/Documents`（`dfr-040-sample.mindmap`、`dfr-040-export.{json,svg,png,pdf}`，合成数据），副本已在证据目录；原文件留待负责人处置（未获删除授权）。
   5. 编辑器在保存时的 `flushActiveEditor` 会提交当前编辑中文字（既有设计）；驱动曾因此把"遗留编辑会话"计入快照——内容正确，但建议真人试用时留意 Esc/blur 语义是否符合预期。
 
-## 七、交接
+## 七、DFR-090 返修收口（2026-09-14 追加）
+
+审阅意见：[/tmp 外部审阅文档，要点存档于本节] REVISE —— F1（ready 提交失败丢意图）、F2（正文编辑清空样式/编辑态退回 16px/编辑中格式读旧文本）。均按"先红灯后修复"执行，不做无关重构。
+
+### F1（`cb45b8b`）
+
+ready 分支拆分为两个 try：commitIntent 失败 → 意图按 pending 同规则归并入队（`hasPendingIntents` 为 true，显式 flush 可重试、持续失败时拒绝——Save 阻断可见），onError 呈现后 resolve（void 调用无未处理拒绝）；`onCommitted` 通知抛错 → 仅 onError，绝不重入队（避免 flush 重复提交已生效命令）。归并逻辑抽取为 `queueIntent` 供两分支共用。红灯用例 3 个：可恢复失败重试恰好一次、持续失败 flush 拒绝且文档未误改、通知失败不重复提交。
+
+### F2（`ade5a07` + `4b5d054`）
+
+1. 新增 `packages/ui/src/controller/runs-remap.ts`：前缀/后缀 diff 的 TextRun 区间映射——整节点统一样式（含 stepFontSize 多段同属性）全域保留（含全量替换）；混合 runs 边界映射（start/end 规则区分插入点归属）、空 run 丢弃、相邻同属性合并。
+2. `commitEditText` 携带映射后 runs 并以其测量；barrier pending/ready 两路径共用同一映射。编辑态实时测量与渲染沿用整节点样式（`NodeTextEditor` 新增 fontWeight/underline；混合 runs 编辑态退回纯文本渲染，提交后样式保留）。
+3. 编辑中点格式：`flushActiveEditor` 返回草稿文本，先提交草稿（样式随映射保留）再基于最新文本重算命令 runs——不再用渲染期捕获的旧 `node.text` 覆盖新草稿。
+4. **原生实测追加暴露**：A+ 后点 B 时 `toggleWhole` 整体替换 runs 导致字号静默丢失（F2"字号/粗体/下划线共存"前提不成立）。修复为翻转目标属性、保留其他属性（`4b5d054`，红灯用例先行）。
+
+### 返修验证
+
+- 自动门：`pnpm test:unit` 703 passed（+23 vs 上轮 680）；export golden 18 passed；typecheck/lint 5/5。
+- 新候选：source `4b5d054`（clean worktree），DMG sha256 `c181429c2a2e47c94be4971aaf9456ba6bbb333c54b9ed95e1dce3022e321ecc`，inventory `.tmp/dogfood-2026-09-13/bundle-inventory-f1f2.json`。旧候选 `00f353a2…` 转为诊断记录，不作交付。
+- 原生短路径（同一驱动增补 S5b/S8 场景，43 项断言全 PASS）：带样式节点续写 ⌘Enter 提交（bold+fontSize 18 runs 全域保留至导出 JSON）、编辑中点 U 草稿不被旧文本覆盖（underline 落在草稿文本全域）、撤销重做、整理、保存重开、四格式导出（Graph JSON runs/眉题/文本逐项核对、SVG font-size 18 呈现、PNG/PDF 魔数）。证据 `dfr-040-native-evidence.json`。
+- 期间发现并处理环境干扰：本机自动锁屏会阻断 AX 通道（进程存活但 0 窗口）；解锁后以 caffeinate 保持唤醒完成跑批，非产品缺陷。
+- **遗留观察（交审阅定夺，未擅自改）**：LXGW WenKai 无 bold 字面，导出层 `seg.bold` 依赖 `fonts.bold(fontId)`，文楷文档的粗体在 SVG/PDF 中不呈现（canvas 由浏览器合成粗体）；是否引入 faux-bold 属独立导出策略决策。`layout.ts` 已有 `fauxBold` 常量但无生产者。
+- 真实 IME 手工抽查：自动化无法驱动系统 IME，建议负责人本机试用时以真实输入法在带样式节点上续写一次。
+
+## 八、交接
 
 - 新候选（见 §一）+ 证据目录 `.tmp/dogfood-2026-09-13/`（驱动、证据 JSON、截图、导出件、inventory）。
 - 提交链：`0458634`（文档）→ `af86d4a`（DFR-010）→ `d5dd5bd`（DFR-020）→ `24fe172`+`b63c361`（DFR-030）→ `dea33ed`（onboarding，范围扩展已批）→ `5544adf`（选择态）→ `e132a22`→`8384007`→`5b221f6`→`b1f04f4`（夹紧终案）。
