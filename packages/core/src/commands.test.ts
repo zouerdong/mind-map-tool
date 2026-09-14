@@ -15,6 +15,8 @@ function unwrap(r: ApplyResult): { stateNode: StateNode; inverse: Command | null
 
 function stateWithTwoNodes(): ReturnType<typeof makeStateNode> {
   const doc = emptyDocument();
+  // 字体切换事务测试以 Noto 为起点（OFR-2026-09-14 #4 后默认文楷，显式锁定）。
+  doc.document.font = "noto-sans-sc";
   doc.document.nodes.push({
     id: "a",
     text: "A",
@@ -312,13 +314,16 @@ describe("SetDocumentFontAndResizeNodes（PRR-040 权威几何事务）", () => 
   });
 
   it("空文档：仅切换字体（空 size 映射合法）", () => {
-    const s0 = makeStateNode(emptyDocument());
+    const empty = emptyDocument();
+    empty.document.font = "noto-sans-sc"; // 显式起点（默认文楷见 OFR-2026-09-14 #4）
+    const s0 = makeStateNode(empty);
     const { stateNode } = unwrap(applyCommand(s0, fontSwitchCommand({ sizes: [] })));
     expect(stateNode.document.document.font).toBe("lxgw-wenkai");
   });
 
   it("300 节点计算与提交满足 ≤50ms 高风险编辑预算", () => {
     const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 显式起点（默认文楷见 OFR-2026-09-14 #4）
     for (let i = 0; i < 300; i++) {
       doc.document.nodes.push({
         id: `n${i}`,

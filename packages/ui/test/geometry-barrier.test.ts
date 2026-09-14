@@ -450,6 +450,8 @@ describe("PRR-040 set-document-font 意图", () => {
 
   function seededSession() {
     const doc = emptyDocument();
+    // 字体切换意图测试以 Noto 为起点（OFR-2026-09-14 #4 后默认文楷，显式锁定）。
+    doc.document.font = "noto-sans-sc";
     doc.document.nodes.push(
       {
         id: "n-1",

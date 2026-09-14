@@ -62,6 +62,9 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
     visual?: { kicker?: string; emphasis?: boolean },
   ) => {
     const doc = emptyDocument();
+    // OFR-2026-09-14 #4：新文档默认字体改为文楷——本套 golden 夹具按 Noto
+    // 创作，显式锁定字体，不隐式依赖产品默认值（lxgw-font 夹具已单列）。
+    doc.document.font = "noto-sans-sc";
     const node = {
       id,
       text,
@@ -83,7 +86,11 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
 
   const fixtures: Record<string, MindMapDocumentV1> = {};
 
-  fixtures["empty-document"] = emptyDocument();
+  fixtures["empty-document"] = (() => {
+    const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 同上：夹具显式锁定，不随产品默认值漂移
+    return doc;
+  })();
 
   const two = mk("n-1", "起点", undefined, { x: 0, y: 0 });
   const twoTarget = mk("n-2", "目标 & <关联>", undefined, { x: 220, y: 80 });
@@ -164,6 +171,7 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
   {
     const rand = mulberry32(300450);
     const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 显式锁定（尺寸按 Noto 度量）
     const NODES = 300,
       EDGES = 450,
       COLS = 20;
@@ -213,6 +221,7 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
   // 多入边端口、跨层长边（内部直连 + 贴边通道）、孤立节点。
   {
     const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 显式锁定
     // 横向五列（层沿 x 递增，同层沿 y 堆叠）；孤立节点主图下方成行、首项左齐第一列。
     const POS: Record<string, { x: number; y: number }> = {
       "n-capture": { x: 0, y: 0 },
@@ -319,6 +328,7 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
 
   fixtures["large-bounds"] = (() => {
     const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 显式锁定
     doc.document.nodes.push(
       {
         id: "n-1",

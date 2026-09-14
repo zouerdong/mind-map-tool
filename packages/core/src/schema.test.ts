@@ -6,6 +6,13 @@ function base() {
 }
 
 describe("schema 校验", () => {
+  it("新文档默认值（OFR-2026-09-14 #4：默认文楷）", () => {
+    const doc = emptyDocument();
+    expect(doc.document.font).toBe("lxgw-wenkai");
+    expect(doc.document.theme).toBe("light");
+    expect(doc.document.framesVisible).toBe(true);
+  });
+
   it("合法 v1 文档通过", () => {
     const doc = base();
     doc.document.nodes.push({

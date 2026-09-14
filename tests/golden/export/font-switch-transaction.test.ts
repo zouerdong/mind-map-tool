@@ -39,6 +39,9 @@ const wasm = (() => {
 
 function seededDocument() {
   const doc = emptyDocument();
+  // 本测试验证 Noto→LXGW→Noto 两向切换事务；OFR-2026-09-14 #4 后新文档
+  // 默认文楷，显式锁定起点字体，不依赖产品默认值。
+  doc.document.font = "noto-sans-sc";
   doc.document.nodes.push(
     {
       id: "n-1",

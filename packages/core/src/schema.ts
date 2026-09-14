@@ -333,7 +333,9 @@ export function emptyDocument(): MindMapDocumentV1 {
     schemaVersion: 2, // 新文档即新写（ADR 0010）
     document: {
       theme: "light",
-      font: "noto-sans-sc",
+      // OFR-2026-09-14 #4（负责人 dogfood 决定）：新文档默认文楷而非黑体；
+      // 既有文档字体随文件持久化，不受影响。工具条仍可在两款字体间切换。
+      font: "lxgw-wenkai",
       shape: "card",
       framesVisible: true,
       nodes: [],
