@@ -726,6 +726,96 @@ describe("DFR-010 状态同步复核（指南 §1）", () => {
   });
 });
 
+describe("DFR-090 F1：ready 提交失败的意图保留（与 pending 同规则）", () => {
+  function readyBarrier(
+    session: DocumentSession,
+    hooks?: { onCommitted?: () => void; onError?: (e: unknown) => void },
+  ) {
+    return new GeometryBarrier({
+      session,
+      getMetricsState: () => "ready",
+      whenMetricsReady: () => Promise.resolve(REAL_FONTS),
+      getFallbackFonts: () => REAL_FONTS,
+      ...(hooks?.onCommitted !== undefined ? { onCommitted: hooks.onCommitted } : {}),
+      ...(hooks?.onError !== undefined ? { onError: hooks.onError } : {}),
+    });
+  }
+
+  it("ready 提交失败：意图保留可重试；故障恢复后显式 flush 恰好提交一次", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const onError = vi.fn();
+    const onCommitted = vi.fn();
+    const barrier = readyBarrier(session, { onError, onCommitted });
+    const direct = session.commit({
+      kind: "CreateNode",
+      id: "dup",
+      text: "已有",
+      position: { x: 0, y: 0 },
+      size: { width: 120, height: 50 },
+    });
+    expect(direct.ok).toBe(true);
+
+    // 提交失败：意图不得丢失——hasPendingIntents 为 true，用户文本保留
+    await barrier.enqueue({ kind: "create-node", id: "dup", position: { x: 9, y: 9 }, text: "冲突草稿" });
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(barrier.hasPendingIntents()).toBe(true);
+    expect(barrier.getPendingIntents()[0]).toMatchObject({
+      kind: "create-node",
+      id: "dup",
+      text: "冲突草稿",
+    });
+    // 文档未被误改
+    expect(session.current.document.document.nodes).toHaveLength(1);
+
+    // 故障恢复（外部删除冲突节点）→ flush 恰好提交一次
+    session.commit({ kind: "DeleteSelection", nodeIds: ["dup"], edgeIds: [] });
+    await barrier.flush();
+    expect(barrier.hasPendingIntents()).toBe(false);
+    const nodes = session.current.document.document.nodes;
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ id: "dup", text: "冲突草稿" });
+  });
+
+  it("ready 失败意图持续失败：显式 flush 拒绝（Save 阻断可见），意图仍保留", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const barrier = readyBarrier(session, { onError: () => {} });
+    session.commit({
+      kind: "CreateNode",
+      id: "dup",
+      text: "已有",
+      position: { x: 0, y: 0 },
+      size: { width: 120, height: 50 },
+    });
+
+    await barrier.enqueue({ kind: "create-node", id: "dup", position: { x: 9, y: 9 }, text: "冲突" });
+    await expect(barrier.flush()).rejects.toThrow();
+    expect(barrier.hasPendingIntents()).toBe(true);
+    // 文档未被误改
+    expect(session.current.document.document.nodes).toHaveLength(1);
+    expect(session.current.document.document.nodes[0]?.text).toBe("已有");
+  });
+
+  it("提交成功但 onCommitted 通知抛错：不重复入队、不重复提交，错误仍呈现", async () => {
+    const session = new DocumentSession(emptyDocument());
+    const onError = vi.fn();
+    const onCommitted = vi.fn(() => {
+      throw new Error("通知故障");
+    });
+    const barrier = readyBarrier(session, { onError, onCommitted });
+
+    await barrier.enqueue({ kind: "create-node", id: "n1", position: { x: 0, y: 0 }, text: "通知失败" });
+    expect(onError).toHaveBeenCalledTimes(1);
+    // 命令已提交且不得重入队——否则 flush 会以 NODE_ALREADY_EXISTS 重复提交
+    expect(barrier.hasPendingIntents()).toBe(false);
+    expect(session.current.document.document.nodes).toHaveLength(1);
+
+    // 后续 flush 是无操作（不重复提交、不再报错）
+    await barrier.flush();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(session.current.document.document.nodes).toHaveLength(1);
+  });
+});
+
 describe("DFR-020 edit-text 测量与 core runs 清除语义一致", () => {
   // 字号差异字体：advance = fontSize（1px/pt/字），让 runs 有无产生可区分几何
   const SIZE_SENSITIVE_FONTS: FontResolver = {

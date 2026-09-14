@@ -10,6 +10,9 @@
 // 提交，绝不持久化 fallback size；
 // 字体加载失败时零提交；单条提交失败时保留失败意图并阻断 canonical save，
 // 已成功提交的前序用户命令仍留在 session 历史中。
+// [DFR-090 F1] ready 态提交失败同样保留意图入队（与 pending 同一套归并
+// 规则），显式 flush 可重试、持续失败时拒绝；命令提交失败与提交后的通知
+// 失败严格分开——通知抛错不得把已提交命令重新入队造成重复提交。
 
 import type { Command, DocumentSession, FontToken, NodeShape, Point, TextRun } from "@mindmap/core";
 import { documentDefaults } from "../projection/projection.js";
@@ -82,16 +85,25 @@ export class GeometryBarrier {
       // DocumentSession 是可变容器；若把 onCommitted 延迟到 Promise 微任务，
       // React Flow 可能先因 selection 等 UI state 重渲染，形成“core 已变、
       // projection version 未变”的短暂窗口并触发 projection drift。
+      // DFR-090 F1：命令提交失败与提交后的通知失败必须分开——
+      // 1) 提交失败：意图按 pending 同规则保留入队（用户输入不丢失，
+      //    hasPendingIntents 为 true，显式 flush 可重试且持续失败时拒绝），
+      //    经 onError 呈现后 resolve（void 调用不得收到 rejected promise）。
+      // 2) 提交成功但通知抛错：命令已生效，绝不再入队（否则 flush 会以
+      //    重复命令再次提交）；错误仍经 onError 呈现。
       try {
         this.commitIntent(intent, this.options.getFallbackFonts());
-        this.options.onCommitted?.();
-        return Promise.resolve();
       } catch (error) {
-        // 调用方大量使用 `void enqueue(...)`：commit 失败经 onError 呈现，
-        // 不得返回 rejected promise 制造未处理拒绝（与 pending 分支同约束）。
+        this.queueIntent(intent);
         this.options.onError?.(error);
         return Promise.resolve();
       }
+      try {
+        this.options.onCommitted?.();
+      } catch (error) {
+        this.options.onError?.(error);
+      }
+      return Promise.resolve();
     }
 
     // pending/failed 态：都只记录意图，不允许 fallback 几何进入 session。
@@ -101,6 +113,20 @@ export class GeometryBarrier {
       this.options.onError?.(new Error("字体资源加载失败；变更已保留，将在下次保存时重试"));
     }
 
+    this.queueIntent(intent);
+
+    // PRR-066：pending 态首个依赖真实字体度量的意图自动启动一次
+    // in-flight flush——字体/导出资源由真实需求触发加载（空白画布 mount
+    // 不预热）。failed 态不自动重试：错误已由 onError 呈现，重试留给
+    // 下次显式 flush（保存/关闭保存/导出），与上方提示承诺一致。
+    if (state === "pending") this.scheduleBackgroundFlush();
+
+    return Promise.resolve();
+  }
+
+  /** 意图入队（含同节点归并）：pending/failed 正常入队与 ready 提交失败
+   *  的保留重试共用同一套规则（DFR-090 F1 统一失败保留语义）。 */
+  private queueIntent(intent: GeometryIntent): void {
     // 同节点 intent 归并更新，确保字体恢复后恰好提交一次。
     if (intent.kind === "create-node") {
       this.queue.push(intent);
@@ -146,14 +172,6 @@ export class GeometryBarrier {
         this.queue.push(intent);
       }
     }
-
-    // PRR-066：pending 态首个依赖真实字体度量的意图自动启动一次
-    // in-flight flush——字体/导出资源由真实需求触发加载（空白画布 mount
-    // 不预热）。failed 态不自动重试：错误已由 onError 呈现，重试留给
-    // 下次显式 flush（保存/关闭保存/导出），与上方提示承诺一致。
-    if (state === "pending") this.scheduleBackgroundFlush();
-
-    return Promise.resolve();
   }
 
   /**
