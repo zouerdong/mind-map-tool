@@ -62,6 +62,30 @@ async function selectNode(id: string) {
 }
 
 describe("上下文工具条（VRA-050）", () => {
+  it("DFR-090 F2：格式可叠加——字号后再粗体不丢字号（toggleWhole 保留其他属性）", async () => {
+    const { session } = renderCanvas();
+    await selectNode("b");
+    fireEvent.click(screen.getByTitle("字号 +2"));
+    await waitFor(() => {
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
+      ).toEqual([{ start: 0, end: 2, fontSize: 18 }]);
+    });
+    fireEvent.click(screen.getByTitle("整节点粗体"));
+    await waitFor(() => {
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
+      ).toEqual([{ start: 0, end: 2, fontSize: 18, bold: true }]);
+    });
+    // 再点粗体关闭：字号仍保留（显式 false 不丢其他属性）
+    fireEvent.click(screen.getByTitle("整节点粗体"));
+    await waitFor(() => {
+      expect(
+        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
+      ).toEqual([{ start: 0, end: 2, fontSize: 18, bold: false }]);
+    });
+  });
+
   it("无选中不渲染；选中节点出现工具条（强调/眉题/字体/字号/形状/框线/删除）", async () => {
     renderCanvas();
     expect(screen.queryByTestId("context-toolbar")).toBeNull();

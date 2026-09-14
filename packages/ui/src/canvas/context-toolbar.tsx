@@ -430,8 +430,13 @@ function stepFontSize(node: MindNode, step: number): TextRun[] {
 function clampSize(v: number): number {
   return Math.min(72, Math.max(8, Math.round(v)));
 }
-/** 整节点开关粗体/下划线（全区间 runs）。 */
+/** 整节点开关粗体/下划线。DFR-090 F2：翻转目标属性时保留既有 runs 的
+ *  其他属性（字号/另一开关）——此前整体替换为单属性 run，A+ 后点 B 会
+ *  静默丢字号。无 runs 时全区间单 run；关闭写显式 false（与原语义一致）。 */
 function toggleWhole(node: MindNode, key: "bold" | "underline"): TextRun[] {
   const currently = node.runs?.some((r) => r[key] === true) === true;
-  return [{ start: 0, end: node.text.length, [key]: !currently } as TextRun];
+  if (node.runs === undefined || node.runs.length === 0) {
+    return [{ start: 0, end: node.text.length, [key]: !currently } as TextRun];
+  }
+  return node.runs.map((r) => ({ ...r, [key]: !currently }));
 }
