@@ -123,7 +123,32 @@ ready 分支拆分为两个 try：commitIntent 失败 → 意图按 pending 同�
 - **遗留观察（交审阅定夺，未擅自改）**：LXGW WenKai 无 bold 字面，导出层 `seg.bold` 依赖 `fonts.bold(fontId)`，文楷文档的粗体在 SVG/PDF 中不呈现（canvas 由浏览器合成粗体）；是否引入 faux-bold 属独立导出策略决策。`layout.ts` 已有 `fauxBold` 常量但无生产者。
 - 真实 IME 手工抽查：自动化无法驱动系统 IME，建议负责人本机试用时以真实输入法在带样式节点上续写一次。
 
-## 八、交接
+## 八、DFR-090 R2 复审收口（2026-09-14 再追加）
+
+复审结论 REVISE（R2），附四个可运行独立反例（已入库 `packages/ui/test/dfr090-independent.test.tsx`，先复用红灯再修根因）。勘误：上轮报告"43 项断言"实际计数为 49。
+
+### R2-F1（`6c23da7`）：旧失败意图覆盖新操作
+
+ready 快路只看 metrics state 不看队列：旧失败意图留队时新操作直接写文档，保存 flush 重放旧操作覆盖新值。修复：队列未空或有 in-flight drain 时新意图先归并入队（同字段新值取代旧值、跨字段保留顺序）经统一 drain 顺序提交；空队列快路保持同步通知。EditorCanvas 五处仅按 `getMetricsState()` 旁路 `api.commit` 的入口（正文/眉题/建点/工具条格式）同步受新增的 `hasUnresolvedIntents()` 约束。独立反例（older 失败入队→latest 成功→flush 得 latest）转绿；失败保留、通知不重入队、持续失败阻断保存的原用例全部保留。
+
+### R2-F2（`7c90826`）：格式叠加只修了一个方向
+
+B→A+ 字号不变（stepFontSize 只步进显式 fontSize，默认 16 未提升）；局部 runs 的空隙吃不到整节点 B/U。修复：`runs-remap.ts` 新增 `segmentTextRuns`（覆盖段+空隙分割全文本域）与 `mergeAdjacentRuns`；stepFontSize 按段有效字号（缺省按正文默认 16）步进，toggleWhole 全域翻转目标属性保留其他属性。混合开关策略不变。两个独立反例转绿。
+
+### R2-F3（`5c46547`）：文楷语义粗体在上游被清除
+
+PRD §5.1 既定"文楷无真粗体用描边模拟"，scene/SVG/PDF 模拟分支均存在；断点是 `layoutNodeText` 把请求 bold 与真粗体字面合成 useBold，文楷段输出 bold=false 使 fauxBold 永不命中。修复：段上保留语义 bold（缺真粗体仍用 regular 度量），scene 派生 fauxBold；SVG 端 font-weight 与描边只取其一防双重模拟过粗；PDF 双绘与 PNG（消费 SVG）经既有路径生效，未改动。`lxgw-font` golden 三项哈希 REGEN——夹具本就为文楷模拟粗体设计，旧快照固化的是缺陷输出；其余用例哈希不变。独立反例转绿。
+
+### R2 验证
+
+- 自动门：`pnpm test:unit` 707 passed；export golden 18 passed（REGEN 说明如上）；typecheck/lint 5/5。
+- 新候选：source `5c46547`（clean worktree），DMG sha256 `567b4f0974e06e22c47534cdd96f17b70443cefb28f83e0ebbbc4c21c1dfdd2e`，inventory `bundle-inventory-r2.json`。
+- 原生短路径 **51 项断言全 PASS**：在上一轮场景基础上覆盖 B→A+ 逆序叠加（导出 JSON 确认 `bold+fontSize:18` 全域）、文楷导出 SVG 描边模拟（含 stroke、无 font-weight、无双重庆合）、编辑/格式/整理/保存重开/四格式导出。证据 `dfr-040-native-evidence.json`。
+- 视觉对照：导出 PNG 人工目检——文楷描边模拟粗体效果可辨且不过粗（证据目录 `dfr-040-export.png`）。
+- **测试环境观察（非产品缺陷，供后续跑批参考）**：未签名重建候选会触发 macOS TCC「访问文稿文件夹」授权弹窗（cdhash 变化视为新应用）；该弹窗为系统级 modal，出现时 AX 查询返回空窗口——曾被误判为应用故障。跑批前需人工点击允许一次。锁屏同样阻断 AX（见 §七）。
+- R2-F1 相邻残留（已报审阅/负责人，未擅自扩修）：失败意图留队后用户删除目标节点，flush 将永久失败阻断保存；建议下轮决定"不可恢复错误丢弃意图并告警"或"删除命令连带清理队列意图"。
+
+## 九、交接
 
 - 新候选（见 §一）+ 证据目录 `.tmp/dogfood-2026-09-13/`（驱动、证据 JSON、截图、导出件、inventory）。
 - 提交链：`0458634`（文档）→ `af86d4a`（DFR-010）→ `d5dd5bd`（DFR-020）→ `24fe172`+`b63c361`（DFR-030）→ `dea33ed`（onboarding，范围扩展已批）→ `5544adf`（选择态）→ `e132a22`→`8384007`→`5b221f6`→`b1f04f4`（夹紧终案）。

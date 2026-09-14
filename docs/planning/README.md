@@ -1,5 +1,7 @@
 # Planning
 
+2026-09-14 R2 复审收口：`DFR-090 R2-F1/F2/F3 REVISE 收口完成 / STOP_FOR_INDEPENDENT_REVIEW`。四个独立反例入库先红后绿；新候选 source `5c46547`，DMG sha256 `567b4f0974e06e22…`，原生短路径 51 项断言全过（B→A+ 逆序、文楷描边模拟、编辑保存重开、四格式导出），导出 PNG 视觉对照通过。详见[报告 §八](../quality/dogfood-repair-report-2026-09-13.md)。上轮"43 项"勘误为 49。停等独立审阅；G-FINAL 未申请。
+
 2026-09-14 返修回报：`DFR-090 F1/F2 REVISE 收口完成 / STOP_FOR_INDEPENDENT_REVIEW`。新候选 source `4b5d054`，DMG sha256 `c181429c2a2e47c9…`，原生短路径 43 项断言全过（含 F2 续写/编辑中格式/保存重开/四格式导出）。审阅提出的 F1（ready 失败丢意图）与 F2（编辑丢样式/草稿被旧文本覆盖）均已按先红灯后修复收口，另修复原生实测暴露的格式叠加丢字号（toggleWhole）。详见[报告 §七](../quality/dogfood-repair-report-2026-09-13.md)。停等独立审阅；G-FINAL 未申请。
 
 2026-09-14 执行回报：`DFR-010～040 EXECUTED / STOP_FOR_INDEPENDENT_REVIEW`。新候选 source `b1f04f4`（clean worktree），DMG sha256 `00f353a259917228…`，原生 38 项断言全过，四张要求截图齐全。报告：[dogfood-repair-report-2026-09-13.md](../quality/dogfood-repair-report-2026-09-13.md)。停等 DFR-090 独立审阅；旧 DMG 继续作废；G-FINAL 未申请。
