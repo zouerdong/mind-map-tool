@@ -502,7 +502,12 @@ export function EditorCanvas({
             if (!geom || !e.data) return e;
             return {
               ...e,
-              data: { lineStyle: e.data.lineStyle, theme: e.data.theme, pathD: geom.pathD, arrowD: geom.arrowD },
+              data: {
+                lineStyle: e.data.lineStyle,
+                theme: e.data.theme,
+                pathD: geom.pathD,
+                arrowD: geom.arrowD,
+              },
             };
           })
         : view.edges,
@@ -581,7 +586,10 @@ export function EditorCanvas({
     (event: React.MouseEvent) => {
       const point = panePointFromEvent(event.nativeEvent, viewport);
       if (!point) return;
-      if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
+      if (
+        geometryBarrier &&
+        (geometryBarrier.getMetricsState() !== "ready" || geometryBarrier.hasUnresolvedIntents())
+      ) {
         const id = (nextNodeId ?? (() => defaultId("n")))();
         void geometryBarrier.enqueue({ kind: "create-node", id, position: point, text: "" });
         setPendingNodes((prev) => new Map(prev).set(id, { id, position: point, text: "" }));
@@ -723,7 +731,10 @@ export function EditorCanvas({
       y: Math.round(center.y * 1000) / 1000,
     };
 
-    if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
+    if (
+      geometryBarrier &&
+      (geometryBarrier.getMetricsState() !== "ready" || geometryBarrier.hasUnresolvedIntents())
+    ) {
       void geometryBarrier.enqueue({ kind: "create-node", id, position: pos, text: "" });
       setPendingNodes((prev) => new Map(prev).set(id, { id, position: pos, text: "" }));
       setFocusNodeId(id);
@@ -777,7 +788,10 @@ export function EditorCanvas({
       // DFR-090 F2：节点当前样式 runs 随正文变更映射保留（整节点样式续写不丢、
       // 混合 runs 不套旧索引）；pending/ready 两路径同一份映射结果。
       const mappedRuns = remapRunsForTextChange(current, node?.runs, text);
-      if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
+      if (
+        geometryBarrier &&
+        (geometryBarrier.getMetricsState() !== "ready" || geometryBarrier.hasUnresolvedIntents())
+      ) {
         void geometryBarrier.enqueue({
           kind: "edit-text",
           id,
@@ -923,7 +937,11 @@ export function EditorCanvas({
             anchor={toolbarAnchor}
             onCommand={(command) => {
               if (command.kind === "SetNodeKicker") {
-                if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
+                if (
+                  geometryBarrier &&
+                  (geometryBarrier.getMetricsState() !== "ready" ||
+                    geometryBarrier.hasUnresolvedIntents())
+                ) {
                   void geometryBarrier.enqueue({
                     kind: "set-kicker",
                     id: command.id,
@@ -956,7 +974,11 @@ export function EditorCanvas({
                   command.runs !== undefined
                     ? remapRunsForTextChange(command.text, command.runs, baseText)
                     : undefined;
-                if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
+                if (
+                  geometryBarrier &&
+                  (geometryBarrier.getMetricsState() !== "ready" ||
+                    geometryBarrier.hasUnresolvedIntents())
+                ) {
                   void geometryBarrier.enqueue({
                     kind: "edit-text",
                     id: command.id,
@@ -969,9 +991,7 @@ export function EditorCanvas({
                     {
                       text: baseText,
                       ...(runs !== undefined ? { runs } : {}),
-                      ...(latestNode?.kicker !== undefined
-                        ? { kicker: latestNode.kicker }
-                        : {}),
+                      ...(latestNode?.kicker !== undefined ? { kicker: latestNode.kicker } : {}),
                     },
                     fontId,
                     fonts,

@@ -73,6 +73,12 @@ export class GeometryBarrier {
     return this.queue.length > 0;
   }
 
+  /** R2-F1：存在未解决意图（队列或 in-flight drain）时调用方不得旁路
+   *  barrier 直接 api.commit——所有写文档命令必须经队列保持顺序。 */
+  hasUnresolvedIntents(): boolean {
+    return this.queue.length > 0 || this.flushInFlight !== null;
+  }
+
   getPendingIntents(): readonly GeometryIntent[] {
     return this.queue;
   }
@@ -81,6 +87,15 @@ export class GeometryBarrier {
     if (this.disposed) return Promise.resolve();
     const state = this.options.getMetricsState();
     if (state === "ready") {
+      // R2-F1：队列未空或有 in-flight drain 时，新意图不得越过旧意图直接写
+      // 文档（旧失败意图会在保存 flush 时覆盖较新操作）。先按同字段归并入队
+      //（同字段新值取代旧值、跨字段保留顺序），再经统一 drain 顺序提交；
+      // 空队列的正常 ready 快路保持同步提交 + 同步通知。
+      if (this.queue.length > 0 || this.flushInFlight) {
+        this.queueIntent(intent);
+        this.scheduleBackgroundFlush();
+        return Promise.resolve();
+      }
       // ready 分支必须在同一调用栈内同时完成 core commit 与版本通知。
       // DocumentSession 是可变容器；若把 onCommitted 延迟到 Promise 微任务，
       // React Flow 可能先因 selection 等 UI state 重渲染，形成“core 已变、
