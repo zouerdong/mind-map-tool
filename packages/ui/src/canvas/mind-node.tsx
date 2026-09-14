@@ -61,6 +61,11 @@ function MindNodeViewImpl({
   const kicker = frameless ? t.canvasKicker : accent ? t.cardAccentKicker : t.cardNormalKicker;
   const isEllipse = data.shape === "ellipse";
   const primary = selected || focused; // 主选/焦点：角标记
+  // OFR-2026-09-14 #6：无真粗体字体（文楷 bold()=null）的语义粗体段不能用
+  // fontWeight 700——浏览器合成加粗比 regular 度量更宽，SVG 视口会裁掉尾部
+  // （用户实测：idea 框里文字显示不全）。与导出 scene.fauxBold 同一契约：
+  // 描边模拟（stroke + fontSize×1/32），不用合成粗体。
+  const hasRealBold = fonts.bold(data.font) !== null;
   // 编辑态实时尺寸（用户实测 2026-08-29：编辑框长大了、节点框没长，文字溢出框外）。
   const [editBox, setEditBox] = useState<{ width: number; height: number } | null>(null);
 
@@ -125,9 +130,11 @@ function MindNodeViewImpl({
           // 退回普通 16px）；混合 runs 则退回纯文本渲染，提交后样式仍保留。
           {...(() => {
             const editStyle = uniformRunsStyle(data.runs, data.text.length);
+            const editFauxBold = editStyle?.bold === true && !hasRealBold;
             return {
               ...(editStyle?.fontSize !== undefined ? { fontSize: editStyle.fontSize } : {}),
-              ...(editStyle?.bold === true ? { fontWeight: 700 } : {}),
+              ...(editStyle?.bold === true && !editFauxBold ? { fontWeight: 700 } : {}),
+              ...(editFauxBold ? { fauxBold: true } : {}),
               underline: editStyle?.underline === true,
             };
           })()}
@@ -198,6 +205,7 @@ function MindNodeViewImpl({
                 {line.segments.map((seg, si) => {
                   const x = VISUAL_TYPOGRAPHY.paddingX + seg.startX;
                   const showUnderline = seg.underline;
+                  const segFauxBold = seg.bold && !hasRealBold;
                   lastX = x + seg.width;
                   return (
                     <g key={si}>
@@ -207,7 +215,13 @@ function MindNodeViewImpl({
                         fill={text}
                         fontSize={seg.fontSize}
                         fontFamily={fontFamily(data.font)}
-                        fontWeight={seg.bold ? 700 : 400}
+                        fontWeight={seg.bold && !segFauxBold ? 700 : 400}
+                        // fauxBold：与导出 SVG 同一描边模拟（R2-F3 契约；
+                        // 合成粗体宽度超出 regular 度量会被视口裁剪）
+                        stroke={segFauxBold ? text : "none"}
+                        strokeWidth={
+                          segFauxBold ? seg.fontSize * LAYOUT.fauxBoldStrokeRatio : undefined
+                        }
                         style={{ whiteSpace: "pre" }}
                         textDecoration={showUnderline ? "underline" : undefined}
                       >
