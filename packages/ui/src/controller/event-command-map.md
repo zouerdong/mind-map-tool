@@ -13,7 +13,7 @@
 | 节点拖动结束（`onNodeDragStop`）                               | `moveNodes(deltas, doc)`            | `MoveNodes`（批量原子）                              | 拖动期间只本地位移；**只提交一次**；位移为零 → `null`                    |
 | 连接（`onConnect` source→target）                              | `connect(source, target, doc)`      | `CreateEdge`                                         | 预检自环/同向重复/悬空 → `null`（core 亦会拒绝，预检避免注定失败的提交） |
 | Delete / Backspace（画布 focus，非编辑态）                     | `deleteSelection(nodeIds, edgeIds)` | `DeleteSelection`                                    | 选中节点 + 选中边；incident 边由 core 原子删除                           |
-| ⌘/Ctrl+Z（非编辑态、非 IME 组合）                              | `session.undo()`（不产生新命令）    | —                                                    | history hook                                                             |
+| ⌘/Ctrl+Z（非编辑态、非 IME 组合；生产经编辑菜单 accelerator → dispatcher，OFR-2026-09-14 #5） | `session.undo()`（不产生新命令）    | —                                                    | history hook                                                             |
 | ⌘/Ctrl+Shift+Z / ⌘/Ctrl+Y                                      | `session.redo()`                    | —                                                    |                                                                          |
 | 主题切换（未来 MM-070 入口）                                   | `setTheme(theme)`                   | `SetDocumentStyle`                                   | 持久化、可 undo                                                          |
 | 节点形状覆盖（未来入口）                                       | `setNodeShape(id, shape)`           | `SetNodeShape`                                       | null=清除覆盖                                                            |

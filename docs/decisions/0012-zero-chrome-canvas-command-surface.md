@@ -1,11 +1,11 @@
 # ADR 0012: 零 WebView Chrome 画布与 macOS 原生命令承载
 
 - Status: Accepted
-- ADR-Version: 1.1.0
-- Date: 2026-09-08（v1.1.0 修订 2026-09-13）
+- ADR-Version: 1.2.0
+- Date: 2026-09-08（v1.1.0 修订 2026-09-13；v1.2.0 修订 2026-09-14）
 - Owners: ErDong Zou（产品决定）/ 执行 Agent（工程实现）
 - 任务来源: PRR-065（[from-user 2026-09-08]："用户一打开这个程序，就是一张全干净的画布。看不到任何菜单。"）
-- 修订来源: DFR-030（[from-user 2026-09-13]：负责人批准 [首次试用修复开发指南](../planning/dogfood-repair-development-guide-2026-09-13.md) §3 轻量界面方案——空白画布底部创建提示、≥2 节点浮动整理按钮、选中工具条靠近节点）
+- 修订来源: DFR-030（[from-user 2026-09-13]：负责人批准 [首次试用修复开发指南](../planning/dogfood-repair-development-guide-2026-09-13.md) §3 轻量界面方案——空白画布底部创建提示、≥2 节点浮动整理按钮、选中工具条靠近节点）；v1.2.0：OFR-2026-09-14（负责人第二次实用反馈——编辑菜单撤销/重做改为自定义 renderer 命令 ⌘Z/⇧⌘Z；首次使用启动自动出示引导 welcome，见 PRD §7.2）
 
 ## Context
 
@@ -34,7 +34,7 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
 3. **命令归属 macOS 原生菜单**（稳定 menu item id）：
    - `Mind Map`：关于（predefined）、设置/全局热键、Services、Hide、Hide Others、Show All、Quit（自定义，继续走逐窗 fail-closed 关闭协议）
    - `文件`：新建 `⌘N`、打开 `⌘O`、保存 `⌘S`、另存为 `⇧⌘S`、导出 `⌘E`、新建窗口 `⇧⌘N`、关闭窗口 `⌘W`
-   - `编辑`：predefined 撤销/重做/剪切/复制/粘贴/全选（textarea 原生文本语义；画布态 undo/redo 继续由 WebView 键位层处理，不重复派发）
+   - `编辑`：撤销 `⌘Z` / 重做 `⇧⌘Z`（v1.2.0 起为自定义 renderer 命令——accelerator 被菜单拦截产生唯一 menu event，不再依赖画布焦点收到 keydown；renderer 按焦点分流：文本编辑中原生文本撤销，否则 session 文档撤销/重做）+ predefined 剪切/复制/粘贴/全选（textarea 原生文本语义）
    - `视图`：适应画布、整理 `⇧⌘L`、横向布局 ✓ / 纵向布局 ✓（check）、暖白 ✓ / 黑板 ✓（check）
    - `帮助`：开始/重放引导 `⇧⌘H`
 
