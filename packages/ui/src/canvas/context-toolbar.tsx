@@ -167,9 +167,18 @@ function AnchoredPanel({
     h: typeof window !== "undefined" ? window.innerHeight : 600,
   }));
   useEffect(() => {
-    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // 窗口/容器尺寸变化信号：macOS AX 驱动或系统侧的窗口调整不保证派发
+    // webview resize 事件（原生实测：窗口缩小后夹紧停留在旧宽度）。
+    // ResizeObserver 直接观察布局变化，必然触发。
+    const el = barRef.current?.closest(".react-flow");
+    const update = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", update);
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(update) : null;
+    if (el && ro) ro.observe(el);
+    return () => {
+      window.removeEventListener("resize", update);
+      ro?.disconnect();
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -180,11 +189,11 @@ function AnchoredPanel({
     const el = barRef.current;
     const w = el?.offsetWidth ?? 0;
     const h = el?.offsetHeight ?? 0;
-    // 夹紧基准 = 布局视口（documentElement.clientWidth，不受页面横向溢出
-    // 影响）。原生实测反馈环：未夹紧首帧溢出 → 页面横向溢出 → 容器
-    // clientWidth 比窗口宽 16px → 按容器夹紧永远纵容溢出。
-    const vw = document.documentElement.clientWidth || viewportSize.w;
-    const vh = document.documentElement.clientHeight || viewportSize.h;
+    // 夹紧基准 = window.innerWidth（布局视口，不受页面横向溢出影响——
+    // documentElement.clientWidth 与容器 clientWidth 在内容溢出时会被撑大，
+    // 形成“溢出→视口变宽→纵容溢出”的反馈环；原生实测证实）。
+    const vw = window.innerWidth || viewportSize.w;
+    const vh = window.innerHeight || viewportSize.h;
     const left = Math.min(Math.max(anchor.x - w / 2, 8), Math.max(8, vw - w - 8));
     const top = Math.min(Math.max(anchor.y - h - 8, 8), Math.max(8, vh - h - 8));
     // 值相等时保留旧引用，避免 children 每渲染新引用导致的 effect/setState 循环
