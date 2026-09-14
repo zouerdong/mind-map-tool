@@ -24,6 +24,8 @@ use crate::lifecycle::runtime::{
 };
 use std::sync::Arc;
 
+mod save_panel;
+
 pub const WINDOW_BOOTSTRAP_EVENT: &str = "platform://window-bootstrap";
 pub const LAUNCH_RETRYABLE_ERROR_EVENT: &str = "platform://launch-retryable-error";
 pub const CLOSE_REQUEST_EVENT: &str = "platform://close-requested";
@@ -392,9 +394,28 @@ pub async fn platform_request_target_authorization(
             display_path: grant.display_path,
         }));
     }
+    // macOS 文档保存：自承载 NSSavePanel + accessory 格式选择（OFR-2026-09-14
+    // #3 红灯返修）。rfd 在 macOS 把全部 filter 合并进 NSSavePanel
+    // allowedFileTypes，系统不显示格式 popup（2026-09-15 原生 dogfood 实证），
+    // 无法提供负责人要求的「保存时可见格式选择」。导出与其他平台仍走 rfd。
+    #[cfg(target_os = "macos")]
+    if matches!(&kind, TargetKind::Document) {
+        let parent = window.ns_window().map_err(|e| {
+            crate::file::error::IpcError::new("FILE_IO_ERROR", format!("窗口句柄不可用：{e}"))
+        })?;
+        let Some(path) = save_panel::pick_document_save_target(&app, parent, &suggested_name)?
+        else {
+            return Ok(None); // 用户取消
+        };
+        let grant = service.grant_authorization(window.label(), kind, &path)?;
+        return Ok(Some(GrantedAuthorizationDto {
+            authorization_ref: grant.authorization_ref,
+            display_path: grant.display_path,
+        }));
+    }
     let mut builder = app.dialog().file();
     if matches!(&kind, TargetKind::Document) {
-        // OFR-2026-09-14 #3（负责人 dogfood）：保存时提供格式选择——正式
+        // 非 macOS（Windows 通用保存对话框原生显示 filter 下拉）：正式
         // `.mindmap` 文档与兼容 `.json`（与 open 对话框的接受范围一致；
         // 两种扩展名写入同一份 canonical JSON，host 不做扩展名策略）。
         builder = builder
