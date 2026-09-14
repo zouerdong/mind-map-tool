@@ -58,7 +58,9 @@ export function sceneToSvg(scene: ExportScene): Uint8Array {
           const attrs = [`x="${num(seg.x)}"`, `y="${num(seg.baselineY)}"`];
           if (seg.fontSize !== baseSize) attrs.push(`font-size="${num(seg.fontSize)}"`);
           if (seg.letterSpacing !== 0) attrs.push(`letter-spacing="${num(seg.letterSpacing)}"`);
-          if (seg.bold) attrs.push(`font-weight="700"`);
+          // R2-F3：fauxBold（描边模拟）与 font-weight 只取其一，避免浏览器
+          // 合成粗体与描边叠加导致过粗。
+          if (seg.bold && !seg.fauxBold) attrs.push(`font-weight="700"`);
           if (seg.fauxBold) {
             attrs.push(
               `stroke="${item.color}" stroke-width="${num(seg.fontSize * LAYOUT.fauxBoldStrokeRatio)}"`,

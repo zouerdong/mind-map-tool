@@ -59,13 +59,13 @@
       "pdfSha256": "648a372ba651824c27fdccad4f9715eaf63e1b9d96d5f53d392586a86d8b655c"
     },
     "lxgw-font": {
-      "svgSha256": "592e032a2d06e9a26280a1a43aadc3f2c39f42351f3ee9aae908b0d6fe5f6804",
+      "svgSha256": "7323a146f809568b3ccb65c41ba131c7ff8c433dd26331c5fd158a655db79a93",
       "width": 246,
       "height": 126,
-      "pngSha256": "7d62930ce918a4d1cedfaa4b9eca0920846d7aeb8561bb3763d754ebb606ba90",
+      "pngSha256": "27bc0b3d2ce8c51e7695b7b9c86b67032b78541a3395e83a37d50774c40a813f",
       "pngWidth": 492,
       "pngHeight": 252,
-      "pdfSha256": "760bd8a2d7fb1cfaacc3692aec75a1d6d9f4b048c3416f13f1bc6d611b3aeced"
+      "pdfSha256": "788c0c1c464855cb8d7b393c664a36f17cd09a073724d77a812f2a1fb27be020"
     },
     "missing-glyph": {
       "svgSha256": "6c21180bfb08135bb7b77ca61efda2f4ec8d1c43c85589b51d1afe84bb984cf0",

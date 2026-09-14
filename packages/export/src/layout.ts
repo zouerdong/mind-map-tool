@@ -108,8 +108,11 @@ export function layoutNodeText(
     const flush = (endExclusive: number) => {
       if (currentText.length === 0) return;
       const fontSize = currentStyle.fontSize ?? baseFontSize;
-      const useBold = currentStyle.bold === true && bold !== null;
-      const metrics = currentStyle.bold === true ? (bold ?? regular) : regular;
+      // R2-F3：区分语义粗体与字重度量选择——用户请求的 bold 必须保留在段上
+      //（scene 据此派生 fauxBold 模拟分支；PRD §5.1 文楷无真粗体用描边模拟），
+      // 缺真粗体字面时用 regular 度量，不得把请求标记一并抹掉。
+      const requestedBold = currentStyle.bold === true;
+      const metrics = requestedBold ? (bold ?? regular) : regular;
       let width = 0;
       for (const ch of currentText) width += metrics.advance(ch, fontSize);
       segments.push({
@@ -117,7 +120,7 @@ export function layoutNodeText(
         startX: 0, // 稍后统一累加
         width,
         fontSize,
-        bold: useBold,
+        bold: requestedBold,
         underline: currentStyle.underline === true,
       });
       void endExclusive;
