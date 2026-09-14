@@ -8,6 +8,16 @@
 
 会影响体积、性能、数据兼容性或长期维护成本的决策，必须先写入 `docs/decisions/`，再进入实现。当前任务派发以 2026-09-07 PRR 批次为准，见 `docs/planning/README.md`、[终审整改开发指南](./docs/planning/pre-release-remediation-development-guide-2026-09-07.md) 与 [终审整改任务卡](./docs/planning/pre-release-remediation-task-cards-2026-09-07.md)。
 
+## 执行与验收补充
+
+- 文档、计划与回报使用中文；代码、命令、路径及技术标识使用英文。
+- 阅读顺序：本文件 → `docs/product/v1-product-spec.md` → `docs/planning/README.md` 及当前 PRR 指南/整卡 → Accepted ADR。历史 MM/VRA 卡不能代替当前派发入口。
+- 派发必须包含整卡的允许修改路径、STOP/BLOCKED 与 Risk IDs；越界先回报，不自行扩权。
+- 回报格式：`状态；修改文件；关键决定；验证命令及结果；未运行项/原因；风险/阻塞；下一卡输入`。
+- 质量门发现缺陷后修复责任模块并完整重跑受影响的验收门，不只重跑失败用例。
+- 依赖方向：平台无关 `packages/core` ← `packages/ui` / `packages/platform` ← `apps/desktop`；core 禁依赖 React、窗口和 OS API，桌面入口只做组合。
+- schema/文件格式、生产 UI 重构、新运行时依赖须遵守当前卡 Gate；签名、公证、上传及公开发布须另行授权。现行 Gate 状态以本文件页首及决定登记为准。
+
 ## 工程原则
 
 1. 领域逻辑与桌面框架隔离：脑图数据、编辑命令、布局规则不得依赖窗口或操作系统 API。
