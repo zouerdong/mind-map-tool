@@ -643,6 +643,34 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       "help.onboarding": () => {
         setReplaySignal((n) => n + 1);
       },
+      // OFR-2026-09-14 #5（负责人 dogfood：整理后按 ⌘Z 无法回到凌乱态）——
+      // 生产环境 ⌘Z/⌘⇧Z 由编辑菜单自定义项 accelerator 拦截产生唯一 menu
+      // event（不再依赖画布焦点收到 keydown：点击浮动按钮/工具条后焦点在
+      // 按钮上，画布 handler 永远收不到）。文本编辑中保持原生文本撤销；
+      // 否则 session 文档撤销/重做（画布经 revision 重投影，多节点位移
+      // 由 MotionCoordinator reverseTo 平滑接续）。
+      "edit.undo": () => {
+        const active = document.activeElement;
+        if (
+          (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) &&
+          typeof document.execCommand === "function"
+        ) {
+          document.execCommand("undo");
+          return;
+        }
+        if (session.undo()) bump();
+      },
+      "edit.redo": () => {
+        const active = document.activeElement;
+        if (
+          (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) &&
+          typeof document.execCommand === "function"
+        ) {
+          document.execCommand("redo");
+          return;
+        }
+        if (session.redo()) bump();
+      },
     }),
     [onNew, onOpen, onSave, onSaveAs, onOrganize, openShortcutPanel, session, bump],
   );
@@ -1378,14 +1406,18 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         </div>
       ) : null}
 
-      {/* PRR-065：始终挂载以消费偏好损坏警告、恢复进度，但启动时永不
-          自动呈现；仅 help.onboarding（帮助菜单 / ⌘⇧H）显式 replay。 */}
+      {/* PRR-065：始终挂载以消费偏好损坏警告、恢复进度；中断引导不自动
+          呈现（ADR 0012 §7），仅 help.onboarding（帮助菜单 / ⌘⇧H）显式
+          replay。OFR-2026-09-14 #7（负责人 dogfood：开局没看到新手指引
+          →不知道快捷键）：首次使用（偏好 not-started）启动自动呈现
+          welcome，完成/跳过后永不再自动弹出。 */}
       <OnboardingFlow
         observeCommands={observeCommands}
         preferences={onboardingPreferences}
         theme={theme}
         replaySignal={replaySignal}
         presentRestoredState={false}
+        presentOnFirstRun
         onPreferenceWarning={onPreferenceWarning}
       />
     </div>

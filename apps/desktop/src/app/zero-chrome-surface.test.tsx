@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 // PRR-065 红灯（卡 §红灯 1/2/5）：零 WebView Chrome 命令面。
 // 1. 生产渲染树无 AppHeader（主工具条 / 文件 ▾ / 整理 / 视图 / 主题按钮 / 40px 占位）
-// 2. 首启偏好 not-started 不自动出示 onboarding；⌘⇧H（浏览器 dev keydown）可显式打开
+// 2. 首启偏好 not-started 自动出示 welcome（OFR-2026-09-14 #7 负责人 dogfood
+//    推翻 PRR-065「永不自动呈现」：首次用户需要引导）；in-progress 不自动遮挡；
+//    ⌘⇧H（浏览器 dev keydown）可显式重放
 // 3. dirty 确认互斥、document.title 语义在无顶栏后保持
 // React Flow 以 stub 替换（同 app-integration.test.tsx）。
 
@@ -140,16 +142,15 @@ describe("DFR-030：ADR 0012 v1.1.0 状态化轻量元素（from-user 2026-09-13
   });
 });
 
-describe("红灯 2：onboarding explicit-only", () => {
-  it("偏好 not-started 首次启动不自动出现 onboarding 遮罩", async () => {
+describe("红灯 2：onboarding 首启呈现（OFR-2026-09-14 #7）", () => {
+  it("偏好 not-started 首次启动自动出现 welcome 遮罩", async () => {
     const preferences = new FakePreferencesPort();
     const loadSpy = vi.spyOn(preferences, "load");
     setup(preferences); // 空 snapshot → not-started
-    // 先等 restore 链路真实跑完（load 被消费），再断言最终不可见——
-    // 避免异步未完成时的假阴性。
+    // 等 restore 链路真实跑完，welcome 卡出现（首次用户需要看到引导）。
     await waitFor(() => expect(loadSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByTestId("onboarding-overlay")).toBeNull();
+    await screen.findByRole("dialog", { name: "欢迎使用脑图" });
+    expect(screen.getByTestId("onboarding-overlay")).toBeTruthy();
   });
 
   it("偏好 in-progress 也不在启动时自动遮挡画布", async () => {
@@ -185,6 +186,36 @@ describe("红灯 2：onboarding explicit-only", () => {
 });
 
 describe("红灯 5：无顶栏后既有语义保持", () => {
+  it("OFR-2026-09-14 #5：edit.undo/edit.redo 经 dispatcher 路由（不依赖画布焦点）", async () => {
+    setup();
+    const dispatch = (
+      window as typeof window & { __mmDispatchAppCommand?: (id: string) => boolean }
+    ).__mmDispatchAppCommand;
+    expect(dispatch).toBeTypeOf("function");
+
+    // 画布双击建点（rf-stub 路径）→ dirty、节点渲染
+    fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 40, clientY: 24 });
+    await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());
+
+    // 菜单命令路径撤销：文档回到空、dirty 清除（撤销的是唯一未保存变更）
+    expect(dispatch?.("edit.undo")).toBe(true);
+    await waitFor(() => {
+      expect(document.querySelectorAll('[class*="react-flow__node"]')).toHaveLength(0);
+      expect(document.title.startsWith("● ")).toBeFalsy();
+    });
+
+    // 重做恢复节点
+    expect(dispatch?.("edit.redo")).toBe(true);
+    await waitFor(() => {
+      expect(document.querySelectorAll('[class*="react-flow__node"]')).toHaveLength(1);
+      expect(document.title.startsWith("● ")).toBeTruthy();
+    });
+
+    // 空历史上 undo 是无害 no-op（不 bump、不报错）
+    expect(dispatch?.("edit.undo")).toBe(true);
+    expect(dispatch?.("edit.undo")).toBe(true);
+  });
+
   it("重复选择当前主题是 no-op，不产生虚假 dirty", async () => {
     setup();
     const dispatch = (

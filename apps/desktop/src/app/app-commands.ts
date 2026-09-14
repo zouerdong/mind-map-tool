@@ -20,7 +20,9 @@ export type AppCommandId =
   | "view.theme-warm"
   | "view.theme-dark"
   | "app.shortcuts"
-  | "help.onboarding";
+  | "help.onboarding"
+  | "edit.undo"
+  | "edit.redo";
 
 export interface AppCommandHandlers {
   "file.new": () => void;
@@ -36,6 +38,8 @@ export interface AppCommandHandlers {
   "view.theme-dark": () => void;
   "app.shortcuts": () => void;
   "help.onboarding": () => void;
+  "edit.undo": () => void;
+  "edit.redo": () => void;
 }
 
 /** host → renderer 原生菜单命令事件（tauri 定向 emit；见 Rust menu 模块）。 */
@@ -60,6 +64,8 @@ const APP_COMMAND_ID_TABLE = {
   "view.theme-dark": true,
   "app.shortcuts": true,
   "help.onboarding": true,
+  "edit.undo": true,
+  "edit.redo": true,
 } as const satisfies Record<AppCommandId, true>;
 
 const APP_COMMAND_IDS: ReadonlySet<string> = new Set(Object.keys(APP_COMMAND_ID_TABLE));

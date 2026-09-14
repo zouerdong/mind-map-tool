@@ -9,8 +9,11 @@
 //!   `platform_sync_menu_state` 上报非敏感状态，按窗口缓存；窗口聚焦时
 //!   刷新 app-wide 菜单（跟随最近聚焦窗口，不污染其他窗口）。
 //!
-//! 编辑菜单使用 predefined 项（undo/redo/cut/copy/paste/select_all）：
-//! textarea 原生文本语义 + 画布层键位不变，不产生双派发。
+//! 编辑菜单：撤销/重做是自定义 renderer 命令（OFR-2026-09-14 #5，带
+//! accelerator——按键被菜单拦截产生唯一 menu event，画布不再依赖焦点
+//! 收到 keydown；renderer 按编辑态分流：文本编辑中原生文本撤销，否则
+//! session 文档撤销）；cut/copy/paste/select_all 仍是 predefined 项
+//! （textarea 原生文本语义，不带自定义 accelerator）。
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -41,9 +44,13 @@ pub const MENU_VIEW_THEME_WARM: &str = "view.theme-warm";
 pub const MENU_VIEW_THEME_DARK: &str = "view.theme-dark";
 pub const MENU_APP_SHORTCUTS: &str = "app.shortcuts";
 pub const MENU_HELP_ONBOARDING: &str = "help.onboarding";
+pub const MENU_EDIT_UNDO: &str = "edit.undo";
+pub const MENU_EDIT_REDO: &str = "edit.redo";
 
 const ACCEL_FILE_EXPORT: &str = "CmdOrCtrl+E";
 const ACCEL_FILE_CLOSE_WINDOW: &str = "CmdOrCtrl+W";
+const ACCEL_EDIT_UNDO: &str = "CmdOrCtrl+Z";
+const ACCEL_EDIT_REDO: &str = "CmdOrCtrl+Shift+Z";
 
 /// 全部 renderer 命令 id（分流与对齐测试用；顺序即菜单呈现序）。
 pub const RENDERER_COMMAND_IDS: &[&str] = &[
@@ -60,6 +67,8 @@ pub const RENDERER_COMMAND_IDS: &[&str] = &[
     MENU_VIEW_THEME_DARK,
     MENU_APP_SHORTCUTS,
     MENU_HELP_ONBOARDING,
+    MENU_EDIT_UNDO,
+    MENU_EDIT_REDO,
 ];
 
 /// macOS/muda 会在派发 CheckMenuItem 事件前先自动反转勾选态。主题与布局是
@@ -268,11 +277,16 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         Some(ACCEL_FILE_CLOSE_WINDOW),
     )?;
 
-    // 编辑菜单：predefined 项走系统原生文本语义（textarea undo/copy 等），
-    // 不带自定义 accelerator——⌘Z/⌘A 等继续直达 WebView（画布层键位不变）。
+    // 编辑菜单：撤销/重做是自定义 renderer 命令（OFR-2026-09-14 #5）——
+    // accelerator 被 macOS 菜单拦截产生唯一 menu event（与 ⌘S/⇧⌘L 同一
+    // exactly-once 机制，ADR 0012 §5），不再依赖画布焦点收到 keydown；
+    // renderer 按焦点分流：文本编辑中 execCommand 原生文本撤销，否则
+    // session 文档撤销。cut/copy/paste/select_all 保持 predefined。
+    let edit_undo = MenuItem::with_id(app, MENU_EDIT_UNDO, "撤销", true, Some(ACCEL_EDIT_UNDO))?;
+    let edit_redo = MenuItem::with_id(app, MENU_EDIT_REDO, "重做", true, Some(ACCEL_EDIT_REDO))?;
     let edit_menu = SubmenuBuilder::new(app, "编辑")
-        .undo()
-        .redo()
+        .item(&edit_undo)
+        .item(&edit_redo)
         .separator()
         .cut()
         .copy()
@@ -419,8 +433,8 @@ pub fn forward_menu_command<R: Runtime>(
 }
 
 /// 预定义编辑菜单项工厂（供测试与构建一致性断言）。
-pub fn predefined_edit_ids() -> [&'static str; 6] {
-    ["undo", "redo", "cut", "copy", "paste", "select_all"]
+pub fn predefined_edit_ids() -> [&'static str; 4] {
+    ["cut", "copy", "paste", "select_all"]
 }
 
 #[cfg(test)]
@@ -493,12 +507,14 @@ mod tests {
     #[test]
     fn predefined_edit_menu_covers_required_commands() {
         let ids = predefined_edit_ids();
-        assert_eq!(ids, ["undo", "redo", "cut", "copy", "paste", "select_all"]);
+        assert_eq!(ids, ["cut", "copy", "paste", "select_all"]);
     }
 
     #[test]
     fn native_accelerators_match_shortcut_contract() {
         assert_eq!(ACCEL_FILE_EXPORT, "CmdOrCtrl+E");
         assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
+        assert_eq!(ACCEL_EDIT_UNDO, "CmdOrCtrl+Z");
+        assert_eq!(ACCEL_EDIT_REDO, "CmdOrCtrl+Shift+Z");
     }
 }
