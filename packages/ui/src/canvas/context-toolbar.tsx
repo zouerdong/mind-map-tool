@@ -20,6 +20,8 @@ import type {
   MindNode,
   TextRun,
 } from "@mindmap/core";
+import { VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
+import { mergeAdjacentRuns, segmentTextRuns } from "../controller/runs-remap.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 
 export interface ContextToolbarSelection {
@@ -417,26 +419,28 @@ function EdgeTools({
   );
 }
 
-/** 整节点字号步进：既有 runs 的 fontSize ±step，无 runs 则全区间应用。 */
+/** 整节点字号步进：R2-F2——基于每段有效字号（未指定按正文默认 16），
+ *  未覆盖空隙同样获得新字号；保留 bold/underline；合并相邻同属性段。 */
 function stepFontSize(node: MindNode, step: number): TextRun[] {
-  if (node.runs === undefined || node.runs.length === 0) {
-    return [{ start: 0, end: node.text.length, fontSize: clampSize(16 + step) }];
-  }
-  return node.runs.map((r) => ({
-    ...r,
-    ...(r.fontSize !== undefined ? { fontSize: clampSize(r.fontSize + step) } : {}),
-  }));
+  return mergeAdjacentRuns(
+    segmentTextRuns(node.text.length, node.runs).map((seg) => ({
+      ...seg,
+      fontSize: clampSize((seg.fontSize ?? VISUAL_TYPOGRAPHY.bodyFontSize) + step),
+    })),
+  );
 }
 function clampSize(v: number): number {
   return Math.min(72, Math.max(8, Math.round(v)));
 }
-/** 整节点开关粗体/下划线。DFR-090 F2：翻转目标属性时保留既有 runs 的
- *  其他属性（字号/另一开关）——此前整体替换为单属性 run，A+ 后点 B 会
- *  静默丢字号。无 runs 时全区间单 run；关闭写显式 false（与原语义一致）。 */
+/** 整节点开关粗体/下划线：R2-F2——在整个文本域（含未覆盖空隙）翻转目标
+ *  属性，保留字号/另一属性；合并相邻同属性段。开关策略不变（任一段为真
+ *  则全域关闭）。无 runs 时退化为全区间单 run（与原行为一致）。 */
 function toggleWhole(node: MindNode, key: "bold" | "underline"): TextRun[] {
   const currently = node.runs?.some((r) => r[key] === true) === true;
-  if (node.runs === undefined || node.runs.length === 0) {
-    return [{ start: 0, end: node.text.length, [key]: !currently } as TextRun];
-  }
-  return node.runs.map((r) => ({ ...r, [key]: !currently }));
+  return mergeAdjacentRuns(
+    segmentTextRuns(node.text.length, node.runs).map((seg) => ({
+      ...seg,
+      [key]: !currently,
+    })),
+  );
 }

@@ -60,10 +60,7 @@ export function remapRunsForTextChange(
   while (prefix < maxPrefix && oldText[prefix] === newText[prefix]) prefix += 1;
   let suffix = 0;
   const maxSuffix = Math.min(oldLen, newLen) - prefix;
-  while (
-    suffix < maxSuffix &&
-    oldText[oldLen - 1 - suffix] === newText[newLen - 1 - suffix]
-  ) {
+  while (suffix < maxSuffix && oldText[oldLen - 1 - suffix] === newText[newLen - 1 - suffix]) {
     suffix += 1;
   }
   const oldChangeEnd = oldLen - suffix;
@@ -95,6 +92,39 @@ export function remapRunsForTextChange(
     mapped.push({ start, end, ...attrsOf(run) });
   }
   return mapped.length > 0 ? mapped : undefined;
+}
+
+/** R2-F2：把 [0, textLength) 分割为已有 runs 与未覆盖空隙（空隙为
+ *  默认属性空集），供整节点格式命令在全文本域上操作。 */
+export function segmentTextRuns(
+  textLength: number,
+  runs: readonly TextRun[] | undefined,
+): TextRun[] {
+  if (textLength <= 0) return [];
+  const segments: TextRun[] = [];
+  let cursor = 0;
+  for (const run of runs ?? []) {
+    if (run.start > cursor) segments.push({ start: cursor, end: run.start });
+    segments.push({ ...run });
+    cursor = run.end;
+  }
+  if (cursor < textLength) segments.push({ start: cursor, end: textLength });
+  return segments;
+}
+
+/** R2-F2：合并相邻同属性段（整节点格式翻转/步进后保持区间模型整洁）。 */
+export function mergeAdjacentRuns(runs: readonly TextRun[]): TextRun[] {
+  const merged: TextRun[] = [];
+  for (const run of runs) {
+    if (run.end <= run.start) continue;
+    const prev = merged[merged.length - 1];
+    if (prev && prev.end === run.start && sameAttrs(attrsOf(prev), attrsOf(run))) {
+      prev.end = run.end;
+      continue;
+    }
+    merged.push({ ...run });
+  }
+  return merged;
 }
 
 /** 整节点统一样式 → 编辑态渲染样式（textarea 只能呈现单一排版；
