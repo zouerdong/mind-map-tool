@@ -25,6 +25,11 @@ export interface OnboardingFlowProps {
   replaySignal?: number;
   /** 是否在恢复 not-started/in-progress 偏好后自动呈现；默认保持历史行为。 */
   presentRestoredState?: boolean;
+  /** OFR-2026-09-14 #7（负责人 dogfood：开局没看到新手指引）：偏好为
+   *  not-started（首次使用）时启动自动呈现 welcome，无论
+   *  presentRestoredState 为何。in-progress 仍遵 presentRestoredState
+   * （ADR 0012 §7：中断引导仅后台恢复，不遮挡画布）。 */
+  presentOnFirstRun?: boolean;
   /** 偏好损坏/写入失败时的非致命提示；不阻塞画布与引导。 */
   onPreferenceWarning?: (message: string) => void;
 }
@@ -35,6 +40,7 @@ export function OnboardingFlow({
   theme = "light",
   replaySignal = 0,
   presentRestoredState = true,
+  presentOnFirstRun = false,
   onPreferenceWarning,
 }: OnboardingFlowProps) {
   const [state, dispatch] = useReducer(onboardingReducer, INITIAL_ONBOARDING_STATE);
@@ -50,7 +56,11 @@ export function OnboardingFlow({
         if (cancelled) return;
         const warning = preferences.consumeWarning?.();
         if (warning) onPreferenceWarning?.(warning);
-        dispatch({ type: "restore", status, present: presentRestoredState });
+        // OFR-2026-09-14 #7：首次使用（not-started）按 presentOnFirstRun
+        // 自动呈现 welcome；其余状态仍遵 presentRestoredState。
+        const present =
+          status === "not-started" && presentOnFirstRun ? true : presentRestoredState;
+        dispatch({ type: "restore", status, present });
         // 用户可能在异步偏好读取完成前已调用显式入口；restore 之后重放
         // show，避免启动策略把刚打开的引导再次隐藏。
         if (explicitOpenRequested.current) dispatch({ type: "show" });
@@ -60,13 +70,17 @@ export function OnboardingFlow({
         onPreferenceWarning?.(
           `本机偏好读取失败，已使用默认设置：${error instanceof Error ? error.message : String(error)}`,
         );
-        dispatch({ type: "restore", status: "not-started", present: presentRestoredState });
+        dispatch({
+          type: "restore",
+          status: "not-started",
+          present: presentOnFirstRun ? true : presentRestoredState,
+        });
         if (explicitOpenRequested.current) dispatch({ type: "show" });
       });
     return () => {
       cancelled = true;
     };
-  }, [onPreferenceWarning, preferences, presentRestoredState]);
+  }, [onPreferenceWarning, preferences, presentRestoredState, presentOnFirstRun]);
 
   // 命令观察：状态机推进只依赖 observation（真实命令/动作）。
   useEffect(() => {

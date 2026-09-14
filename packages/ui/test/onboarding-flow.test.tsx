@@ -146,7 +146,7 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
     channel.emit({ kind: "command", command: CREATE });
     channel.emit({ kind: "command", command: MOVE });
     channel.emit({ kind: "command", command: EDGE });
-    await screen.findByText("第 3 步 · 撤销或换主题");
+    await screen.findByText("第 3 步 · 撤销、整理或换主题");
 
     // 第 3 步（任一）
     channel.emit({ kind: "command", command: THEME });
@@ -194,6 +194,39 @@ describe("OnboardingFlow（端到端：偏好 + 命令通道）", () => {
       await waitFor(() => expect(loadSpy).toHaveBeenCalled());
       expect(screen.queryByRole("dialog")).toBeNull();
     }
+  });
+
+  it("OFR-2026-09-14 #7：presentOnFirstRun——not-started 首启自动呈现 welcome；in-progress 仍不自动遮挡", async () => {
+    // not-started：即使 presentRestoredState=false 也呈现 welcome
+    const store = new InMemoryPreferenceStore();
+    const prefs = createOnboardingPreferences(store);
+    const channel = fakeChannel();
+    render(
+      <OnboardingFlow
+        observeCommands={channel.observeCommands}
+        preferences={prefs}
+        presentRestoredState={false}
+        presentOnFirstRun
+      />,
+    );
+    await screen.findByRole("dialog", { name: "欢迎使用脑图" });
+
+    // in-progress（中断引导）：仅后台恢复，不自动遮挡画布（ADR 0012 §7）
+    cleanup();
+    const store2 = new InMemoryPreferenceStore({ onboardingStatus: "in-progress" });
+    const prefs2 = createOnboardingPreferences(store2);
+    const loadSpy = vi.spyOn(prefs2, "load");
+    render(
+      <OnboardingFlow
+        observeCommands={channel.observeCommands}
+        preferences={prefs2}
+        presentRestoredState={false}
+        presentOnFirstRun
+      />,
+    );
+    await waitFor(() => expect(loadSpy).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("偏好读取失败不阻塞画布，并向宿主报告非致命提示", async () => {

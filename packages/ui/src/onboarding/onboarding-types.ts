@@ -56,7 +56,9 @@ export const ONBOARDING_STEPS: readonly OnboardingStepSpec[] = [
   {
     id: "undo-or-theme",
     anchor: "theme.toggle",
-    observe: ["undo", "redo", "SetDocumentStyle"],
+    // OFR-2026-09-14：文案提及 ⇧⌘L 整理——MoveNodes（整理/拖动提交同一
+    // kind）纳入完成条件，保持“完成靠真实动作”契约。
+    observe: ["undo", "redo", "SetDocumentStyle", "MoveNodes"],
     mode: "any",
   },
   { id: "save-or-export", anchor: null, observe: ["action:save", "action:export"], mode: "any" },

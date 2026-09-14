@@ -24,7 +24,7 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
   },
   "create-first": {
     title: "第 1 步 · 创建第一个节点",
-    body: "在画布空白处双击创建节点；再双击节点输入文字，按 Enter 确认。",
+    body: "在画布空白处双击（或按 ⌥Space）创建节点并直接输入文字，按 ⌘Enter 确认。",
     secondary: "跳过引导",
     hint: "完成：创建节点 ✓ 待输入内容",
   },
@@ -35,14 +35,14 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
     hint: "完成：创建、移动、连接",
   },
   "undo-or-theme": {
-    title: "第 3 步 · 撤销或换主题",
-    body: "按 ⌘Z 撤销、⇧⌘Z 重做，或用主题按钮在白板/黑板间切换（任选其一）。",
+    title: "第 3 步 · 撤销、整理或换主题",
+    body: "按 ⌘Z 撤销、⇧⌘Z 重做；⇧⌘L 一键整理布局；或用主题按钮在白板/黑板间切换（任选其一）。",
     secondary: "跳过引导",
-    hint: "完成：撤销 / 重做 / 主题切换（任一）",
+    hint: "完成：撤销 / 重做 / 整理 / 主题切换（任一）",
   },
   "save-or-export": {
     title: "第 4 步 · 保存或导出",
-    body: "用 ⌘S 保存你的脑图，或导出为图片/PDF。现在也可以稍后再做——引导到此完成。",
+    body: "用 ⌘S 保存脑图（可选 .mindmap / .json 格式），或用 ⌘E 导出为图片/PDF。现在也可以稍后再做——引导到此完成。",
     primary: "稍后再说，完成引导",
     secondary: "跳过引导",
     hint: "完成：保存 / 导出（任一）",
