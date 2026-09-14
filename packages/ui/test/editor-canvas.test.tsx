@@ -137,6 +137,86 @@ describe("EditorCanvas", () => {
     expect(screen.queryByTestId("rf-node-n1")).toBeNull();
   });
 
+  it("DFR-090 F2：带整节点样式的正文续写保留 runs（提交/撤销/重做一致）", async () => {
+    const doc = makeDoc();
+    doc.document.nodes[0]!.runs = [{ start: 0, end: 3, bold: true, fontSize: 20 }];
+    const session = new DocumentSession(makeStateNode(doc).document);
+    render(<EditorCanvas session={session} fonts={fakeFonts} />);
+
+    fireEvent.doubleClick(await screen.findByText("根节点"));
+    const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    // 编辑态渲染沿用整节点样式（不再是普通 16px）
+    expect(editor.style.fontWeight).toBe("700");
+    expect(editor.style.fontSize).toBe("20px");
+    fireEvent.change(editor, { target: { value: "根节点续" } });
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+
+    await waitFor(() => {
+      const node = session.current.document.document.nodes[0]!;
+      expect(node.text).toBe("根节点续");
+      expect(node.runs).toEqual([{ start: 0, end: 4, bold: true, fontSize: 20 }]);
+    });
+
+    // 撤销恢复原 runs 区间；重做恢复映射后区间
+    const canvasHost = document.querySelector('[role="application"]')!;
+    fireEvent.keyDown(canvasHost, { key: "z", metaKey: true });
+    await waitFor(() => {
+      const node = session.current.document.document.nodes[0]!;
+      expect(node.text).toBe("根节点");
+      expect(node.runs).toEqual([{ start: 0, end: 3, bold: true, fontSize: 20 }]);
+    });
+    fireEvent.keyDown(canvasHost, { key: "z", metaKey: true, shiftKey: true });
+    await waitFor(() => {
+      const node = session.current.document.document.nodes[0]!;
+      expect(node.text).toBe("根节点续");
+      expect(node.runs).toEqual([{ start: 0, end: 4, bold: true, fontSize: 20 }]);
+    });
+  });
+
+  it("DFR-090 F2：编辑中点击格式——草稿先提交，格式落在最新文本上", async () => {
+    const session = new DocumentSession(makeStateNode(makeDoc()).document);
+    render(<EditorCanvas session={session} fonts={fakeFonts} />);
+
+    fireEvent.click(screen.getByTestId("rf-node-n1")); // 选中使工具条出现
+    fireEvent.doubleClick(await screen.findByText("根节点"));
+    const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: "根节点改" } });
+
+    // 草稿未提交时点击整节点粗体：不得用旧 node.text 覆盖草稿
+    fireEvent.click(screen.getByTitle("整节点粗体"));
+    await waitFor(() => {
+      const node = session.current.document.document.nodes[0]!;
+      expect(node.text).toBe("根节点改");
+      expect(node.runs).toEqual([{ start: 0, end: 4, bold: true }]);
+    });
+  });
+
+  it("DFR-090 F2：pending 度量路径与 ready 一致（续写保留 runs，flush 后一致）", async () => {
+    const doc = makeDoc();
+    doc.document.nodes[0]!.runs = [{ start: 0, end: 3, underline: true }];
+    const session = new DocumentSession(makeStateNode(doc).document);
+    const { GeometryBarrier } = await import("../src/canvas/geometry-barrier.js");
+    const barrier = new GeometryBarrier({
+      session,
+      getMetricsState: () => "pending",
+      whenMetricsReady: () => Promise.resolve(fakeFonts),
+      getFallbackFonts: () => fakeFonts,
+    });
+    render(<EditorCanvas session={session} fonts={fakeFonts} geometryBarrier={barrier} />);
+
+    fireEvent.doubleClick(await screen.findByText("根节点"));
+    const editor = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: "根节点续" } });
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+
+    await barrier.flush();
+    await waitFor(() => {
+      const node = session.current.document.document.nodes[0]!;
+      expect(node.text).toBe("根节点续");
+      expect(node.runs).toEqual([{ start: 0, end: 4, underline: true }]);
+    });
+  });
+
   it("编辑态下画布快捷键不派发（IME/焦点隔离的一部分）", async () => {
     const { session } = renderCanvas();
     const canvasHost = document.querySelector('[role="application"]')!;

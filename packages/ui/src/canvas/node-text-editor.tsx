@@ -17,6 +17,9 @@ export interface NodeTextEditorProps {
    *  不一致，且小节点里一行塞不下一个汉字）。不传则退化为填满容器（单测直渲）。 */
   fontFamily?: string;
   fontSize?: number;
+  /** DFR-090 F2：整节点统一样式的编辑态沿用（textarea 仅支持单一排版）。 */
+  fontWeight?: number;
+  underline?: boolean;
   textColor?: string;
   background?: string;
   /** 正文块顶内距（含眉题占位；默认 VISUAL_TYPOGRAPHY.paddingTop）。 */
@@ -34,6 +37,8 @@ export function NodeTextEditor({
   onCancel,
   fontFamily,
   fontSize,
+  fontWeight,
+  underline,
   textColor,
   background,
   paddingTop,
@@ -126,6 +131,8 @@ export function NodeTextEditor({
         outline: "none",
         background: background ?? "transparent",
         fontSize: effectiveFontSize,
+        fontWeight,
+        textDecoration: underline === true ? "underline" : undefined,
         lineHeight: `${effectiveFontSize * VISUAL_TYPOGRAPHY.bodyLineHeightFactor}px`,
         fontFamily,
         padding: `${effectivePaddingTop}px ${VISUAL_TYPOGRAPHY.paddingX}px`,

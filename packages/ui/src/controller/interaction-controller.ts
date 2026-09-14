@@ -10,9 +10,11 @@ import type {
   Point,
   Size,
   ThemeName,
+  TextRun,
 } from "@mindmap/core";
+import { remapRunsForTextChange } from "./runs-remap.js";
 
-export type MeasureText = (text: string, fontId: FontToken, kicker?: string) => Size;
+export type MeasureText = (text: string, fontId: FontToken, kicker?: string, runs?: TextRun[]) => Size;
 
 export interface InteractionControllerDeps {
   nextNodeId(): string;
@@ -42,19 +44,30 @@ export function createInteractionController(deps: InteractionControllerDeps) {
     },
 
     /**
-     * 编辑提交（Enter/blur）：text 与 size 同命令提交（size 由共享 layout 计算，
-     * runs 不再适用于新文本 → 不携带，core 侧清除）。
+     * 编辑提交（Enter/blur）：text 与 size 同命令提交（size 由共享 layout 计算）。
      * 文本未变化时返回 null（不产生空历史）。
      * DFR-020：kicker 独立于正文编辑——正文编辑必须保留眉题高度（传入节点
      * 当前眉题参与测量），不得量出无眉题的矮卡把眉题压掉。
+     * DFR-090 F2：currentRuns（节点当前样式区间）经文本变更映射后随命令
+     * 提交——整节点样式随正文续写保留，混合 runs 按区间模型映射而非原样
+     * 套旧索引；测量也使用映射后的 runs，提交前后几何一致。不传
+     *  currentRuns 时维持纯文本语义（core 清除旧 runs）。
      */
-    commitEditText(id: string, nextText: string, currentText: string, kicker?: string): Command | null {
+    commitEditText(
+      id: string,
+      nextText: string,
+      currentText: string,
+      kicker?: string,
+      currentRuns?: TextRun[],
+    ): Command | null {
       if (nextText === currentText) return null;
+      const runs = remapRunsForTextChange(currentText, currentRuns, nextText);
       return {
         kind: "EditNodeText",
         id,
         text: nextText,
-        size: deps.measure(nextText, deps.currentFont(), kicker),
+        size: deps.measure(nextText, deps.currentFont(), kicker, runs),
+        ...(runs !== undefined ? { runs } : {}),
       };
     },
 

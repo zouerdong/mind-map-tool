@@ -8,7 +8,7 @@
 | -------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
 | 画布空白双击（`onPaneDoubleClick`，viewport 逆变换为画布坐标） | `createNodeAt(point)`               | `CreateNode`（空文本，size=共享 layout 空文本框）    | 任意位置创建                                                             |
 | 节点双击（`onNodeDoubleClick`）                                | 进入编辑态（无命令）                | —                                                    | 编辑提交才产生命令                                                       |
-| 编辑输入 Enter / blur（非 IME 组合）                           | `commitEditText(id, next, current)` | `EditNodeText`（text + 权威 size 同命令；runs 清除） | 文本未变 → `null`（无空历史）                                            |
+| 编辑输入 Enter / blur（非 IME 组合）                           | `commitEditText(id, next, current, kicker?, currentRuns?)` | `EditNodeText`（text + 权威 size 同命令；runs 经文本变更映射保留） | 文本未变 → `null`（无空历史）；无 currentRuns → 纯文本（core 清除 runs） |
 | 编辑输入 Escape                                                | 取消（无命令）                      | —                                                    |                                                                          |
 | 节点拖动结束（`onNodeDragStop`）                               | `moveNodes(deltas, doc)`            | `MoveNodes`（批量原子）                              | 拖动期间只本地位移；**只提交一次**；位移为零 → `null`                    |
 | 连接（`onConnect` source→target）                              | `connect(source, target, doc)`      | `CreateEdge`                                         | 预检自环/同向重复/悬空 → `null`（core 亦会拒绝，预检避免注定失败的提交） |
@@ -33,4 +33,4 @@
 
 ## 权威尺寸约定
 
-`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeVisual({ text, runs, kicker }, fontId, fonts)`（`@mindmap/export` 共享完整视觉契约）计算——包含 G-VIS 卡片最小宽度与内距，并与 exporter 使用同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。DFR-020：正文编辑（textarea / `commitEditText`）必须传入节点当前眉题参与测量（眉题高度不被正文编辑压掉）；不携带 runs 的命令按纯文本测量（与 core 清除 runs 语义一致）。
+`CreateNode` / `EditNodeText` 携带的 `size` 由 `measureNodeVisual({ text, runs, kicker }, fontId, fonts)`（`@mindmap/export` 共享完整视觉契约）计算——包含 G-VIS 卡片最小宽度与内距，并与 exporter 使用同一 `FontResolver`，保证画布所见即导出所得；core 不做字体测量（ADR 0003）。DFR-020：正文编辑（textarea / `commitEditText`）必须传入节点当前眉题参与测量（眉题高度不被正文编辑压掉）；不携带 runs 的命令按纯文本测量（与 core 清除 runs 语义一致）。DFR-090 F2：节点既有 runs 经 `remapRunsForTextChange`（前缀/后缀 diff 的区间映射，见 `runs-remap.ts`）随命令提交并参与测量——整节点样式续写保留，混合 runs 不套旧索引；编辑中点击工具条格式命令时先提交草稿再基于最新文本重算 runs（不用旧 `node.text` 覆盖新草稿）。

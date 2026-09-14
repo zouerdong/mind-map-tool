@@ -67,6 +67,33 @@ describe("commitEditText", () => {
   it("文本未变 → null（无空历史）", () => {
     expect(setup().commitEditText("a", "A", "A")).toBeNull();
   });
+
+  it("DFR-090 F2：整节点样式 runs 随正文续写保留（映射后随命令提交）", () => {
+    const c = setup();
+    const cmd = c.commitEditText("a", "AB续", "AB", undefined, [
+      { start: 0, end: 2, bold: true, fontSize: 20 },
+    ]);
+    expect(cmd).toMatchObject({
+      kind: "EditNodeText",
+      id: "a",
+      text: "AB续",
+      runs: [{ start: 0, end: 3, bold: true, fontSize: 20 }],
+    });
+  });
+
+  it("DFR-090 F2：混合 runs 按变更区间映射，不原样套旧索引", () => {
+    const c = setup();
+    const cmd = c.commitEditText("a", "新ABC", "ABC", undefined, [
+      { start: 0, end: 1, bold: true },
+    ]);
+    expect(cmd).toMatchObject({ runs: [{ start: 1, end: 2, bold: true }] });
+  });
+
+  it("DFR-090 F2：无 currentRuns 时维持纯文本语义（core 清除旧 runs）", () => {
+    const c = setup();
+    const cmd = c.commitEditText("a", "两个节点", "A") as { runs?: unknown };
+    expect(cmd.runs).toBeUndefined();
+  });
 });
 
 describe("moveNodes（验收：拖动只提交一次 command）", () => {

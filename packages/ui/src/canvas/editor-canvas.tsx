@@ -40,6 +40,7 @@ import {
 } from "@mindmap/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
+import { remapRunsForTextChange } from "../controller/runs-remap.js";
 import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
 import {
   documentDefaults,
@@ -231,12 +232,16 @@ export function EditorCanvas({
       createInteractionController({
         nextNodeId: nextNodeId ?? (() => defaultId("n")),
         nextEdgeId: nextEdgeId ?? (() => defaultId("e")),
-        measure: (text, fontId, kicker) =>
+        measure: (text, fontId, kicker, runs) =>
           measureNodeVisual(
-            { text, ...(kicker !== undefined && kicker.length > 0 ? { kicker } : {}) },
+            {
+              text,
+              ...(kicker !== undefined && kicker.length > 0 ? { kicker } : {}),
+              ...(runs !== undefined ? { runs } : {}),
+            },
             fontId,
             fonts,
-          ), // 完整视觉 size（含眉题高度）：与 UI/exporter 同源
+          ), // 完整视觉 size（含眉题高度与 runs 样式）：与 UI/exporter 同源
         currentFont: () => documentDefaults(session.current.document).font,
       }),
     [fonts, nextNodeId, nextEdgeId, session],
@@ -766,14 +771,22 @@ export function EditorCanvas({
         });
         return;
       }
-      const current = session.current.document.document.nodes.find((n) => n.id === id)?.text ?? "";
+      const node = session.current.document.document.nodes.find((n) => n.id === id);
+      const current = node?.text ?? "";
       if (text === current) return;
+      // DFR-090 F2：节点当前样式 runs 随正文变更映射保留（整节点样式续写不丢、
+      // 混合 runs 不套旧索引）；pending/ready 两路径同一份映射结果。
+      const mappedRuns = remapRunsForTextChange(current, node?.runs, text);
       if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
-        void geometryBarrier.enqueue({ kind: "edit-text", id, text });
+        void geometryBarrier.enqueue({
+          kind: "edit-text",
+          id,
+          text,
+          ...(mappedRuns !== undefined ? { runs: mappedRuns } : {}),
+        });
         setTextOverrides((prev) => new Map(prev).set(id, text));
       } else {
-        const node = session.current.document.document.nodes.find((n) => n.id === id);
-        const cmd = controller.commitEditText(id, text, current, node?.kicker);
+        const cmd = controller.commitEditText(id, text, current, node?.kicker, node?.runs);
         if (cmd) api.commit(cmd);
       }
     },
@@ -795,15 +808,17 @@ export function EditorCanvas({
     setEditingId(null);
   }, [editingId, geometryBarrier, pendingNodes]);
 
-  const flushActiveEditor = useCallback(() => {
+  const flushActiveEditor = useCallback((): string | null => {
     if (editingId !== null) {
       const activeEl = document.querySelector<HTMLTextAreaElement>(
         "textarea[aria-label='编辑节点文本']",
       );
       if (activeEl) {
         onCommitEdit(editingId, activeEl.value);
+        return activeEl.value;
       }
     }
+    return null;
   }, [editingId, onCommitEdit]);
 
   useEffect(() => {
@@ -928,30 +943,45 @@ export function EditorCanvas({
                   });
                 }
               } else if (command.kind === "EditNodeText") {
+                // DFR-090 F2：编辑中点格式（工具条 preventDefault 保持编辑焦点，
+                // 命令携带的是渲染期捕获的旧 node.text）——先把草稿提交（样式随
+                // 文本变更映射保留），再基于最新文本重算命令；绝不用旧文本覆盖
+                // 新草稿。
+                const flushed = editingId === command.id ? flushActiveEditor() : null;
+                const latestNode = session.current.document.document.nodes.find(
+                  (n) => n.id === command.id,
+                );
+                const baseText = flushed ?? latestNode?.text ?? command.text;
+                const runs =
+                  command.runs !== undefined
+                    ? remapRunsForTextChange(command.text, command.runs, baseText)
+                    : undefined;
                 if (geometryBarrier && geometryBarrier.getMetricsState() !== "ready") {
                   void geometryBarrier.enqueue({
                     kind: "edit-text",
                     id: command.id,
-                    text: command.text,
-                    ...(command.runs !== undefined ? { runs: command.runs } : {}),
+                    text: baseText,
+                    ...(runs !== undefined ? { runs } : {}),
                   });
                 } else {
                   const fontId = documentDefaults(session.current.document).font;
-                  const node = session.current.document.document.nodes.find(
-                    (n) => n.id === command.id,
-                  );
                   const box = measureNodeVisual(
                     {
-                      text: command.text,
-                      ...(command.runs !== undefined ? { runs: command.runs } : {}),
-                      ...(node?.kicker !== undefined ? { kicker: node.kicker } : {}),
+                      text: baseText,
+                      ...(runs !== undefined ? { runs } : {}),
+                      ...(latestNode?.kicker !== undefined
+                        ? { kicker: latestNode.kicker }
+                        : {}),
                     },
                     fontId,
                     fonts,
                   );
                   api.commit({
-                    ...command,
+                    kind: "EditNodeText",
+                    id: command.id,
+                    text: baseText,
                     size: { width: box.width, height: box.height },
+                    ...(runs !== undefined ? { runs } : {}),
                   });
                 }
               } else if (command.kind === "SetDocumentStyle" && command.font !== undefined) {

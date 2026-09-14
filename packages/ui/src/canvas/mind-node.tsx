@@ -13,6 +13,7 @@ import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import { LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 import type { MindFlowNode } from "../projection/projection.js";
+import { remapRunsForTextChange, uniformRunsStyle } from "../controller/runs-remap.js";
 import { NodeTextEditor } from "./node-text-editor.js";
 
 interface MindNodeViewProps extends NodeProps {
@@ -120,6 +121,16 @@ function MindNodeViewImpl({
           fontFamily={fontFamily(data.font)}
           textColor={text}
           background={fill}
+          // DFR-090 F2：整节点统一样式在编辑态沿用同一排版渲染（不再是
+          // 退回普通 16px）；混合 runs 则退回纯文本渲染，提交后样式仍保留。
+          {...(() => {
+            const editStyle = uniformRunsStyle(data.runs, data.text.length);
+            return {
+              ...(editStyle?.fontSize !== undefined ? { fontSize: editStyle.fontSize } : {}),
+              ...(editStyle?.bold === true ? { fontWeight: 700 } : {}),
+              underline: editStyle?.underline === true,
+            };
+          })()}
           // 眉题存在时正文起始位置与提交后渲染一致（paddingTop + 眉题行高 + gap）
           paddingTop={
             layout.kicker
@@ -128,17 +139,20 @@ function MindNodeViewImpl({
                 VISUAL_TYPOGRAPHY.kickerBodyGap
               : VISUAL_TYPOGRAPHY.paddingTop
           }
-          // 实时增长与提交后渲染同一测量源（所见即所得；runs 在编辑态按纯文本计）
-          measureBox={(txt) =>
-            measureNodeVisual(
+          // 实时增长与提交后渲染同一测量源（所见即所得）；DFR-090 F2：测量
+          // 携带 runs 的文本变更映射结果——带样式节点续写时外框不再先缩后跳。
+          measureBox={(txt) => {
+            const mappedRuns = remapRunsForTextChange(data.text, data.runs, txt);
+            return measureNodeVisual(
               {
                 text: txt,
                 ...(data.kicker !== undefined ? { kicker: data.kicker } : {}),
+                ...(mappedRuns !== undefined ? { runs: mappedRuns } : {}),
               },
               data.font,
               fonts,
-            )
-          }
+            );
+          }}
           onMeasure={setEditBox}
           onCommit={(txt) => onCommitEdit(id, txt)}
           onCancel={onCancelEdit}
