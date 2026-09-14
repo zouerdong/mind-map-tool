@@ -93,6 +93,15 @@ export async function rfStubModule(): Promise<unknown> {
         style: { display: "none" },
         onClick: () => props.onNodeDragStop?.(null, null),
       }),
+      // 拖动中事件（OFR-2026-09-14 #2：驻留规整态拖动的实时连线测试）
+      createElement("button", {
+        "data-testid": "rf-drag-n2-pos",
+        style: { display: "none" },
+        onClick: () =>
+          props.onNodesChange?.([
+            { id: "n2", type: "position", position: { x: 260, y: 220 }, dragging: true },
+          ]),
+      }),
       // children（VRA-050：ContextToolbar 以 Panel 形式作为 ReactFlow 子元素）
       ...(Array.isArray(props.children) ? props.children : props.children ? [props.children] : []),
       createElement("button", {

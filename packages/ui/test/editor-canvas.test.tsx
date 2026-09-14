@@ -304,4 +304,97 @@ describe("EditorCanvas", () => {
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2));
     expect(onResult.mock.calls[1]![0].status).toBe("no-op");
   });
+
+  it("OFR-2026-09-14 #2：整理后拖动节点——规整态连线实时跟随（不掉回静态路径）", async () => {
+    // reduced-motion：整理动画同步完成（lineMorph=1 驻留），测试确定性
+    const originalMatchMedia = globalThis.matchMedia;
+    globalThis.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    })) as unknown as typeof matchMedia;
+    try {
+      const doc = makeDoc();
+      // 三节点两链：整理位移 ≥2 节点才走 MotionCoordinator 动画/驻留路径
+      // （两节点场景若只动一节，走普通重投影——既有行为，非本测试目标）
+      doc.document.nodes.push({
+        id: "n3",
+        text: "孙节点",
+        position: { x: 520, y: 240 },
+        size: { width: 120, height: 37 },
+      });
+      doc.document.edges.push({ id: "e2", sourceNodeId: "n2", targetNodeId: "n3" });
+      const session = new DocumentSession(makeStateNode(doc).document);
+      const onResult = vi.fn();
+      const { rerender } = render(
+        <EditorCanvas
+          session={session}
+          fonts={fakeFonts}
+          organizeSignal={0}
+          onOrganizeResult={onResult}
+        />,
+      );
+      rerender(
+        <EditorCanvas
+          session={session}
+          fonts={fakeFonts}
+          organizeSignal={1}
+          onOrganizeResult={onResult}
+        />,
+      );
+      await waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
+      expect(onResult.mock.calls[0]![0].status).toBe("moved");
+
+      // 规整态驻留：连线携带静态 pathD
+      const edge = await screen.findByTestId("rf-edge-e1");
+      await waitFor(() => {
+        expect(edge.getAttribute("data-path") ?? "").not.toBe("");
+      });
+      const settledPath = edge.getAttribute("data-path")!;
+
+      // 拖动 n2（doc 未提交）：连线必须实时重算跟随
+      fireEvent.click(screen.getByTestId("rf-drag-n2-pos"));
+      await waitFor(() => {
+        const livePath = edge.getAttribute("data-path") ?? "";
+        expect(livePath).not.toBe("");
+        expect(livePath).not.toBe(settledPath);
+      });
+    } finally {
+      globalThis.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it("OFR-2026-09-14 #6：文楷粗体段用描边模拟（无合成粗体，宽度不超出度量）", async () => {
+    const doc = makeDoc();
+    doc.document.font = "lxgw-wenkai";
+    doc.document.nodes[0]!.runs = [{ start: 0, end: 3, bold: true }];
+    const wenkaiFonts: FontResolver = {
+      regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+      // 文楷无真粗体（与生产 FontResolver 一致）
+      bold: (fontId) =>
+        fontId === "lxgw-wenkai"
+          ? null
+          : { advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 },
+    };
+    const session = new DocumentSession(makeStateNode(doc).document);
+    render(<EditorCanvas session={session} fonts={wenkaiFonts} />);
+    const text = await screen.findByText("根节点");
+    // 与导出 scene.fauxBold 同一契约：stroke 描边模拟 + font-weight 400
+    expect(text.getAttribute("stroke")).toBe("#F5F2EA");
+    expect(text.getAttribute("stroke-width")).toBe("0.5"); // 16 × 1/32
+    expect(text.getAttribute("font-weight")).toBe("400");
+  });
+
+  it("OFR-2026-09-14 #1：编辑器 textarea 携带 nodrag（全选后单击可放置光标）", async () => {
+    renderCanvas();
+    const pane = screen.getByTestId("rf-pane");
+    fireEvent.doubleClick(pane, { clientX: 320, clientY: 240 });
+    const textarea = (await screen.findByLabelText("编辑节点文本")) as HTMLTextAreaElement;
+    expect(textarea.className).toContain("nodrag");
+  });
 });

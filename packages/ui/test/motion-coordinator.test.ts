@@ -308,3 +308,39 @@ describe("DFR-020 规整态驻留（settledEdgePaths）", () => {
     expect(coordinator.settledEdgePaths(edited)).toBeNull();
   });
 });
+
+describe("OFR-2026-09-14 #2 驻留期拖动实时连线（settledEdgePathsFor）", () => {
+  it("整理后拖动：按显式实时位置重算连线；散乱态返回 null；不污染动画基线", () => {
+    const coordinator = new MotionCoordinator();
+    const doc = makeDoc(3);
+    const from = new Map(doc.document.nodes.map((n) => [n.id, { ...n.position }]));
+    const to = new Map([
+      ["n1", { x: 0, y: 0 }],
+      ["n2", { x: 300, y: 0 }],
+      ["n3", { x: 600, y: 0 }],
+    ]);
+
+    // 散乱态：实时接口同样返回 null（走投影默认曲线）
+    expect(coordinator.settledEdgePathsFor(doc, from)).toBeNull();
+
+    coordinator.start(doc, from, to, { reducedMotion: true });
+    expect(coordinator.getLineMorph()).toBe(1);
+
+    // 驻留静止态基准 = 动画终态位置集
+    const settled = coordinator.settledEdgePathsFor(doc, to)!;
+    // 拖动 n2 到新位置（doc 未提交，位置来自受控 view-model）
+    const dragged = new Map(to);
+    dragged.set("n2", { x: 300, y: 220 });
+    const live = coordinator.settledEdgePathsFor(doc, dragged);
+    expect(live).not.toBeNull();
+    expect(live!.size).toBe(2);
+    // 连线几何跟随拖动位置（与驻留静止态不同）
+    expect(live!.get("e1")!.pathD).not.toBe(settled.get("e1")!.pathD);
+    expect(live!.get("e1")!.pathD.length).toBeGreaterThan(0);
+    // 动画基线不被拖动中途污染：currentPositions 仍是动画终态
+    expect(coordinator.getCurrentPositions().get("n2")).toEqual({ x: 300, y: 0 });
+    // 拖回原点：几何与驻留静止态一致
+    const back = coordinator.settledEdgePathsFor(doc, to);
+    expect(back!.get("e1")!.pathD).toBe(settled.get("e1")!.pathD);
+  });
+});

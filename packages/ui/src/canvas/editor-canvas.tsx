@@ -538,15 +538,43 @@ export function EditorCanvas({
     (changes: NodeChange<MindFlowNode>[]) => {
       trackSelection("nodes", changes);
       // 若动画运行中，用户拖拽节点立即打断接管该节点
+      let dragged = false;
       for (const c of changes) {
         if (c.type === "position" && c.position) {
           coordinatorRef.current.interruptNode(c.id, c.position);
           displayPositionsRef.current.set(c.id, c.position);
+          dragged = true;
         }
       }
       onNodesChangeBase(changes); // 受控 view-model（拖动位移在此本地应用）
+      // OFR-2026-09-14 #2：规整态驻留（整理后）拖动——静态 pathD 不会随 RF
+      // 位置更新，用户看到“框离开线”。动画运行中由 interruptNode 的 onFrame
+      // 负责；驻留静止期此处按实时显示位置重算连线几何。
+      if (dragged && coordinatorRef.current.getPhase() !== "running") {
+        const live = coordinatorRef.current.settledEdgePathsFor(
+          session.current.document,
+          displayPositionsRef.current,
+        );
+        if (live && live.size > 0) {
+          setRfEdges((prevEdges) =>
+            prevEdges.map((e) => {
+              const geom = live.get(e.id);
+              if (!geom || !e.data) return e;
+              return {
+                ...e,
+                data: {
+                  lineStyle: e.data.lineStyle,
+                  theme: e.data.theme,
+                  pathD: geom.pathD,
+                  arrowD: geom.arrowD,
+                },
+              };
+            }),
+          );
+        }
+      }
     },
-    [onNodesChangeBase, trackSelection],
+    [onNodesChangeBase, session, setRfEdges, trackSelection],
   );
 
   const onEdgesChange = useCallback(

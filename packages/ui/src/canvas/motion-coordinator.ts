@@ -268,38 +268,7 @@ export class MotionCoordinator {
     this.delays = computeNodeDelays(doc);
 
     // 冻结目标拓扑的路由通道，动画期间不重选
-    const nodeMap = new Map(doc.document.nodes.map((n) => [n.id, n]));
-    const targetBoxes: NodeBox[] = [];
-    const targetInputs: EdgePlanInput[] = [];
-    for (const n of doc.document.nodes) {
-      const p = to.get(n.id) ?? n.position;
-      targetBoxes.push({ x: p.x, y: p.y, width: n.size.width, height: n.size.height });
-    }
-    for (const e of doc.document.edges) {
-      const srcNode = nodeMap.get(e.sourceNodeId);
-      const tgtNode = nodeMap.get(e.targetNodeId);
-      if (!srcNode || !tgtNode) continue;
-      const srcPos = to.get(srcNode.id) ?? srcNode.position;
-      const tgtPos = to.get(tgtNode.id) ?? tgtNode.position;
-      targetInputs.push({
-        id: e.id,
-        sourceId: srcNode.id,
-        targetId: tgtNode.id,
-        source: {
-          x: srcPos.x,
-          y: srcPos.y,
-          width: srcNode.size.width,
-          height: srcNode.size.height,
-        },
-        target: {
-          x: tgtPos.x,
-          y: tgtPos.y,
-          width: tgtNode.size.width,
-          height: tgtNode.size.height,
-        },
-      });
-    }
-    this.frozenRoutes = planEdgeRoutes(targetInputs, this.direction, { obstacles: targetBoxes });
+    this.freezeRoutesFor(doc, to);
 
     // prefers-reduced-motion：归零直接到达终态
     if (options.reducedMotion) {
@@ -309,6 +278,9 @@ export class MotionCoordinator {
       const frame = this.calculateFrame(this.currentPositions, 1, "completed");
       this.onFrameCallback?.(frame);
       this.onCompleteCallback?.();
+      // 冻结只服务动画期间（路由/锚点随目标位置烘焙）；动作结束后驻留
+      // 重算必须能跟随后续拖动/编辑（OFR-2026-09-14 #2）。
+      this.frozenRoutes = undefined;
       return;
     }
 
@@ -344,6 +316,10 @@ export class MotionCoordinator {
     this.duration = this.mainDuration;
     this.delays = new Map(doc.document.nodes.map((n) => [n.id, 0]));
 
+    // reverseTo 同样冻结目标（undo 历史态）拓扑路由——避免运行期逐帧重选
+    // 通道（大图性能）；动作结束后随 cancel/completion 解除。
+    this.freezeRoutesFor(doc, this.toPositions);
+
     if (options.reducedMotion) {
       this.currentPositions = new Map(targetPositions);
       this.currentLineMorph = 0;
@@ -351,6 +327,7 @@ export class MotionCoordinator {
       const frame = this.calculateFrame(this.currentPositions, 0, "completed");
       this.onFrameCallback?.(frame);
       this.onCompleteCallback?.();
+      this.frozenRoutes = undefined;
       return;
     }
 
@@ -377,6 +354,45 @@ export class MotionCoordinator {
       this.rafId = null;
     }
     if (this.phase === "running") this.phase = "interrupted";
+    // 冻结路由只服务单次动作；中断后驻留/后续动作按实时位置重算
+    // （否则锚点停留在旧目标位置，拖动的节点会“离线”——OFR-2026-09-14 #2）。
+    this.frozenRoutes = undefined;
+  }
+
+  /** 按目标位置集冻结路由通道（start/reverseTo 共用；动画期间不重选）。 */
+  private freezeRoutesFor(doc: MindMapDocumentV1, targets: Map<string, Point>): void {
+    const nodeMap = new Map(doc.document.nodes.map((n) => [n.id, n]));
+    const targetBoxes: NodeBox[] = [];
+    const targetInputs: EdgePlanInput[] = [];
+    for (const n of doc.document.nodes) {
+      const p = targets.get(n.id) ?? n.position;
+      targetBoxes.push({ x: p.x, y: p.y, width: n.size.width, height: n.size.height });
+    }
+    for (const e of doc.document.edges) {
+      const srcNode = nodeMap.get(e.sourceNodeId);
+      const tgtNode = nodeMap.get(e.targetNodeId);
+      if (!srcNode || !tgtNode) continue;
+      const srcPos = targets.get(srcNode.id) ?? srcNode.position;
+      const tgtPos = targets.get(tgtNode.id) ?? tgtNode.position;
+      targetInputs.push({
+        id: e.id,
+        sourceId: srcNode.id,
+        targetId: tgtNode.id,
+        source: {
+          x: srcPos.x,
+          y: srcPos.y,
+          width: srcNode.size.width,
+          height: srcNode.size.height,
+        },
+        target: {
+          x: tgtPos.x,
+          y: tgtPos.y,
+          width: tgtNode.size.width,
+          height: tgtNode.size.height,
+        },
+      });
+    }
+    this.frozenRoutes = planEdgeRoutes(targetInputs, this.direction, { obstacles: targetBoxes });
   }
 
   /** 当前线形态参数（0 = 散乱曲线，1 = 规整正交；整理/undo 动画终态驻留）。 */
@@ -398,6 +414,22 @@ export class MotionCoordinator {
       doc.document.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
     );
     this.currentPositions = new Map(positions);
+    const frame = this.calculateFrame(positions, this.currentLineMorph, "completed");
+    return frame.edgePaths;
+  }
+
+  /**
+   * 规整态驻留期间的拖动实时连线（OFR-2026-09-14 #2）：拖动只改受控
+   * view-model，doc 尚未提交，settledEdgePaths 不会重算——静态 pathD 停在
+   * 原地，用户看到“拖动 idea 框离开线的连接”。此处按调用方给的实时显示
+   * 位置集重算；不覆盖 currentPositions（动画基线不受拖动中途污染）。
+   */
+  public settledEdgePathsFor(
+    doc: MindMapDocumentV1,
+    positions: Map<string, Point>,
+  ): Map<string, { pathD: string; arrowD: string }> | null {
+    if (this.currentLineMorph <= 0) return null;
+    this.activeDoc = doc;
     const frame = this.calculateFrame(positions, this.currentLineMorph, "completed");
     return frame.edgePaths;
   }
@@ -448,6 +480,8 @@ export class MotionCoordinator {
       this.onFrameCallback?.(finalFrame);
       this.onCompleteCallback?.();
       this.rafId = null;
+      // 动作结束解除路由冻结（驻留重算跟随后续拖动/编辑——OFR-2026-09-14 #2）
+      this.frozenRoutes = undefined;
       return;
     }
 

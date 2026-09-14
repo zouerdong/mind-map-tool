@@ -7,6 +7,7 @@
 // - 自动聚焦与全选，中/英/日输入法行为一致。
 
 import { useEffect, useRef, useState } from "react";
+import { LAYOUT } from "@mindmap/export/src/layout.js";
 import { VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
 
 export interface NodeTextEditorProps {
@@ -20,6 +21,10 @@ export interface NodeTextEditorProps {
   /** DFR-090 F2：整节点统一样式的编辑态沿用（textarea 仅支持单一排版）。 */
   fontWeight?: number;
   underline?: boolean;
+  /** OFR-2026-09-14 #6：无真粗体字体（文楷）的语义粗体不用 fontWeight 700
+   *  （浏览器合成加粗比 regular 度量宽，overflow:hidden 会裁掉尾部文字）；
+   *  与导出 fauxBold 同契约——描边模拟（LAYOUT.fauxBoldStrokeRatio）。 */
+  fauxBold?: boolean;
   textColor?: string;
   background?: string;
   /** 正文块顶内距（含眉题占位；默认 VISUAL_TYPOGRAPHY.paddingTop）。 */
@@ -39,6 +44,7 @@ export function NodeTextEditor({
   fontSize,
   fontWeight,
   underline,
+  fauxBold,
   textColor,
   background,
   paddingTop,
@@ -93,6 +99,10 @@ export function NodeTextEditor({
       ref={ref}
       value={value}
       aria-label="编辑节点文本"
+      // OFR-2026-09-14 #1：RF 节点拖拽默认认 `.nodrag` 豁免——缺省时第一次
+      // mousedown 被 d3-drag 吞掉（preventDefault 防文本选择），全选后单击
+      // 无法放置光标、且按住会拖走节点。
+      className="nodrag"
       onChange={(e) => setValue(e.target.value)}
       onCompositionStart={() => setComposing(true)}
       onCompositionEnd={(e) => {
@@ -138,6 +148,12 @@ export function NodeTextEditor({
         padding: `${effectivePaddingTop}px ${VISUAL_TYPOGRAPHY.paddingX}px`,
         color: textColor ?? "inherit",
         caretColor: textColor,
+        // 文楷 fauxBold：描边模拟（与提交后 SVG 渲染/导出同一视觉契约），
+        // 不用合成粗体（宽度超出 regular 度量会裁剪）。
+        WebkitTextStroke:
+          fauxBold === true
+            ? `${effectiveFontSize * LAYOUT.fauxBoldStrokeRatio}px ${textColor ?? "currentColor"}`
+            : undefined,
         // 与提交后渲染一致：只按 \n 分行，不软换行（layoutNodeText 语义）
         whiteSpace: "pre",
         overflow: "hidden",
