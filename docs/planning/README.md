@@ -1,5 +1,7 @@
 # Planning
 
+2026-09-15 出口合并轮：`保存/另存为/导出已合并为统一「存储为…」面板 / 原生全路径 32/32 PASS / 候选已安装待体验`。保存仅 .mindmap；统一面板五格式分组；未保存文档选导出格式自动补写同名源文件。Graph JSON 导出改用纯 .json 扩展名。详见[报告 §十二](../quality/dogfood-repair-report-2026-09-13.md)。verify-decision 证据按方案 B 重冻结中。
+
 2026-09-15 第三轮：`OFR-2026-09-15 两项反馈已修复（5c0b947）/ 原生速验通过 / 清理事故待决定`。长文本软换行（卡宽回归 G-VIS 120–260 上限、纵向生长）与引导"下一步/计步/末步错接"已修复并实机验证。同日清理误删 `.tmp/runtime-spike/` 冻结证据致 verify-decision 3 项红灯，重冻结方案（A 补跑重冻结 / B 证据入库）待负责人批准，见[报告 §十一](../quality/dogfood-repair-report-2026-09-13.md)。
 
 2026-09-15 OFR 收口：`OFR-2026-09-14 #1～#7 全部修复 / R2 原生全路径 26 项断言 PASS / STOP_FOR_INDEPENDENT_REVIEW`。负责人第二次实用反馈七项全部修复；R1 原生验证暴露 #3 初修无效（rfd 在 macOS 合并 filter 进 allowedFileTypes，系统不显示格式 popup），`bd1fdae` 改为自承载 NSSavePanel accessory 格式选择后全绿。新候选 source `bd1fdae`，DMG sha256 `570e10b2f7864abb…`。详见[报告 §十](../quality/dogfood-repair-report-2026-09-13.md)。旧 DMG 继续作废；G-FINAL 未申请。

@@ -210,3 +210,32 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 ### 另一次流程偏差（已闭环）
 
 为隔离负责人会话而起的探针两次误用：① 未知 tauri-plugin-single-instance 的存在，`open -n` 探针被转发进负责人正在使用的实例，注入了两个合成节点（"这是一段故意…"、"别的框"）——经全盘点对，未写入任何磁盘文件，会话退出后消失；② 速验探针未检查应用是否在运行即驱动，可能打断了负责人 140 步的会话（截图显示当时"已保存"，探针只在其后追加了未保存的合成节点）。教训：探针必须先检查目标进程状态，运行中一律中止等待。
+
+## 十二、OFR-2026-09-15 出口合并轮：保存/另存为/导出统一（2026-09-15 追加）
+
+### 负责人决策链（[from-user 2026-09-15]）
+
+「保存/另存为/导出三个功能合并成一个出口」→ 收敛为「保存=可编辑文档（仅此一种）」+「另存为与导出合并」→「保存的 .json 与 Graph JSON 是否重复？不重复则保存只留 .mindmap」。最终定稿（PRD §8.2 / ADR 0012 v1.3.0）：
+
+- 保存 ⌘S：仅 `.mindmap`（既有 .json 文档打开兼容不变）；
+- 存储为… ⇧⌘S（⌘E 同入口）：统一面板五格式分两组（可编辑文档 .mindmap / SVG / PNG 2x / PDF / Graph JSON）；
+- 选导出格式且文档从未保存过：自动补写同名 .mindmap 并绑定为文档目标（防源文档丢失，面板内预告）。
+
+### 实现与两个追加修复
+
+- `c54e1b5`：macOS 自承载 NSSavePanel 分组 popup（分隔线 + 扩展名联动 + 兜底提示行）；host 新增 `platform_request_unified_save_authorization`（按格式签发 Document/Export 授权 + 兜底双授权）；前端 `unifiedSaveFlow`（文档路由走保存队列、导出路由共享冻结/渲染/提交段）；应用内导出浮层与视图菜单直出项移除；⌘E 不再有菜单 owner，经 renderer keydown 进入同一命令（注释记录 exactly-once 豁免理由）。
+- `7b67fd1`：AppKit name field 无法无损显示 `.graph.json` 双段扩展名（吞中段）——allowedFileTypes 限单段 + allowsOtherFileTypes 透传 + host 落盘前按选择器规范化路径。
+- `330b298`：Graph JSON 导出扩展名改为纯 `.json`（保存侧 .json 选项移除后无歧义，双段扩展名问题随之消失；Graph JSON 为单向导出产物，无迁移负担）。
+
+### 验证
+
+- cargo test 214 passed + clippy 干净；pnpm typecheck / lint 干净；test:unit 723/726（3 项红 = §十一 清理事故的 verify-decision 证据缺失，重冻结进行中）。
+- 原生全路径 **32/32 PASS**（`.tmp/dogfood-2026-09-15/ofr-native-evidence.json`，source `330b298` clean，DMG sha256 `cd58dff6cd5846e1…`）：首启引导、默认文楷、单击放光标、整理/拖动/撤销重做、保存单一 .mindmap、统一面板五格式分组、Graph JSON 与 SVG 经统一面板导出落盘（含扩展名联动、跨行长文本完整、描边模拟、已保存文档不产生兜底文件）。
+- 驱动修正披露：S5/S6 改为驱动统一原生面板；SVG 长文本断言改为跨 tspan 拼合（软换行产物）；faux-bold 描边断言落到 tspan（导出处 stroked tspan，stroke-width=字号×1/32）。
+- 环境干扰：锁屏再次阻断一轮跑批（保活方案 `caffeinate -u` 循环已加入验证流程）；S5b 曾因保存 sheet 关闭后焦点漂移丢 ⇧⌘S（驱动补 activate）。
+- 未运行项：Windows、advisory、性能 20 轮、VoiceOver。
+
+### 交接
+
+- 新候选已安装至 /Applications（DMG `.tmp/dogfood-2026-09-15/Mind Map_0.1.0_aarch64.dmg`）。
+- verify-decision 证据重冻结按负责人批准的方案 B 执行中（证据迁入版本库 docs/quality/evidence/g1/ + register 路径与哈希重冻结）。
