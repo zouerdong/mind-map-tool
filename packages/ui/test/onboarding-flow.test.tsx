@@ -63,6 +63,7 @@ describe("OnboardingOverlay", () => {
         state={state}
         tokens={LIGHT_TOKENS}
         onStart={() => {}}
+        onNext={() => {}}
         onSkip={() => {}}
         onHide={() => {}}
       />,
@@ -79,6 +80,7 @@ describe("OnboardingOverlay", () => {
         state={state}
         tokens={LIGHT_TOKENS}
         onStart={() => {}}
+        onNext={() => {}}
         onSkip={() => {}}
         onHide={() => {}}
       />,
@@ -100,6 +102,7 @@ describe("OnboardingOverlay", () => {
         state={state}
         tokens={LIGHT_TOKENS}
         onStart={() => {}}
+        onNext={() => {}}
         onSkip={() => {}}
         onHide={() => {}}
         anchorLookup={(id) => (id === "canvas.pane" ? anchor : null)}
@@ -110,6 +113,63 @@ describe("OnboardingOverlay", () => {
     expect(card.style.top).toContain("98"); // bottom(90)+8
   });
 
+  it("welcome 是入口卡不显示步数；步骤卡有「引导 1/4」与显式「下一步」（OFR-2026-09-15）", () => {
+    const welcome = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "not-started",
+    });
+    const { unmount } = render(
+      <OnboardingOverlay
+        state={welcome}
+        tokens={LIGHT_TOKENS}
+        onStart={() => {}}
+        onNext={() => {}}
+        onSkip={() => {}}
+        onHide={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/^引导 \d+\/4$/)).toBeNull(); // welcome 不计步
+    unmount();
+
+    const step1 = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start" });
+    const onNext = vi.fn();
+    render(
+      <OnboardingOverlay
+        state={step1}
+        tokens={LIGHT_TOKENS}
+        onStart={() => {}}
+        onNext={onNext}
+        onSkip={() => {}}
+        onHide={() => {}}
+      />,
+    );
+    expect(screen.getByText("引导 1/4")).toBeTruthy();
+    fireEvent.click(screen.getByText("下一步"));
+    expect(onNext).toHaveBeenCalled();
+  });
+
+  it("末步主按钮「稍后再说，完成引导」接 onNext（此前错接 onStart 会回跳第一步）", () => {
+    let s = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start" });
+    s = onboardingReducer(s, { type: "next" });
+    s = onboardingReducer(s, { type: "next" });
+    s = onboardingReducer(s, { type: "next" }); // save-or-export
+    const onNext = vi.fn();
+    const onStart = vi.fn();
+    render(
+      <OnboardingOverlay
+        state={s}
+        tokens={LIGHT_TOKENS}
+        onStart={onStart}
+        onNext={onNext}
+        onSkip={() => {}}
+        onHide={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("稍后再说，完成引导"));
+    expect(onNext).toHaveBeenCalled();
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("× 隐藏按钮回调 onHide（不等于跳过）", () => {
     const state = onboardingReducer(INITIAL_ONBOARDING_STATE, { type: "start" });
     const onHide = vi.fn();
@@ -118,6 +178,7 @@ describe("OnboardingOverlay", () => {
         state={state}
         tokens={LIGHT_TOKENS}
         onStart={() => {}}
+        onNext={() => {}}
         onSkip={() => {}}
         onHide={onHide}
       />,

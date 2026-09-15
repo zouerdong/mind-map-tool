@@ -17,8 +17,8 @@ const { makeDoc } = await import("./projection.test.js");
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
-  bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
 };
 
 function renderCanvas(extra?: { revision?: number }) {
@@ -374,12 +374,12 @@ describe("EditorCanvas", () => {
     doc.document.font = "lxgw-wenkai";
     doc.document.nodes[0]!.runs = [{ start: 0, end: 3, bold: true }];
     const wenkaiFonts: FontResolver = {
-      regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+      regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
       // 文楷无真粗体（与生产 FontResolver 一致）
       bold: (fontId) =>
         fontId === "lxgw-wenkai"
           ? null
-          : { advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 },
+          : { advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 },
     };
     const session = new DocumentSession(makeStateNode(doc).document);
     render(<EditorCanvas session={session} fonts={wenkaiFonts} />);

@@ -16,8 +16,8 @@ const { makeDoc } = await import("./projection.test.js");
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
-  bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
 };
 
 describe("NodeTextEditor（直接渲染）", () => {
@@ -82,8 +82,8 @@ describe("EditorCanvas 编辑流（中文提交 + 权威 size）", () => {
     await waitFor(() => {
       expect(session.current.document.document.nodes[0]?.text).toBe("中心主题");
     });
-    // 权威 size：共享视觉契约假字体（advance = size×10）：4 字 × 160 + 32 padding
-    expect(session.current.document.document.nodes[0]?.size.width).toBe(4 * 160 + 32);
+    // 权威 size：假字体 CJK 一字 = 字号宽（16px）：4×16+32 padding = 96 < 120 → 卡宽下限
+    expect(session.current.document.document.nodes[0]?.size.width).toBe(120);
   });
 
   it("DFR-020：带眉题节点正文编辑后保留眉题高度（ready 路径）", async () => {

@@ -195,6 +195,38 @@ describe("偏好 port（只写本机，键集受控）", () => {
     expect(serialized).not.toContain("onboarding");
   });
 
+  it("显式下一步（OFR-2026-09-15）：步骤内 next 不等真实动作直接推进", () => {
+    const s = started();
+    const n = onboardingReducer(s, { type: "next" });
+    expect(n.currentStep).toBe("second-connect");
+    expect(n.status).toBe("in-progress");
+    expect(n.visible).toBe(true);
+  });
+
+  it("next 连点至末步后再 next = 完成引导（写 completed，不再自动弹出）", () => {
+    let s = started(); // create-first
+    s = onboardingReducer(s, { type: "next" }); // second-connect
+    s = onboardingReducer(s, { type: "next" }); // undo-or-theme
+    s = onboardingReducer(s, { type: "next" }); // save-or-export（末步）
+    expect(s.currentStep).toBe("save-or-export");
+    s = onboardingReducer(s, { type: "next" });
+    expect(s.status).toBe("completed");
+    expect(s.currentStep).toBeNull();
+    expect(s.visible).toBe(false);
+  });
+
+  it("welcome 上 next 等价开始；completed/skipped 后 next 无效", () => {
+    const w = onboardingReducer(INITIAL_ONBOARDING_STATE, {
+      type: "restore",
+      status: "not-started",
+    });
+    const n = onboardingReducer(w, { type: "next" });
+    expect(n.currentStep).toBe("create-first");
+    expect(n.status).toBe("in-progress");
+    const skipped = onboardingReducer(n, { type: "skip" });
+    expect(onboardingReducer(skipped, { type: "next" })).toEqual(skipped);
+  });
+
   it("步骤锚点与文案一一对应（漂移守卫）", () => {
     expect(ONBOARDING_STEPS.length).toBe(5);
     expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual([

@@ -115,6 +115,7 @@ export function OnboardingFlow({
   const handlers = useMemo(
     () => ({
       onStart: () => dispatch({ type: "start" }),
+      onNext: () => dispatch({ type: "next" }),
       onSkip: () => dispatch({ type: "skip" }),
       onHide: () => dispatch({ type: "hide" }),
     }),
@@ -126,6 +127,7 @@ export function OnboardingFlow({
       state={state}
       tokens={tokens}
       onStart={handlers.onStart}
+      onNext={handlers.onNext}
       onSkip={handlers.onSkip}
       onHide={handlers.onHide}
     />

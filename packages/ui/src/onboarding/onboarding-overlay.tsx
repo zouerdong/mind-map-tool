@@ -14,6 +14,8 @@ export interface OnboardingOverlayProps {
   state: OnboardingState;
   tokens: ThemeTokens;
   onStart(): void;
+  /** 显式“下一步”（welcome→第一步；步骤内直接推进；末步=完成引导）。 */
+  onNext(): void;
   onSkip(): void;
   onHide(): void;
   /** 锚点查找（默认 document.querySelector；测试可注入）。 */
@@ -40,6 +42,7 @@ export function OnboardingOverlay({
   state,
   tokens,
   onStart,
+  onNext,
   onSkip,
   onHide,
   anchorLookup,
@@ -74,6 +77,7 @@ export function OnboardingOverlay({
 
   const stepIndex = ONBOARDING_STEPS.findIndex((s) => s.id === spec.id);
   const actionableSteps = ONBOARDING_STEPS.filter((s) => s.observe.length > 0);
+  const isWelcome = spec.id === "welcome";
 
   return (
     <div
@@ -104,9 +108,13 @@ export function OnboardingOverlay({
         }}
         data-testid="onboarding-card"
       >
-        <div aria-live="polite" style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
-          引导 {Math.max(0, stepIndex - 1) + 1}/{actionableSteps.length}
-        </div>
+        {/* OFR-2026-09-15：welcome 是入口卡不是第 1 步——不显示步数，避免与
+            第一步同显“引导 1/4”造成“卡住”错觉（负责人 dogfood 实测误读）。 */}
+        {!isWelcome ? (
+          <div aria-live="polite" style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+            引导 {Math.max(0, stepIndex - 1) + 1}/{actionableSteps.length}
+          </div>
+        ) : null}
         <h2 style={{ fontSize: 15, margin: "0 0 6px" }}>{copy.title}</h2>
         <p style={{ fontSize: 13, margin: "0 0 10px", lineHeight: 1.6 }}>{copy.body}</p>
         {copy.hint ? (
@@ -114,8 +122,22 @@ export function OnboardingOverlay({
         ) : null}
         <div style={{ display: "flex", gap: 8 }}>
           {copy.primary ? (
-            <button type="button" onClick={onStart} data-testid="onboarding-primary">
+            // welcome 的 primary=开始引导（onStart）；其余步骤的 primary
+            //（如末步“稍后再说，完成引导”）语义是显式推进（onNext）——
+            // 此前末步错接到 onStart 会跳回第一步（OFR-2026-09-15）。
+            <button
+              type="button"
+              onClick={isWelcome ? onStart : onNext}
+              data-testid="onboarding-primary"
+            >
               {copy.primary}
+            </button>
+          ) : null}
+          {/* PRD §7.2：步骤卡提供“下一步”与“跳过”——动作自动推进之外始终
+              有显式出口，不再只能关掉（OFR-2026-09-15 负责人反馈）。 */}
+          {!isWelcome && copy.primary === undefined ? (
+            <button type="button" onClick={onNext} data-testid="onboarding-next">
+              下一步
             </button>
           ) : null}
           {copy.secondary ? (

@@ -161,11 +161,45 @@ describe("节点测量（kicker + runs 正文，UI/导出同源）", () => {
     expect(s.height).toBeCloseTo(12 + 22 * 1.4 + 12, 6);
   });
 
-  it("宽度自适应：内容超过 260 下限按内容延展（无软换行，不截断）", () => {
-    const wide = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // 36 字符 × 8 = 288 + 32
+  it("宽度自适应：正文超过上限在内容区 228px 处软换行（OFR-2026-09-15；卡片纵向生长不越 260）", () => {
+    const wide = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // 36 字符 × 8px，无空格 → 硬折
     const s = measureNodeVisual({ text: wide }, "noto-sans-sc", fonts);
-    expect(s.width).toBeGreaterThan(VISUAL_TYPOGRAPHY.cardMaxWidth);
-    expect(s.width).toBeCloseTo(36 * 8 + 32, 6);
+    expect(s.width).toBeLessThanOrEqual(VISUAL_TYPOGRAPHY.cardMaxWidth);
+    expect(s.width).toBeCloseTo(28 * 8 + 32, 6); // 228÷8=28 字符/行
+    expect(s.height).toBeCloseTo(12 + 2 * 16 * 1.4 + 12, 6); // 两行纵向生长
+  });
+
+  it("软换行偏好词边界（行内最后空格后断开）；CJK 长句字符硬折不丢字", () => {
+    const latin = layoutNodeVisual(
+      { text: "alpha beta gamma delta epsilon zeta" },
+      "card",
+      "noto-sans-sc",
+      fonts,
+    );
+    expect(latin.lines.length).toBeGreaterThan(1);
+    for (const l of latin.lines) expect(l.width).toBeLessThanOrEqual(228);
+    // 不丢字：全部行拼接等于原文（空格保留在前一行尾，不可见）
+    expect(latin.lines.map((l) => l.segments.map((s2) => s2.text).join("")).join("")).toBe(
+      "alpha beta gamma delta epsilon zeta",
+    );
+    expect(latin.lines[0]!.segments.map((s2) => s2.text).join("").endsWith(" ")).toBe(true);
+    // CJK 硬折：14 字/行（14×16=224≤228，15×16=240>228）
+    const cjkText = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十"; // 30 字
+    const cjk = layoutNodeVisual({ text: cjkText }, "card", "noto-sans-sc", fonts);
+    expect(cjk.lines.length).toBe(3); // 14+14+2
+    expect(cjk.lines.map((l) => l.segments.map((s2) => s2.text).join("")).join("")).toBe(cjkText);
+  });
+
+  it("软换行跨行保留 runs（样式随字符走，折行不丢样式）", () => {
+    const text = "一二三四五六七八九十一二三四五六七八九十"; // 20 字，14 字处折行
+    const v = layoutNodeVisual(
+      { text, runs: [{ start: 12, end: 18, bold: true }] },
+      "card",
+      "lxgw-wenkai",
+      fonts,
+    );
+    expect(v.lines[0]!.segments.at(-1)!.bold).toBe(true); // 第一行尾段 bold
+    expect(v.lines[1]!.segments[0]!.bold).toBe(true); // 折到第二行仍 bold
   });
 
   it("眉题宽度计入卡宽（长中文眉题不溢出）", () => {

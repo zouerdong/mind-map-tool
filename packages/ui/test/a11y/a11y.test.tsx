@@ -29,8 +29,8 @@ beforeAll(() => {
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
-  bold: () => ({ advance: (_ch: string, size: number) => size * 10, ascentRatio: 0.8 }),
+  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
 };
 
 async function expectNoViolations(container: HTMLElement) {

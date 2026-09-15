@@ -99,7 +99,9 @@ export const VISUAL_TYPOGRAPHY = {
   cardRadius: 12,
   /** 卡宽自适应下限（§1.3 卡宽基准 188px，内容自适应 120–260） */
   cardMinWidth: 120,
-  /** 卡宽自适应上限（同上；本契约无软换行，超宽内容按内容延展而非截断） */
+  /** 卡宽自适应上限（同上）。OFR-2026-09-15（负责人 dogfood：长文本显示不全）：
+   *  超出上限的正文在内容区 228px 处软换行（词边界优先、CJK 硬折），卡片纵向
+   *  生长——上限语义回归 token 表“内容自适应 120–260”，不再无限加宽。 */
   cardMaxWidth: 260,
 } as const;
 
@@ -230,6 +232,7 @@ export function layoutNodeVisual(
   const body = layoutNodeText(node.text, node.runs, fontId, fonts, {
     baseFontSize: VISUAL_TYPOGRAPHY.bodyFontSize,
     lineHeightFactor: VISUAL_TYPOGRAPHY.bodyLineHeightFactor,
+    wrapWidth: VISUAL_TYPOGRAPHY.cardMaxWidth - VISUAL_TYPOGRAPHY.paddingX * 2,
   });
 
   const kickerText = node.kicker ?? "";

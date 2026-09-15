@@ -19,6 +19,10 @@ import {
 export type OnboardingAction =
   | { type: "start" }
   | { type: "skip" }
+  /** OFR-2026-09-15（负责人 dogfood：步骤卡没有“下一步”只能关掉）：显式
+   *  推进当前步骤——welcome 进入第一步；步骤内不等真实动作直接进下一步；
+   *  最后一步视为完成引导。动作驱动的自动推进（observe）保持不变。 */
+  | { type: "next" }
   | { type: "replay" }
   | { type: "observe"; observation: OnboardingObservation }
   | { type: "hide" }
@@ -79,6 +83,21 @@ export function onboardingReducer(
     }
     case "skip":
       return { ...state, status: "skipped", currentStep: null, visible: false };
+    case "next": {
+      if (state.status === "completed" || state.status === "skipped") return state;
+      if (state.currentStep === null) return state;
+      if (state.currentStep === "welcome") {
+        const first = ONBOARDING_STEPS[1]!;
+        return { ...state, status: "in-progress", completedSteps: [], ...beginStep(first.id) };
+      }
+      if (state.status !== "in-progress") return state;
+      const next = stepAfter(state.currentStep);
+      if (next === null) {
+        // 最后一步的“下一步/完成”：写入完成偏好，不再自动弹出。
+        return { ...state, status: "completed", currentStep: null, visible: false };
+      }
+      return { ...state, ...beginStep(next) };
+    }
     case "replay":
       return {
         ...INITIAL_ONBOARDING_STATE,
