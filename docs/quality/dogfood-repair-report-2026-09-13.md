@@ -198,12 +198,14 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 - 原生速验（新候选实机，`5c0b947`，DMG sha256 `04b01f454e15269f…`，证据 `.tmp/dogfood-2026-09-15/`）：步骤卡"引导 2/4 + 下一步/跳过引导/×"截图确认；长文本节点提交后 w=256 ≤260、h=181 纵向生长、失焦后完整可见。
 - 未运行项：cargo test（本轮无 Rust 变更，212 项基线未动）；Windows；完整 drive.mjs 全路径（驱动断言需为折行后的尺寸断言微调，留待独立审阅轮）。
 
-### ⚠️ 清理事故（过程缺陷，待负责人决定）
+### ⚠️ 清理事故（过程缺陷；已于当日按方案 B 闭环）
 
 执行"清理中间文件"时误删 `.tmp/runtime-spike/`（254MB）：该目录被 `docs/decisions/decision-register.json` 的 G1 `candidateEvidenceSha256` 按字节冻结引用，**不是普通构建缓存**。原始字节不可恢复（无 Time Machine/快照/Trash 副本）。已按 README"可再生"路径重生成 export/fonts 两轨，但含计时字段无法字节一致，verify-decision packaging 红灯 3 项（hosts/canvas 两轨证据缺失 + export/fonts 哈希漂移）。修复方向（均需负责人批准，因为改写 G1 冻结记录）：
 
 - A. 补齐重跑 hosts/canvas 两轨（需下载 Electron/Playwright、构建 spike app）后运行 `finalize-g1.mjs` 重冻结哈希；
 - B. 借机把四轨证据迁入受版本控制目录（如 `docs/quality/evidence/g1/`）并同步 register 路径与哈希，一次性消除"测试依赖易失 .tmp"的结构性隐患。
+
+**闭环记录（[from-user 2026-09-15] 负责人选 B）**：四轨批准候选证据经 harness 再生并迁入 `docs/quality/evidence/g1/`（tracked）；register 的 exitEvidence 路径/哈希与 candidateEvidenceSha256 重冻结；`test:unit` 恢复 726/726 全绿。electron（未批准候选）证据未再生（其 exitEvidence 不参与批准校验，原路径保留作历史记录）。spike 侧构建残留（tauri target 888MB、node_modules 142MB、Electron 半成品）已清。
 
 已沉淀规则到项目 AGENTS.md：`.tmp/runtime-spike/` 为 register 冻结引用证据，清理禁区。
 
