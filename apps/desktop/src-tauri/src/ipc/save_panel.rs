@@ -15,6 +15,68 @@
 //!   生成双授权）。仅 macOS 使用；其他平台仍走 rfd（Windows 通用对话框
 //!   原生显示 filter 下拉）。
 
+/// 已知的可交换扩展名（长后缀优先：`.graph.json` 先于 `.json`）。
+/// 平台无关纯函数区：macOS 面板与 ipc 最终路径规范化共用。
+const KNOWN_EXTS: [&str; 6] = ["graph.json", "mindmap", "svg", "png", "pdf", "json"];
+
+/// 把文件名扩展名换成所选格式；未带已知扩展名时直接追加。
+/// 保留用户输入的基础名与大小写；已带其他扩展名（如 `.txt`）不剥除。
+fn swap_extension(name: &str, ext: &str) -> String {
+    let lower = name.to_ascii_lowercase();
+    for known in KNOWN_EXTS {
+        let suffix = format!(".{known}");
+        if lower.ends_with(&suffix) {
+            return format!("{}.{ext}", &name[..name.len() - suffix.len()]);
+        }
+    }
+    format!("{name}.{ext}")
+}
+
+/// 以所选格式为权威，规范化最终落盘路径的扩展名（AppKit name field 不能
+/// 无损显示 `.graph.json` 双段扩展名——会吞掉中段——因此落盘前以选择器
+/// 为准重写；用户手改扩展名不改变格式语义）。
+pub fn normalize_path_for_format(path: &mut std::path::PathBuf, ext: &str) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let renamed = swap_extension(&name, ext);
+    path.set_file_name(renamed);
+}
+
+#[cfg(test)]
+mod pure_tests {
+    use super::{normalize_path_for_format, swap_extension};
+
+    #[test]
+    fn swaps_known_extensions_case_insensitively() {
+        assert_eq!(swap_extension("未命名.mindmap", "svg"), "未命名.svg");
+        assert_eq!(swap_extension("未命名.graph.json", "mindmap"), "未命名.mindmap");
+        assert_eq!(swap_extension("a.JSON", "pdf"), "a.pdf");
+        assert_eq!(swap_extension("图.png", "graph.json"), "图.graph.json");
+        // 长后缀优先：`.graph.json` 整体被替换，不产生 `图.graph.svg`
+        assert_eq!(swap_extension("图.graph.json", "svg"), "图.svg");
+    }
+
+    #[test]
+    fn appends_when_no_known_extension() {
+        assert_eq!(swap_extension("未命名", "mindmap"), "未命名.mindmap");
+        assert_eq!(swap_extension("notes.txt", "pdf"), "notes.txt.pdf");
+    }
+
+    #[test]
+    fn normalize_repairs_appkit_mangled_double_extension() {
+        // AppKit name field 把 "未命名.graph.json" 显示/返回为 "未命名.json"，
+        // 落盘前必须按选择器格式修复回双段扩展名。
+        let mut p = std::path::PathBuf::from("/tmp/未命名.json");
+        normalize_path_for_format(&mut p, "graph.json");
+        assert_eq!(p, std::path::PathBuf::from("/tmp/未命名.graph.json"));
+        let mut q = std::path::PathBuf::from("/tmp/未命名.graph.json");
+        normalize_path_for_format(&mut q, "graph.json");
+        assert_eq!(q, std::path::PathBuf::from("/tmp/未命名.graph.json")); // 幂等
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     use std::ffi::c_void;
@@ -30,6 +92,7 @@ mod imp {
     };
     use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString};
 
+    use super::swap_extension;
     use crate::file::error::IpcError;
 
     /// 「存储为…」面板的可选格式（分两组：可编辑文档 / 导出产物）。
@@ -76,22 +139,6 @@ mod imp {
     pub struct UnifiedChoice {
         pub path: PathBuf,
         pub format: UnifiedFormat,
-    }
-
-    /// 已知的可交换扩展名（长后缀优先：`.graph.json` 先于 `.json`）。
-    const KNOWN_EXTS: [&str; 6] = ["graph.json", "mindmap", "svg", "png", "pdf", "json"];
-
-    /// 把文件名扩展名换成所选格式；未带已知扩展名时直接追加。
-    /// 保留用户输入的基础名与大小写；已带其他扩展名（如 `.txt`）不剥除。
-    fn swap_extension(name: &str, ext: &str) -> String {
-        let lower = name.to_ascii_lowercase();
-        for known in KNOWN_EXTS {
-            let suffix = format!(".{known}");
-            if lower.ends_with(&suffix) {
-                return format!("{}.{ext}", &name[..name.len() - suffix.len()]);
-            }
-        }
-        format!("{name}.{ext}")
     }
 
     /// popup 行索引 → 格式（索引 1 是分组分隔线，不可选）。
@@ -245,13 +292,17 @@ mod imp {
         run_on_main(app, parent_ns_window, move |mtm, parent| {
             let panel = NSSavePanel::savePanel(mtm);
             panel.setCanCreateDirectories(true);
-            // 五种扩展名均为合法输入（用户手改扩展名同样接受）。
-            let allowed: Vec<Retained<NSString>> = KNOWN_EXTS
+            // allowedFileTypes 只放合法单段扩展名（AppKit 的扩展名校验不认
+            // `.graph.json` 双段，会把 name field 的中段吞掉）；允许其他类型
+            // 透传，用户手改扩展名与双段扩展名都不被改写——最终落盘路径由
+            // host 按选择器格式规范化（normalize_path_for_format）。
+            let allowed: Vec<Retained<NSString>> = ["mindmap", "svg", "png", "pdf"]
                 .iter()
                 .map(|e| NSString::from_str(e))
                 .collect();
             #[allow(deprecated)]
             panel.setAllowedFileTypes(Some(&NSArray::from_retained_slice(&allowed)));
+            panel.setAllowsOtherFileTypes(true);
             panel.setNameFieldStringValue(&NSString::from_str(&suggested));
 
             // accessory view：「格式：」popup（分两组）+ 兜底提示行。
@@ -303,23 +354,7 @@ mod imp {
 
     #[cfg(test)]
     mod tests {
-        use super::{format_for_index, swap_extension, UnifiedFormat};
-
-        #[test]
-        fn swaps_known_extensions_case_insensitively() {
-            assert_eq!(swap_extension("未命名.mindmap", "svg"), "未命名.svg");
-            assert_eq!(swap_extension("未命名.graph.json", "mindmap"), "未命名.mindmap");
-            assert_eq!(swap_extension("a.JSON", "pdf"), "a.pdf");
-            assert_eq!(swap_extension("图.png", "graph.json"), "图.graph.json");
-            // 长后缀优先：`.graph.json` 整体被替换，不产生 `图.graph.svg`
-            assert_eq!(swap_extension("图.graph.json", "svg"), "图.svg");
-        }
-
-        #[test]
-        fn appends_when_no_known_extension() {
-            assert_eq!(swap_extension("未命名", "mindmap"), "未命名.mindmap");
-            assert_eq!(swap_extension("notes.txt", "pdf"), "notes.txt.pdf");
-        }
+        use super::{format_for_index, UnifiedFormat};
 
         #[test]
         fn popup_index_maps_around_separator() {

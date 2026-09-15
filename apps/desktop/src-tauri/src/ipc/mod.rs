@@ -490,14 +490,18 @@ pub async fn platform_request_unified_save_authorization(
     }
 
     /// 由（路径, 格式）组装授权 DTO；导出格式 + 未保存文档时补兜底授权。
+    /// 落盘路径先按选择器格式规范化扩展名（AppKit name field 无法无损显示
+    /// `.graph.json` 双段扩展名，会把中段吞掉——选择器才是格式权威）。
     fn grant_for_choice(
         service: &FileLifecycleService,
         window_label: &str,
-        path: std::path::PathBuf,
+        mut path: std::path::PathBuf,
         format_ipc: &str,
+        format_ext: &str,
         is_document: bool,
         document_saved: bool,
     ) -> Result<UnifiedSaveGrantDto, crate::file::error::IpcError> {
+        save_panel::normalize_path_for_format(&mut path, format_ext);
         let kind = if is_document {
             TargetKind::Document
         } else {
@@ -535,6 +539,7 @@ pub async fn platform_request_unified_save_authorization(
             window.label(),
             choice.path,
             choice.format.as_ipc_str(),
+            choice.format.ext(),
             choice.format.is_document(),
             document_saved,
         )?))
@@ -561,22 +566,23 @@ pub async fn platform_request_unified_save_authorization(
             crate::file::error::IpcError::new("FILE_IO_ERROR", format!("所选路径不可用：{e}"))
         })?;
         let lower = path.to_string_lossy().to_ascii_lowercase();
-        let (format_ipc, is_document) = if lower.ends_with(".svg") {
-            ("svg", false)
+        let (format_ipc, format_ext, is_document) = if lower.ends_with(".svg") {
+            ("svg", "svg", false)
         } else if lower.ends_with(".png") {
-            ("png", false)
+            ("png", "png", false)
         } else if lower.ends_with(".pdf") {
-            ("pdf", false)
+            ("pdf", "pdf", false)
         } else if lower.ends_with(".graph.json") {
-            ("graph-json", false)
+            ("graph-json", "graph.json", false)
         } else {
-            ("mindmap", true)
+            ("mindmap", "mindmap", true)
         };
         Ok(Some(grant_for_choice(
             &service,
             window.label(),
             path,
             format_ipc,
+            format_ext,
             is_document,
             document_saved,
         )?))
