@@ -362,6 +362,56 @@ describe("EditorCanvas", () => {
     }
   });
 
+  it("OFR-2026-09-15：还原布局把线形态一起拨回散乱曲线（morph→0，不再是折线）", async () => {
+    // reduced-motion：动画同步完成，测试确定性（形态终态即断言对象）
+    const originalMatchMedia = globalThis.matchMedia;
+    globalThis.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    })) as unknown as typeof matchMedia;
+    try {
+      const doc = makeDoc();
+      doc.document.nodes.push({
+        id: "n3",
+        text: "孙节点",
+        position: { x: 520, y: 240 },
+        size: { width: 120, height: 37 },
+      });
+      doc.document.edges.push({ id: "e2", sourceNodeId: "n2", targetNodeId: "n3" });
+      const session = new DocumentSession(makeStateNode(doc).document);
+      const onResult = vi.fn();
+      const { rerender } = render(
+        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={0} onOrganizeResult={onResult} />,
+      );
+      const edge = await screen.findByTestId("rf-edge-e1");
+      // 散乱初态：无自定义 pathD（mind-edge 回退 getBezierPath 贝塞尔曲线）
+      await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
+
+      rerender(
+        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={1} onOrganizeResult={onResult} />,
+      );
+      await waitFor(() => expect(onResult.mock.calls.length).toBe(1));
+      // 整理态：正交圆角折线（L/Q，无贝塞尔 C）
+      await waitFor(() => expect(edge.getAttribute("data-path") ?? "").not.toContain("C"));
+
+      rerender(
+        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={2} onOrganizeResult={onResult} />,
+      );
+      await waitFor(() => expect(onResult.mock.calls.length).toBe(2));
+      expect(onResult.mock.calls[1]![0].status).toBe("restored");
+      // 还原本质：位置 + 线形态一起回散乱曲线（pathD 清空 → 贝塞尔回退）
+      await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
+    } finally {
+      globalThis.matchMedia = originalMatchMedia;
+    }
+  });
+
   it("OFR-2026-09-14 #6：文楷粗体段用描边模拟（无合成粗体，宽度不超出度量）", async () => {
     const doc = makeDoc();
     doc.document.font = "lxgw-wenkai";

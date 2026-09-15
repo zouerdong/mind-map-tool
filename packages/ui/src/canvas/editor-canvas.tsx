@@ -272,6 +272,8 @@ export function EditorCanvas({
   // 快照仅 session 级（布局快照不入文档文件，与 viewport 同红线）。
   const preOrganizeRef = useRef<Map<string, Point> | null>(null);
   const organizedRef = useRef(false);
+  /** 还原提交标记：下一次核心重投影走 reverseTo（位置+线形态一起回散乱态）。 */
+  const restoreMotionRef = useRef(false);
   useEffect(() => {
     if (organizeSignal === 0 || organizeSignal === lastOrganizeSignalRef.current) return;
     lastOrganizeSignalRef.current = organizeSignal;
@@ -301,6 +303,10 @@ export function EditorCanvas({
         if (moves.length === 0) {
           onOrganizeResult?.({ status: "no-op" });
         } else {
+          // 还原要连"线形态"一起拨回散乱曲线（morph→0）：重投影经 undo 同款
+          // reverseTo 通道，而非整理的前向 start（否则位置回去了线还是折线——
+          // 负责人实机反馈 2026-09-15）。
+          restoreMotionRef.current = true;
           api.commit({ kind: "MoveNodes", moves });
           onOrganizeResult?.({ status: "restored" });
         }
@@ -463,9 +469,13 @@ export function EditorCanvas({
       }
     }
 
-    // 若正在动画中或者有多节点位置变更（且不是单节点拖拽提交）
-    if (movedCount >= 2 || coordinatorRef.current.getPhase() === "running") {
-      const isUndo = session.canRedo; // undo 导致的重排
+    // 若正在动画中或者有多节点位置变更（且不是单节点拖拽提交）；
+    // 整理还原（restoreMotionRef）同样必须进入动画通道——散乱曲线靠
+    // reverseTo 的 morph→0 恢复，哪怕位置只差一个节点。
+    const restoreMotion = restoreMotionRef.current;
+    restoreMotionRef.current = false;
+    if (movedCount >= 2 || restoreMotion || coordinatorRef.current.getPhase() === "running") {
+      const isUndo = session.canRedo || restoreMotion; // undo 或整理还原导致的重排
       const onFrame = (frame: MotionFrame) => {
         setRfNodes((prevNodes) =>
           prevNodes.map((n) => {
