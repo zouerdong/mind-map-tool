@@ -1,13 +1,11 @@
 // AppShellHeader（VRA-070）：极简 40px 常驻顶栏与下拉菜单
-// 左侧：[文件 ▾] 下拉菜单（新建/打开/保存/另存为/导出/热键/重放）
+// 左侧：[文件 ▾] 下拉菜单（新建/打开/保存/存储为/热键/重放；OFR-2026-09-15 出口合并）
 // 中间：文档标题 · 保存状态指示（非桌面环境附带 fake 指示供测试识别）
 // 右侧：[整理 ⌘⇧L] 主动作 + [☰ 视图 ▾] 菜单 + [◐] 主题切换
 
 import React, { useEffect, useRef, useState } from "react";
 import type { Command, OrganizeDirection, ThemeName } from "@mindmap/core";
 import { ThemeToggle } from "@mindmap/ui";
-import type { ExportFormat } from "./export-commands.js";
-
 export interface AppHeaderProps {
   theme: ThemeName;
   docName: string;
@@ -17,8 +15,6 @@ export interface AppHeaderProps {
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onExport: (format: ExportFormat) => void;
-  onOpenExportPanel: () => void;
   onOrganize: () => void;
   organizeDirection: OrganizeDirection;
   onToggleOrganizeDirection: () => void;
@@ -37,8 +33,6 @@ export function AppHeader({
   onOpen,
   onSave,
   onSaveAs,
-  onExport,
-  onOpenExportPanel,
   onOrganize,
   organizeDirection,
   onToggleOrganizeDirection,
@@ -250,28 +244,15 @@ export function AppHeader({
           </button>
           <button
             type="button"
-            aria-label="另存为…"
+            aria-label="存储为…"
             style={menuItemStyle}
             onClick={() => {
               setFileMenuOpen(false);
               onSaveAs();
             }}
           >
-            <span>另存为…</span>
+            <span>存储为…</span>
             <span style={kbdStyle}>⌘⇧S</span>
-          </button>
-          <hr style={hrStyle} />
-          <button
-            type="button"
-            aria-label="导出"
-            style={menuItemStyle}
-            onClick={() => {
-              setFileMenuOpen(false);
-              onOpenExportPanel();
-            }}
-          >
-            <span>导出</span>
-            <span style={kbdStyle}>⌘E</span>
           </button>
           <hr style={hrStyle} />
           <button
@@ -390,47 +371,6 @@ export function AppHeader({
               <span style={kbdStyle}>
                 {organizeDirection === "horizontal" ? "横向 (默认)" : "纵向"}
               </span>
-            </button>
-            <hr style={hrStyle} />
-            <button
-              type="button"
-              style={menuItemStyle}
-              onClick={() => {
-                setViewMenuOpen(false);
-                onExport("graph-json");
-              }}
-            >
-              <span>导出 Graph JSON（供 Agent）</span>
-            </button>
-            <button
-              type="button"
-              style={menuItemStyle}
-              onClick={() => {
-                setViewMenuOpen(false);
-                onExport("svg");
-              }}
-            >
-              <span>导出 SVG</span>
-            </button>
-            <button
-              type="button"
-              style={menuItemStyle}
-              onClick={() => {
-                setViewMenuOpen(false);
-                onExport("png");
-              }}
-            >
-              <span>导出 PNG（2x）</span>
-            </button>
-            <button
-              type="button"
-              style={menuItemStyle}
-              onClick={() => {
-                setViewMenuOpen(false);
-                onExport("pdf");
-              }}
-            >
-              <span>导出 PDF</span>
             </button>
             <hr style={hrStyle} />
             <button

@@ -8,6 +8,7 @@ import { DocumentSession, emptyDocument, encodeDocument } from "@mindmap/core";
 import { PlatformError } from "@mindmap/platform";
 import type { CommitDocumentRequest, CommitReceipt, FilePort } from "@mindmap/platform";
 import { FakeFilePort } from "./fake-ports.js";
+import { okRenderer } from "./export-commands.test-helpers.js";
 import {
   newDocumentFlow,
   openDocumentFlow,
@@ -15,6 +16,7 @@ import {
   saveAsFlow,
   saveFlow,
   suggestedName,
+  unifiedSaveFlow,
   whenSavesSettled,
 } from "./file-commands.js";
 
@@ -35,6 +37,13 @@ class GatedFilePort implements FilePort {
   private failure: PlatformError | null = null;
 
   constructor(private readonly inner: FakeFilePort) {}
+
+  requestUnifiedSaveAuthorization(
+    suggestedName: string,
+    documentSaved: boolean,
+  ): ReturnType<FilePort["requestUnifiedSaveAuthorization"]> {
+    return this.inner.requestUnifiedSaveAuthorization(suggestedName, documentSaved);
+  }
 
   /** 下一次 commitDocument 挂起，直到 release。 */
   holdNextCommit(promise: Promise<void>): void {
@@ -551,4 +560,75 @@ describe("文档替换 pending gate（MRT-001A / CR-001 收尾）", () => {
     expect(await saving).toMatchObject({ kind: "ok" });
     expect(session.displayPath).toBe("/docs/a.json");
   }, 10_000);
+});
+
+describe("统一「存储为…」流程（OFR-2026-09-15 出口合并，PRD §8.2）", () => {
+  it("选 .mindmap：文档另存提交并签发新 handle", async () => {
+    const port = new FakeFilePort();
+    port.nextSaveDialog = "/out/方案v2.mindmap";
+    const session = new DocumentSession(emptyDocument());
+    session.commit({
+      kind: "CreateNode",
+      id: "n1",
+      text: "根",
+      position: { x: 0, y: 0 },
+      size: { width: 10, height: 10 },
+    });
+    const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok" || result.format !== "mindmap") throw new Error("应走文档路由");
+    expect(result.receipt.displayPath).toBe("/out/方案v2.mindmap");
+    expect(port.files.has("/out/方案v2.mindmap")).toBe(true);
+    expect(session.displayPath).toBe("/out/方案v2.mindmap"); // 绑定新目标
+  });
+
+  it("选导出格式且文档从未保存：导出落盘 + 自动补写同名 .mindmap 并绑定", async () => {
+    const port = new FakeFilePort();
+    port.nextSaveDialog = "/out/分享.svg";
+    const session = new DocumentSession(emptyDocument());
+    const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok" || result.format === "mindmap") throw new Error("应走导出路由");
+    expect(result.exportPath).toBe("/out/分享.svg");
+    expect(result.backupPath).toBe("/out/分享.mindmap");
+    expect(port.files.has("/out/分享.mindmap")).toBe(true); // 源文件兜底
+    // 绑定后 ⌘S 原地保存到该源文件（ordinary，不再弹对话框）
+    const callsBefore = port.saveDialogCalls;
+    const again = await saveFlow(session, { filePort: port });
+    expect(again.kind).toBe("ok");
+    expect(port.saveDialogCalls).toBe(callsBefore);
+  });
+
+  it("选导出格式且文档已保存：仅导出，不产生兜底文件", async () => {
+    const port = new FakeFilePort();
+    const session = new DocumentSession(emptyDocument());
+    port.nextSaveDialog = "/out/源.mindmap";
+    await saveAsFlow(session, { filePort: port }, "源.mindmap"); // 先保存过
+    port.nextSaveDialog = "/out/图.pdf";
+    const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok" || result.format === "mindmap") throw new Error("应走导出路由");
+    expect(result.backupPath).toBeUndefined();
+    expect(port.files.has("/out/图.mindmap")).toBe(false);
+    expect(port.files.has("/out/图.pdf")).toBe(true);
+  });
+
+  it("graph.json 双段扩展名：兜底剥离正确（分享.graph.json → 分享.mindmap）", async () => {
+    const port = new FakeFilePort();
+    port.nextSaveDialog = "/out/分享.graph.json";
+    const session = new DocumentSession(emptyDocument());
+    const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok" || result.format === "mindmap") throw new Error("应走导出路由");
+    expect(result.backupPath).toBe("/out/分享.mindmap");
+  });
+
+  it("取消：零提交零文件", async () => {
+    const port = new FakeFilePort();
+    port.nextSaveDialog = null;
+    const session = new DocumentSession(emptyDocument());
+    const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
+    expect(result.kind).toBe("cancelled");
+    expect(port.files.size).toBe(0);
+  });
 });

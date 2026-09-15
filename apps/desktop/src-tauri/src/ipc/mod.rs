@@ -48,6 +48,33 @@ pub struct GrantedAuthorizationDto {
     pub display_path: String,
 }
 
+/// 「存储为…」统一面板的授权返回（OFR-2026-09-15 出口合并，PRD §8.2）。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnifiedSaveGrantDto {
+    pub authorization_ref: String,
+    pub display_path: String,
+    /// "mindmap" | "svg" | "png" | "pdf" | "graph-json"
+    pub format: String,
+    /// 导出格式且文档从未保存过时的兜底文档授权（同名 .mindmap）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_authorization_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_display_path: Option<String>,
+}
+
+impl UnifiedSaveGrantDto {
+    fn single(format: &str, grant: crate::file::GrantOutcome) -> Self {
+        Self {
+            authorization_ref: grant.authorization_ref,
+            display_path: grant.display_path,
+            format: format.to_string(),
+            backup_authorization_ref: None,
+            backup_display_path: None,
+        }
+    }
+}
+
 /// commit 契约（Wave 2 §4.3）：bytes 已落盘时 receipt 真实有效；
 /// `rebind_state` 区分 registry 换绑/刷新是否完成——`recovery-pending`
 /// 不得显示为普通保存失败。
@@ -394,10 +421,11 @@ pub async fn platform_request_target_authorization(
             display_path: grant.display_path,
         }));
     }
-    // macOS 文档保存：自承载 NSSavePanel + accessory 格式选择（OFR-2026-09-14
-    // #3 红灯返修）。rfd 在 macOS 把全部 filter 合并进 NSSavePanel
-    // allowedFileTypes，系统不显示格式 popup（2026-09-15 原生 dogfood 实证），
-    // 无法提供负责人要求的「保存时可见格式选择」。导出与其他平台仍走 rfd。
+    // macOS 文档保存：自承载 NSSavePanel（OFR-2026-09-14 #3 红灯返修）。
+    // rfd 在 macOS 把全部 filter 合并进 NSSavePanel allowedFileTypes，系统
+    // 不显示格式 popup（2026-09-15 原生 dogfood 实证）。OFR-2026-09-15 定稿：
+    // 「保存」仅 .mindmap 单一可编辑格式（无 popup）；统一「存储为…」面板
+    // 见 platform_request_unified_save_authorization。导出与其他平台仍走 rfd。
     #[cfg(target_os = "macos")]
     if matches!(&kind, TargetKind::Document) {
         let parent = window.ns_window().map_err(|e| {
@@ -415,12 +443,10 @@ pub async fn platform_request_target_authorization(
     }
     let mut builder = app.dialog().file();
     if matches!(&kind, TargetKind::Document) {
-        // 非 macOS（Windows 通用保存对话框原生显示 filter 下拉）：正式
-        // `.mindmap` 文档与兼容 `.json`（与 open 对话框的接受范围一致；
-        // 两种扩展名写入同一份 canonical JSON，host 不做扩展名策略）。
-        builder = builder
-            .add_filter("Mind Map 文档", &["mindmap"])
-            .add_filter("JSON", &["json"]);
+        // 非 macOS（Windows 通用保存对话框原生显示 filter 下拉）：单一
+        // `.mindmap` 可编辑格式（OFR-2026-09-15 定稿；既有 .json 文档打开
+        // 兼容不变）。
+        builder = builder.add_filter("Mind Map 文档", &["mindmap"]);
     }
     if !suggested_name.is_empty() {
         builder = builder.set_file_name(&suggested_name);
@@ -436,6 +462,125 @@ pub async fn platform_request_target_authorization(
         authorization_ref: grant.authorization_ref,
         display_path: grant.display_path,
     }))
+}
+
+/// 「存储为…」统一面板授权（OFR-2026-09-15 出口合并，PRD §8.2）：
+/// 另存为与导出合并为单一面板——可编辑文档 .mindmap 与四格式导出产物
+/// 分两组呈现。按所选格式签发对应种类的一次性授权（Document/Export）；
+/// 选导出格式且文档从未保存过（document_saved=false）时，同时签发同名
+/// .mindmap 的兜底文档授权，防止源文档丢失。授权 TTL 过期自然回收，
+/// 取消/失败不产生半授权状态。
+#[tauri::command]
+pub async fn platform_request_unified_save_authorization(
+    app: AppHandle,
+    window: WebviewWindow,
+    service: State<'_, std::sync::Arc<FileLifecycleService>>,
+    suggested_name: String,
+    document_saved: bool,
+) -> Result<Option<UnifiedSaveGrantDto>, crate::file::error::IpcError> {
+    // perf 模式不走统一面板（无人值守采样只用 env 声明的精确目标）。
+    if app
+        .try_state::<std::sync::Arc<crate::perf::PerfProbe>>()
+        .is_some()
+    {
+        return Err(crate::file::error::IpcError::new(
+            "PERF_PROBE_UNAUTHORIZED_TARGET",
+            "perf 模式不支持统一存储为面板",
+        ));
+    }
+
+    /// 由（路径, 格式）组装授权 DTO；导出格式 + 未保存文档时补兜底授权。
+    fn grant_for_choice(
+        service: &FileLifecycleService,
+        window_label: &str,
+        path: std::path::PathBuf,
+        format_ipc: &str,
+        is_document: bool,
+        document_saved: bool,
+    ) -> Result<UnifiedSaveGrantDto, crate::file::error::IpcError> {
+        let kind = if is_document {
+            TargetKind::Document
+        } else {
+            TargetKind::Export
+        };
+        let grant = service.grant_authorization(window_label, kind, &path)?;
+        let mut dto = UnifiedSaveGrantDto::single(format_ipc, grant);
+        if !is_document && !document_saved {
+            let mut backup = path.clone();
+            backup.set_extension("mindmap");
+            let backup_grant =
+                service.grant_authorization(window_label, TargetKind::Document, &backup)?;
+            dto.backup_authorization_ref = Some(backup_grant.authorization_ref);
+            dto.backup_display_path = Some(backup_grant.display_path);
+        }
+        Ok(dto)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let parent = window.ns_window().map_err(|e| {
+            crate::file::error::IpcError::new("FILE_IO_ERROR", format!("窗口句柄不可用：{e}"))
+        })?;
+        let Some(choice) = save_panel::pick_unified_save_target(
+            &app,
+            parent,
+            &suggested_name,
+            document_saved,
+        )?
+        else {
+            return Ok(None); // 用户取消
+        };
+        Ok(Some(grant_for_choice(
+            &service,
+            window.label(),
+            choice.path,
+            choice.format.as_ipc_str(),
+            choice.format.is_document(),
+            document_saved,
+        )?))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // 非 macOS：rfd filter 下拉（Windows 通用对话框原生显示）；格式由
+        // 最终路径扩展名推断（rfd 不报告所选 filter）。
+        let mut builder = app.dialog().file();
+        builder = builder
+            .add_filter("Mind Map 文档", &["mindmap"])
+            .add_filter("SVG", &["svg"])
+            .add_filter("PNG 2x", &["png"])
+            .add_filter("PDF", &["pdf"])
+            .add_filter("Graph JSON", &["graph.json"]);
+        if !suggested_name.is_empty() {
+            builder = builder.set_file_name(&suggested_name);
+        }
+        let Some(picked) = builder.blocking_save_file() else {
+            return Ok(None); // 用户取消
+        };
+        let path = picked.into_path().map_err(|e| {
+            crate::file::error::IpcError::new("FILE_IO_ERROR", format!("所选路径不可用：{e}"))
+        })?;
+        let lower = path.to_string_lossy().to_ascii_lowercase();
+        let (format_ipc, is_document) = if lower.ends_with(".svg") {
+            ("svg", false)
+        } else if lower.ends_with(".png") {
+            ("png", false)
+        } else if lower.ends_with(".pdf") {
+            ("pdf", false)
+        } else if lower.ends_with(".graph.json") {
+            ("graph-json", false)
+        } else {
+            ("mindmap", true)
+        };
+        Ok(Some(grant_for_choice(
+            &service,
+            window.label(),
+            path,
+            format_ipc,
+            is_document,
+            document_saved,
+        )?))
+    }
 }
 
 /// 生产提交唯一入口（Wave 2）：ordinary/Save As 均经

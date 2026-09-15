@@ -31,6 +31,10 @@ import {
   type FilePort,
   type OpenedDocument,
 } from "@mindmap/platform";
+import {
+  exportWithGrant,
+  type ExportRendererLike,
+} from "./export-commands.js";
 
 export type FlowResult<T = undefined> =
   | ({ kind: "ok" } & (T extends undefined ? Record<string, never> : { value: T }))
@@ -200,9 +204,98 @@ async function executeSaveAsFlow(
     return platformError(e);
   }
   if (grant === null) return { kind: "cancelled" };
-  const request = session.requestSaveAs(grant.authorizationRef);
+  return executeSaveAsWithGrant(session, deps, grant.authorizationRef);
+}
+
+/** 已持有选址授权的 Save As 执行段（保存队列语义不变）。 */
+function executeSaveAsWithGrant(
+  session: DocumentSession,
+  deps: FileFlowDeps,
+  authorizationRef: string,
+): Promise<SaveFlowResult> {
+  const request = session.requestSaveAs(authorizationRef as never);
   if (request.kind === "queued") return awaitQueuedSave(session, deps);
   return executeSaveSnapshot(session, deps, request.snapshot);
+}
+
+/** 「存储为…」统一流程（OFR-2026-09-15 出口合并，PRD §8.2）的结果。 */
+export type UnifiedSaveResult =
+  | { kind: "ok"; format: "mindmap"; receipt: CommitReceipt }
+  | {
+      kind: "ok";
+      format: "svg" | "png" | "pdf" | "graph-json";
+      exportPath: string;
+      /** 面板预告的兜底：文档首次落盘的可编辑源文件路径（有备份授权时）。 */
+      backupPath?: string;
+    }
+  | { kind: "cancelled" }
+  | { kind: "conflict"; message: string }
+  | { kind: "error"; code: string; message: string };
+
+/**
+ * 存储为…（另存为与导出合并）：一个原生面板按所选格式路由——
+ * - `.mindmap`：文档另存（保存队列语义与 saveAsFlow 一致，签发新 handle）；
+ * - 导出四格式：渲染提交导出产物；面板在文档从未保存过时已签发同名
+ *   `.mindmap` 兜底授权（PRD §8.2 防源文档丢失），导出成功后补写并绑定
+ *   为当前文档目标（后续 ⌘S 原地保存到该源文件）。
+ */
+export async function unifiedSaveFlow(
+  session: DocumentSession,
+  deps: FileFlowDeps & { renderer: ExportRendererLike },
+): Promise<UnifiedSaveResult> {
+  let grant;
+  try {
+    grant = await deps.filePort.requestUnifiedSaveAuthorization(
+      suggestedName(session),
+      session.displayPath !== null,
+    );
+  } catch (e) {
+    return platformError(e);
+  }
+  if (grant === null) return { kind: "cancelled" };
+
+  if (grant.format === "mindmap") {
+    const saved = await trackSave(
+      session,
+      executeSaveAsWithGrant(session, deps, grant.authorizationRef),
+    );
+    if (saved.kind === "ok") return { kind: "ok", format: "mindmap", receipt: saved.value.receipt };
+    return saved;
+  }
+
+  const exported = await exportWithGrant(session, deps, grant.format, grant.authorizationRef);
+  if (exported.kind === "cancelled") return { kind: "cancelled" };
+  if (exported.kind === "error")
+    return { kind: "error", code: exported.code, message: exported.message };
+
+  let backupPath: string | undefined;
+  if (grant.backupAuthorizationRef !== undefined) {
+    const backup = await trackSave(
+      session,
+      executeSaveAsWithGrant(session, deps, grant.backupAuthorizationRef),
+    );
+    if (backup.kind !== "ok") {
+      // 导出已落盘、兜底失败：如实报告半完成状态（不吞掉失败也不假装全失败）。
+      const reason =
+        backup.kind === "conflict"
+          ? backup.message
+          : backup.kind === "error"
+            ? `${backup.code}: ${backup.message}`
+            : "兜底提交未执行（授权已签发，cancelled 理论上不可达）";
+      return {
+        kind: "error",
+        code: "BACKUP_SAVE_FAILED",
+        message: `已导出 ${exported.displayPath}，但可编辑源文件备份失败（${reason}）。当前文档仍未保存，请立即用「存储为…」保存 .mindmap。`,
+      };
+    }
+    backupPath = backup.value.receipt.displayPath;
+  }
+  return {
+    kind: "ok",
+    format: grant.format,
+    exportPath: exported.displayPath,
+    ...(backupPath !== undefined ? { backupPath } : {}),
+  };
 }
 
 /** 新建结果：ok（已替换为空白文档）/ cancelled（放弃确认）/ error（busy 等）。 */

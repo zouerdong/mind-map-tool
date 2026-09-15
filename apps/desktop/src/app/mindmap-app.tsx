@@ -43,11 +43,11 @@ import { isTauriRuntime } from "./ports.js";
 import {
   newDocumentFlow,
   openDocumentFlow,
-  saveAsFlow,
   saveFlow,
+  unifiedSaveFlow,
   whenSavesSettled,
 } from "./file-commands.js";
-import { EXPORT_PANEL_FORMATS, exportFlow, type ExportFormat } from "./export-commands.js";
+
 import { normalizeShortcut } from "./keyboard.js";
 
 type Notice = { tone: "info" | "error"; text: string } | null;
@@ -138,7 +138,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, []);
   /** 读取当前活动 close request id（函数封装打破 ref.current 的跨 await 收窄）。 */
   const activeCloseRequestId = useCallback(() => closeStateRef.current?.requestId ?? null, []);
-  const [exportPanel, setExportPanel] = useState(false);
   const [shortcutPanel, setShortcutPanel] = useState(false);
   const [shortcutValue, setShortcutValue] = useState("");
   const [shortcutError, setShortcutError] = useState<string | null>(null);
@@ -363,20 +362,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     bump();
   }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 
-  const onSaveAs = useCallback(async () => {
-    try {
-      activeEditorRef.current?.flush();
-      await geometryBarrier.flush();
-    } catch (e) {
-      setNotice({
-        tone: "error",
-        text: `字体资源加载失败，无法另存文档：${e instanceof Error ? e.message : String(e)}`,
-      });
-      return;
-    }
-    reportSaveResult(await saveAsFlow(session, deps, "未命名.mindmap"));
-    bump();
-  }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 
   // ---- 原生关闭三分支控制器（MRT-003 / CR-003）----
   // host fail-closed 持有 pending request；此处只做应答：clean 直接放行；
@@ -532,43 +517,51 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       setCloseError(e instanceof Error ? e.message : String(e));
     }
   }, [applyCloseState, closePort]);
-  const onExport = useCallback(
-    async (format: ExportFormat) => {
+  const onStoreAs = useCallback(
+    async () => {
       try {
         // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
         // 必须包含未提交的编辑中文字）。
         activeEditorRef.current?.flush();
-        // Graph JSON 本身不依赖字体；但若 flush 后仍有 geometry intent，
-        // session 尚未包含用户眼前的节点/文字。此时必须先收敛，失败就阻止
-        // 导出，绝不能用“成功”掩盖旧快照或空图。
-        if (format !== "graph-json" || geometryBarrier.hasPendingIntents()) {
-          await geometryBarrier.flush();
-        }
+        // 仅存在待提交几何时才必须收敛 barrier（PRC-025：fallback 尺寸绝不
+        // 落盘）；无待提交几何但字体资源失败时，文档/Graph JSON 使用既有
+        // core 数据不依赖字体（§3.4），视觉格式由 renderer buildScene 结构化
+        // 失败收口——不在此粗粒度拦截。
+        if (geometryBarrier.hasPendingIntents()) await geometryBarrier.flush();
       } catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
         setNotice({
           tone: "error",
-          text:
-            format === "graph-json"
-              ? `当前有尚未完成的编辑，无法导出准确的 Graph JSON：${detail}`
-              : `字体资源加载失败，无法导出：${detail}`,
+          text: `字体资源加载失败，无法存储为：${e instanceof Error ? e.message : String(e)}`,
         });
         return;
       }
-      const result = await exportFlow(
-        session,
-        { filePort: ports.filePort, renderer: ports.renderer },
-        format,
-      );
+      // OFR-2026-09-15 出口合并（PRD §8.2）：另存为与导出同一原生面板，
+      // 按所选格式路由文档授权或导出授权；未保存文档选导出格式时 host 已
+      // 签发同名 .mindmap 兜底授权，导出成功后补写并绑定为文档目标。
+      const result = await unifiedSaveFlow(session, {
+        filePort: ports.filePort,
+        renderer: ports.renderer,
+      });
       if (result.kind === "ok") {
-        session.notifyExported();
-        setNotice({ tone: "info", text: `已导出 ${result.displayPath}` });
-        setExportPanel(false);
+        bump();
+        if (result.format === "mindmap") {
+          reportSaveResult({ kind: "ok", value: { receipt: result.receipt } });
+        } else {
+          session.notifyExported();
+          if (result.backupPath !== undefined) session.notifySaved(); // 兜底源文件已落盘
+          setNotice({
+            tone: "info",
+            text:
+              result.backupPath !== undefined
+                ? `已导出 ${result.exportPath}；已同时保留可编辑源文件 ${result.backupPath}`
+                : `已导出 ${result.exportPath}`,
+          });
+        }
       } else if (result.kind !== "cancelled") {
         setNotice({ tone: "error", text: result.message });
       }
     },
-    [geometryBarrier, ports.filePort, ports.renderer, session],
+    [bump, geometryBarrier, ports.filePort, ports.renderer, reportSaveResult, session],
   );
 
   // 全局热键设置（MM-088；默认 ⌥Space，键位专项讨论定稿 2026-08-29）。
@@ -623,8 +616,8 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       "file.new": () => void onNew(),
       "file.open": () => void onOpen(),
       "file.save": () => void onSave(),
-      "file.save-as": () => void onSaveAs(),
-      "file.export-panel": () => setExportPanel((v) => !v),
+      "file.save-as": () => void onStoreAs(),
+      "file.export-panel": () => void onStoreAs(), // OFR-2026-09-15：⌘E 与 ⇧⌘S 同一统一面板
       "view.fit": () => setFitViewSignal((n) => n + 1),
       "view.organize": () => onOrganize(),
       "view.layout-horizontal": () => setOrganizeDirection("horizontal"),
@@ -672,7 +665,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         if (session.redo()) bump();
       },
     }),
-    [onNew, onOpen, onSave, onSaveAs, onOrganize, openShortcutPanel, session, bump],
+    [onNew, onOpen, onSave, onStoreAs, onOrganize, openShortcutPanel, session, bump],
   );
   const dispatchCommand = useCallback(
     (id: string): boolean => {
@@ -685,11 +678,14 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   // ---- 全局快捷键（输入/IME 隔离见 keyboard.ts） ----
   // exactly-once 分工（ADR 0012 §5）：Tauri 生产环境应用级快捷键由 macOS
   // 原生菜单 accelerator 拦截（唯一 menu event）；keydown 仅浏览器 dev 派发。
+  // 例外（OFR-2026-09-15 出口合并）：菜单不再有「导出…」项，⌘E 无菜单
+  // owner——生产环境的 ⌘E 由 keydown 派发（不可能双派发），其余键不变。
   useEffect(() => {
-    if (!shouldDispatchShortcutViaKeydown(isTauriRuntime())) return;
+    const viaKeydown = shouldDispatchShortcutViaKeydown(isTauriRuntime());
     const onKeyDown = (e: KeyboardEvent) => {
       const shortcut = normalizeShortcut(e);
       if (!shortcut) return;
+      if (!viaKeydown && shortcut.action !== "export-panel") return;
       e.preventDefault();
       dispatchCommand(shortcutActionToCommandId(shortcut.action));
     };
@@ -1179,43 +1175,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
             onClick={() => void onResolveRecovery()}
           >
             完成恢复
-          </button>
-        </div>
-      ) : null}
-
-      {exportPanel ? (
-        <div
-          role="dialog"
-          aria-label="导出"
-          data-testid="export-panel"
-          style={{
-            position: "absolute",
-            right: 12,
-            top: 12,
-            padding: 12,
-            border: `1px solid ${theme === "dark" ? "#35312A" : "#E3DFD5"}`,
-            background: theme === "dark" ? "#211E18" : "#FFFDF9",
-            color: theme === "dark" ? "#EFEAE0" : "#3B372F",
-            borderRadius: 8,
-            display: "grid",
-            gap: 8,
-            zIndex: 35,
-            boxShadow: "0 8px 24px rgba(0,0,0,.18)",
-          }}
-        >
-          <strong>导出当前脑图</strong>
-          {EXPORT_PANEL_FORMATS.map(({ format: f, label }) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => void onExport(f)}
-              data-testid={`export-${f}`}
-            >
-              {label}
-            </button>
-          ))}
-          <button type="button" onClick={() => setExportPanel(false)}>
-            取消
           </button>
         </div>
       ) : null}

@@ -13,6 +13,7 @@ import type {
   OpenedDocument,
   TargetAuthorizationRef,
 } from "@mindmap/platform";
+import type { UnifiedSaveFormat, UnifiedSaveGrant } from "@mindmap/platform";
 import { PlatformError } from "@mindmap/platform";
 import type { PreferencesPort, PreferencesSnapshot } from "@mindmap/platform";
 import type { LaunchRetryableError, PendingRecovery } from "@mindmap/platform";
@@ -79,6 +80,53 @@ export class FakeFilePort implements FilePort {
     void suggestedName;
     const path = this.nextSaveDialog;
     if (path === null) return null;
+    const ref = await this.grantFor(kind, path);
+    return { authorizationRef: ref, displayPath: path };
+  }
+
+  /** 统一「存储为…」面板的 fake（OFR-2026-09-15）：按路径扩展名推断格式，
+   *  导出格式 + documentSaved=false 时附带同名 .mindmap 兜底授权。 */
+  async requestUnifiedSaveAuthorization(
+    suggestedName: string,
+    documentSaved: boolean,
+  ): Promise<(UnifiedSaveGrant & { authorizationRef: TargetAuthorizationRef }) | null> {
+    this.saveDialogCalls += 1;
+    let path = this.nextSaveDialog;
+    if (path === null) return null;
+    // 面板行为：无已知扩展名时追加 .mindmap（与 swap_extension 语义一致）
+    if (!/\.(mindmap|svg|png|pdf|json)$/i.test(path)) path = `${path}.mindmap`;
+    const lower = path.toLowerCase();
+    const format: UnifiedSaveFormat = lower.endsWith(".svg")
+      ? "svg"
+      : lower.endsWith(".png")
+        ? "png"
+        : lower.endsWith(".pdf")
+          ? "pdf"
+          : lower.endsWith(".graph.json")
+            ? "graph-json"
+            : "mindmap";
+    const isDoc = format === "mindmap";
+    const ref = await this.grantFor(isDoc ? "document" : "export", path);
+    const dto: UnifiedSaveGrant & { authorizationRef: TargetAuthorizationRef } = {
+      authorizationRef: ref,
+      displayPath: path,
+      format,
+    };
+    if (!isDoc && !documentSaved) {
+      // 剥掉导出扩展名（graph.json 双段）后补 .mindmap
+      const stem = path.replace(/\.graph\.json$/i, "").replace(/\.[^.]*$/, "");
+      const backupPath = `${stem}.mindmap`;
+      dto.backupAuthorizationRef = await this.grantFor("document", backupPath);
+      dto.backupDisplayPath = backupPath;
+    }
+    void suggestedName;
+    return dto;
+  }
+
+  private async grantFor(
+    kind: "document" | "export",
+    path: string,
+  ): Promise<TargetAuthorizationRef> {
     const bytes = this.files.get(path);
     const ref = `fake-auth-${++this.seq}`;
     this.auths.set(ref, {
@@ -89,7 +137,7 @@ export class FakeFilePort implements FilePort {
       consumed: false,
       grantedAt: Date.now(),
     });
-    return { authorizationRef: ref as TargetAuthorizationRef, displayPath: path };
+    return ref as TargetAuthorizationRef;
   }
 
   async commitDocument(request: CommitDocumentRequest): Promise<CommitReceipt> {

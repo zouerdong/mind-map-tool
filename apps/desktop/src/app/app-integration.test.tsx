@@ -234,83 +234,66 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
     const { filePort, renderer } = setup();
     await createNodeViaCanvas();
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    const panel = await screen.findByTestId("export-panel");
-
+    // OFR-2026-09-15 出口合并：⌘E 打开统一「存储为…」原生面板（fake 由
+    // 目标路径扩展名推断格式路由）；文档未保存时自动补写同名 .mindmap。
     filePort.nextSaveDialog = "/out/map.svg";
-    fireEvent.click(screen.getByTestId("export-svg"));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.svg/)).toBeTruthy());
     expect(filePort.files.get("/out/map.svg")).toBeTruthy();
+    expect(filePort.files.get("/out/map.mindmap")).toBeTruthy(); // 兜底源文件
     expect(renderer.rendered.at(-1)?.format).toBe("svg");
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/map.png";
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-png"]')!,
-    );
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.png/)).toBeTruthy());
     expect(renderer.rendered.at(-1)?.format).toBe("png");
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/map.pdf";
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-pdf"]')!,
-    );
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.pdf/)).toBeTruthy());
     expect(renderer.rendered.at(-1)?.format).toBe("pdf");
-    void panel;
 
-    // 空文档：新建（丢弃）→ 导出被拒绝且不请求授权
+    // 空文档：首次导出的兜底已把文档绑定为已保存 .mindmap（非 dirty），
+    // ⌘N 直接新建无确认；新建后选导出格式仍被拒绝（不落盘任何文件）
     fireEvent.keyDown(window, { key: "n", metaKey: true });
-    fireEvent.click(await screen.findByTestId("confirm-discard"));
     await waitFor(() => expect(screen.getByText(/已新建空白文档/)).toBeTruthy());
-    const calls = filePort.saveDialogCalls;
+    filePort.nextSaveDialog = "/out/empty.svg";
     fireEvent.keyDown(window, { key: "e", metaKey: true });
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector('[data-testid="export-svg"]')!,
-    );
     await waitFor(() => expect(screen.getByText(/空文档/)).toBeTruthy());
-    expect(filePort.saveDialogCalls).toBe(calls); // buildScene 前置失败 → 不弹授权
+    expect(filePort.files.get("/out/empty.svg")).toBeUndefined();
+    expect(filePort.files.get("/out/empty.mindmap")).toBeUndefined();
   });
 });
 
 describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）", () => {
-  it("面板显示四种格式且 Graph JSON 首位；导出落盘可解析（§3.6）", async () => {
+  it("统一面板路由 Graph JSON（.graph.json）；导出落盘可解析（§3.6）", async () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    const panel = await screen.findByTestId("export-panel");
-    const ids = [...panel.querySelectorAll("button[data-testid]")].map((b) =>
-      b.getAttribute("data-testid"),
-    );
-    expect(ids).toEqual(["export-graph-json", "export-svg", "export-png", "export-pdf"]);
-    expect(panel.textContent).toContain("Graph JSON（供 Agent）");
-
+    // 四格式分组呈现迁移到原生面板（Rust save_panel popup：文档在上、
+    // 分隔线后导出四格式，映射由 format_for_index 单测锁定）；此处验证
+    // 统一面板按 .graph.json 扩展名路由且不触碰 renderer 渲染管线。
     filePort.nextSaveDialog = "/out/map.graph.json";
-    fireEvent.click(screen.getByTestId("export-graph-json"));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.graph\.json/)).toBeTruthy());
     const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.graph.json")!));
     expect(g.format).toBe("mindmap-graph-json");
     expect(g.version).toBe(1);
     expect(g.meta.nodeCount).toBeGreaterThanOrEqual(1);
     expect(g.graph.nodes.length).toBe(g.meta.nodeCount);
-    // 面板成功后关闭
-    expect(screen.queryByTestId("export-panel")).toBeNull();
   });
 
   it("编辑中的文字先 flush 再进 Graph JSON snapshot（§3.5：未提交输入不丢失）", async () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
-    // 面板保持打开（非模态 overlay），同时节点进入编辑态留有未提交文字
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    await screen.findByTestId("export-panel");
+    // 节点进入编辑态留有未提交文字，再触发统一「存储为…」（onStoreAs 在
+    // 面板前 flush 编辑器——未提交输入不丢失，§3.5）
     fireEvent.doubleClick(screen.getAllByTestId(/^rf-node-/)[0]!);
     const editor = await screen.findByLabelText("编辑节点文本");
     fireEvent.change(editor, { target: { value: "编辑中的未提交文字" } });
 
     filePort.nextSaveDialog = "/out/flush.graph.json";
-    fireEvent.click(screen.getByTestId("export-graph-json"));
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/flush\.graph\.json/)).toBeTruthy());
     const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/flush.graph.json")!));
     expect(g.graph.nodes.some((n: { text: string }) => n.text === "编辑中的未提交文字")).toBe(true);
@@ -327,13 +310,8 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     await waitFor(() => expect(screen.getByText("打开的文档")).toBeTruthy());
     renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
     filePort.nextSaveDialog = "/out/nofont.graph.json";
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector(
-        '[data-testid="export-graph-json"]',
-      )!,
-    );
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.graph\.json/)).toBeTruthy());
     expect(renderer.rendered.length).toBe(0); // 渲染管线零调用
     const graph = JSON.parse(
@@ -349,14 +327,10 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     setup(filePort, renderer);
     await createNodeViaCanvas();
 
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    // 统一流程在面板前收敛待提交几何；字体失败时 flush 拒绝 → 阻断且不开面板
     filePort.nextSaveDialog = "/out/stale.graph.json";
-    fireEvent.click(
-      (await screen.findByTestId("export-panel")).querySelector(
-        '[data-testid="export-graph-json"]',
-      )!,
-    );
-    await waitFor(() => expect(screen.getByText(/无法导出准确的 Graph JSON/)).toBeTruthy());
+    fireEvent.keyDown(window, { key: "e", metaKey: true });
+    await waitFor(() => expect(screen.getByText(/字体资源加载失败，无法存储为/)).toBeTruthy());
     expect(filePort.files.has("/out/stale.graph.json")).toBe(false);
     expect(filePort.saveDialogCalls).toBe(0);
   });

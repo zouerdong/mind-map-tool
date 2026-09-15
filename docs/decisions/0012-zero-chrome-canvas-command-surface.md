@@ -2,10 +2,10 @@
 
 - Status: Accepted
 - ADR-Version: 1.2.0
-- Date: 2026-09-08（v1.1.0 修订 2026-09-13；v1.2.0 修订 2026-09-14）
+- Date: 2026-09-08（v1.1.0 修订 2026-09-13；v1.2.0 修订 2026-09-14；v1.3.0 修订 2026-09-15）
 - Owners: ErDong Zou（产品决定）/ 执行 Agent（工程实现）
 - 任务来源: PRR-065（[from-user 2026-09-08]："用户一打开这个程序，就是一张全干净的画布。看不到任何菜单。"）
-- 修订来源: DFR-030（[from-user 2026-09-13]：负责人批准 [首次试用修复开发指南](../planning/dogfood-repair-development-guide-2026-09-13.md) §3 轻量界面方案——空白画布底部创建提示、≥2 节点浮动整理按钮、选中工具条靠近节点）；v1.2.0：OFR-2026-09-14（负责人第二次实用反馈——编辑菜单撤销/重做改为自定义 renderer 命令 ⌘Z/⇧⌘Z；首次使用启动自动出示引导 welcome，见 PRD §7.2）
+- 修订来源: DFR-030（[from-user 2026-09-13]：负责人批准 [首次试用修复开发指南](../planning/dogfood-repair-development-guide-2026-09-13.md) §3 轻量界面方案——空白画布底部创建提示、≥2 节点浮动整理按钮、选中工具条靠近节点）；v1.2.0：OFR-2026-09-14（负责人第二次实用反馈——编辑菜单撤销/重做改为自定义 renderer 命令 ⌘Z/⇧⌘Z；首次使用启动自动出示引导 welcome，见 PRD §7.2）；v1.3.0：OFR-2026-09-15（[from-user 2026-09-15] 负责人定稿保存/导出出口合并，见 3b 与 PRD §8.2）
 
 ## Context
 
@@ -33,7 +33,7 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
 2. **保留 macOS 标准原生标题栏、交通灯与系统应用菜单栏**；不进入 `LSUIElement`、无边框、强制全屏或 private API 路线。
 3. **命令归属 macOS 原生菜单**（稳定 menu item id）：
    - `Mind Map`：关于（predefined）、设置/全局热键、Services、Hide、Hide Others、Show All、Quit（自定义，继续走逐窗 fail-closed 关闭协议）
-   - `文件`：新建 `⌘N`、打开 `⌘O`、保存 `⌘S`、另存为 `⇧⌘S`、导出 `⌘E`、新建窗口 `⇧⌘N`、关闭窗口 `⌘W`
+   - `文件`：新建 `⌘N`、打开 `⌘O`、保存 `⌘S`、存储为 `⇧⌘S`、新建窗口 `⇧⌘N`、关闭窗口 `⌘W`（v1.3.0 起「另存为」与「导出」合并为单一「存储为…」统一面板，见 3b；`⌘E` 不再有菜单 owner，经 renderer keydown 进入同一命令）
    - `编辑`：撤销 `⌘Z` / 重做 `⇧⌘Z`（v1.2.0 起为自定义 renderer 命令——accelerator 被菜单拦截产生唯一 menu event，不再依赖画布焦点收到 keydown；renderer 按焦点分流：文本编辑中原生文本撤销，否则 session 文档撤销/重做）+ predefined 剪切/复制/粘贴/全选（textarea 原生文本语义）
    - `视图`：适应画布、整理 `⇧⌘L`、横向布局 ✓ / 纵向布局 ✓（check）、暖白 ✓ / 黑板 ✓（check）
    - `帮助`：开始/重放引导 `⇧⌘H`
@@ -43,6 +43,7 @@ macOS 上系统已提供两个天然的命令宿主：屏幕顶部原生应用�
    - **浮动整理入口**：文档有 **2 个及以上**节点时，画布右上角显示浮动按钮「整理 ⇧⌘L」；0/1 节点不显示。按钮与系统菜单「视图 → 整理」调用**同一 dispatcher**（Decision 4），不产生第二份业务逻辑。
    - **上下文工具条定位**：选中态上下文工具条（Decision 8 保留项）定位到主选节点附近（上方 8px 起），贴边时夹紧在视口内，小窗口（800×600）不溢出；节点文本输入期间工具条不抢焦点。
    - 以上元素都是状态驱动的瞬态呈现，不构成常驻 chrome；不恢复整条常驻顶栏（v1.0 决定不变）。
+3b. **[v1.3.0] 保存/导出出口合并**（OFR-2026-09-15，[from-user 2026-09-15] 负责人定稿）：「保存 `⌘S`」仅产出可编辑文档 `.mindmap` 单一格式（不再提供 `.json` 选项；既有 `.json` 文档打开兼容不变）。「存储为…」面板统一承载另存为与导出：可编辑文档 `.mindmap` 在上组，导出产物 SVG / PNG(2x) / PDF / Graph JSON 在下组（原生 accessory popup，分隔线分组，切换实时联动扩展名）。选导出格式且当前文档从未保存过时，host 同时签发同名 `.mindmap` 兜底授权并在面板内预告，导出成功后自动补写源文件并绑定为文档目标（防源文档丢失）。应用内导出浮层与视图菜单直出项移除；格式呈现顺序由 Rust `save_panel` 锁定。
 4. **单一 typed command dispatcher**：renderer 定义 `AppCommandId`；原生菜单事件（host 定向 emit）、应用级快捷键（浏览器 dev keydown）与既有回调都只调用同一 dispatcher，业务逻辑零复制。
 5. **定向与 exactly-once**：带 accelerator 的菜单命令由 macOS 菜单拦截按键并产生唯一 menu event，定向发给最近聚焦且仍存在的 WebView；Tauri 生产环境下 WebView keydown 不再派发应用级快捷键（浏览器 dev 仍走 keydown）。`⌥Space` 全局热键与画布级键位不变。
 6. **菜单状态同步**：renderer 仅向 host 上报非敏感的 enable/check 状态（主题、布局方向）；host 按 per-window 缓存，窗口聚焦时刷新 app-wide 菜单 check state。不轮询、不联网、不持久化。

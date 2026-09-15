@@ -265,6 +265,7 @@ pub fn run() {
             ipc::platform_request_blank_window,
             // 文件能力（commit 经 runtime；export authorization 不变）
             ipc::platform_request_target_authorization,
+            ipc::platform_request_unified_save_authorization,
             ipc::platform_commit_document,
             ipc::platform_commit_export,
             ipc::platform_pending_recovery,

@@ -68,6 +68,7 @@ export const IPC_COMMANDS = {
   resolvePendingRecovery: "platform_resolve_pending_recovery",
   // 文件能力（commit 经 host runtime，Wave 2 §4.3）
   requestTargetAuthorization: "platform_request_target_authorization",
+  requestUnifiedSaveAuthorization: "platform_request_unified_save_authorization",
   commitDocument: "platform_commit_document",
   commitExport: "platform_commit_export",
   loadPreferences: "platform_load_preferences",
@@ -94,6 +95,19 @@ export const IPC_EVENTS = {
 export interface GrantedTargetAuthorization {
   authorizationRef: string;
   displayPath: string;
+}
+
+/** 「存储为…」统一面板的格式契约（与 Rust UnifiedFormat::as_ipc_str 一致）。 */
+export type UnifiedSaveFormat = "mindmap" | "svg" | "png" | "pdf" | "graph-json";
+
+/** requestUnifiedSaveAuthorization 的返回；取消对话框时为 null。 */
+export interface UnifiedSaveGrant {
+  authorizationRef: string;
+  displayPath: string;
+  format: UnifiedSaveFormat;
+  /** 导出格式且文档从未保存过时的兜底文档授权（同名 .mindmap）。 */
+  backupAuthorizationRef?: string;
+  backupDisplayPath?: string;
 }
 
 /** commitDocument 的返回（core DocumentSession.saveCompleted 的输入）。 */

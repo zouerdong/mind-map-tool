@@ -35,6 +35,9 @@ pub const MENU_FILE_NEW: &str = "file.new";
 pub const MENU_FILE_OPEN: &str = "file.open";
 pub const MENU_FILE_SAVE: &str = "file.save";
 pub const MENU_FILE_SAVE_AS: &str = "file.save-as";
+/// OFR-2026-09-15 出口合并：菜单不再提供独立「导出…」项；⌘E 不再由菜单
+/// 占键，经 renderer keydown（keyboard.ts）派发为 file.export-panel 命令，
+/// 与「存储为…」进入同一统一面板。command id 保留（键盘路径仍用）。
 pub const MENU_FILE_EXPORT: &str = "file.export-panel";
 pub const MENU_VIEW_FIT: &str = "view.fit";
 pub const MENU_VIEW_ORGANIZE: &str = "view.organize";
@@ -47,12 +50,12 @@ pub const MENU_HELP_ONBOARDING: &str = "help.onboarding";
 pub const MENU_EDIT_UNDO: &str = "edit.undo";
 pub const MENU_EDIT_REDO: &str = "edit.redo";
 
-const ACCEL_FILE_EXPORT: &str = "CmdOrCtrl+E";
 const ACCEL_FILE_CLOSE_WINDOW: &str = "CmdOrCtrl+W";
 const ACCEL_EDIT_UNDO: &str = "CmdOrCtrl+Z";
 const ACCEL_EDIT_REDO: &str = "CmdOrCtrl+Shift+Z";
 
-/// 全部 renderer 命令 id（分流与对齐测试用；顺序即菜单呈现序）。
+/// 全部 renderer 命令 id（分流与对齐测试用）。file.export-panel 仅键盘
+/// 路径（⌘E），不在菜单呈现序中。
 pub const RENDERER_COMMAND_IDS: &[&str] = &[
     MENU_FILE_NEW,
     MENU_FILE_OPEN,
@@ -258,16 +261,10 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
     let file_save_as = MenuItem::with_id(
         app,
         MENU_FILE_SAVE_AS,
-        "另存为…",
+        // OFR-2026-09-15：另存为与导出合并为单一「存储为…」面板（PRD §8.2）。
+        "存储为…",
         true,
         Some("CmdOrCtrl+Shift+S"),
-    )?;
-    let file_export = MenuItem::with_id(
-        app,
-        MENU_FILE_EXPORT,
-        "导出…",
-        true,
-        Some(ACCEL_FILE_EXPORT),
     )?;
     let file_close_window = MenuItem::with_id(
         app,
@@ -362,7 +359,6 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         .separator()
         .item(&file_save)
         .item(&file_save_as)
-        .item(&file_export)
         .separator()
         .item(&new_window)
         .item(&file_close_window)
@@ -512,8 +508,7 @@ mod tests {
 
     #[test]
     fn native_accelerators_match_shortcut_contract() {
-        assert_eq!(ACCEL_FILE_EXPORT, "CmdOrCtrl+E");
-        assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
+    assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
         assert_eq!(ACCEL_EDIT_UNDO, "CmdOrCtrl+Z");
         assert_eq!(ACCEL_EDIT_REDO, "CmdOrCtrl+Shift+Z");
     }

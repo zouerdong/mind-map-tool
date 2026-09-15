@@ -9,6 +9,7 @@ import {
   type CommitReceipt,
   type ExportCommitResult,
   type GrantedTargetAuthorization,
+  type UnifiedSaveGrant,
 } from "../ipc/types.js";
 import { toPlatformError } from "./errors.js";
 import type {
@@ -69,6 +70,18 @@ export class TauriFileAdapter implements FilePort {
             contentJson: fromBytes(request.contentBytes),
           };
     return this.call<CommitReceipt>(IPC_COMMANDS.commitDocument, { payload: ipcPayload });
+  }
+
+  async requestUnifiedSaveAuthorization(
+    suggestedName: string,
+    documentSaved: boolean,
+  ): Promise<(UnifiedSaveGrant & { authorizationRef: TargetAuthorizationRef }) | null> {
+    const raw = await this.call<UnifiedSaveGrant | null>(
+      IPC_COMMANDS.requestUnifiedSaveAuthorization,
+      { suggestedName, documentSaved },
+    );
+    if (raw === null) return null;
+    return { ...raw, authorizationRef: raw.authorizationRef as TargetAuthorizationRef };
   }
 
   async commitExport(

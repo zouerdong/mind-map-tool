@@ -10,6 +10,7 @@ import type {
   CommitReceipt,
   ExportCommitResult,
   GrantedTargetAuthorization,
+  UnifiedSaveGrant,
   TargetKind,
 } from "../ipc/types.js";
 
@@ -80,6 +81,17 @@ export interface FilePort {
    * saved identity / handle / token / displayPath 不变。
    */
   commitDocument(request: CommitDocumentRequest): Promise<CommitReceipt>;
+
+  /**
+   * 「存储为…」统一面板（OFR-2026-09-15 出口合并，PRD §8.2）：
+   * 另存为与导出同一入口。按所选格式返回 Document 或 Export 一次性授权；
+   * 选导出格式且 documentSaved=false 时附带同名 .mindmap 兜底授权。
+   * 取消返回 null。
+   */
+  requestUnifiedSaveAuthorization(
+    suggestedName: string,
+    documentSaved: boolean,
+  ): Promise<(UnifiedSaveGrant & { authorizationRef: TargetAuthorizationRef }) | null>;
 
   /** 提交导出产物（authorization kind 必须为 "export"）。 */
   commitExport(

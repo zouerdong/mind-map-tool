@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DocumentSession, emptyDocument, type MindMapDocumentV1 } from "@mindmap/core";
 import { exportFlow, exportSuggestedName, type ExportRendererLike } from "./export-commands.js";
+import { okRenderer } from "./export-commands.test-helpers.js";
 import { FakeFilePort } from "./fake-ports.js";
 
 function docWithGraph(): MindMapDocumentV1 {
@@ -26,29 +27,6 @@ function docWithGraph(): MindMapDocumentV1 {
   return doc;
 }
 
-/** 可用 renderer（视觉格式路径的对照组）。 */
-function okRenderer(): ExportRendererLike {
-  return {
-    async buildScene() {
-      return { ok: true as const, scene: { nodeCount: 2 } };
-    },
-    async renderSvg() {
-      return new TextEncoder().encode("<svg/>");
-    },
-    async renderPng() {
-      return new Uint8Array([0x89, 0x50]);
-    },
-    async renderPdf() {
-      return new Uint8Array([0x25, 0x50]);
-    },
-    fonts() {
-      return {
-        regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
-        bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
-      };
-    },
-  };
-}
 
 describe("exportSuggestedName（PRR-070-R2 §3.1）", () => {
   it("graph-json → .graph.json；视觉格式扩展名不变", () => {

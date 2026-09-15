@@ -121,8 +121,8 @@
 | 创建连接 | 从节点连接点拖向目标节点 | 首版不强制纯键盘连接 |
 | 删除选择 | 选中后删除 | `Backspace` / `Delete`，macOS/Windows 统一语义 |
 | 撤销/重做 | 菜单 | `Cmd/Ctrl+Z`、`Cmd/Ctrl+Shift+Z`；Windows 可兼容 `Ctrl+Y` |
-| 保存 | 菜单 | `Cmd/Ctrl+S` |
-| 另存为 | 菜单 | `Cmd/Ctrl+Shift+S` |
+| 保存 | 菜单 | `Cmd/Ctrl+S`；仅可编辑文档 `.mindmap` 一种格式（OFR-2026-09-15 负责人定稿） |
+| 存储为（另存为与导出合并） | 菜单 | `Cmd/Ctrl+Shift+S`；`Cmd/Ctrl+E` 同入口。面板五格式分两组：可编辑文档 `.mindmap`；导出产物 SVG / PNG(2x) / PDF / Graph JSON（OFR-2026-09-15） |
 | 打开 | 菜单 | `Cmd/Ctrl+O` |
 | 全选 | 框选/菜单 | `Cmd/Ctrl+A` |
 | 适合内容 | 画布控件 | 快捷键由交互 ADR 决定 |
@@ -167,6 +167,7 @@
 
 ### 8.2 导出
 
+- **出口合并（OFR-2026-09-15 负责人定稿）**：「保存」只产出可编辑文档 `.mindmap`（内容即 canonical JSON，不再另设 `.json` 选项；既有 `.json` 文档打开兼容不变）。「另存为」与「导出」合并为单一「存储为…」面板：`⌘⇧S` 与 `⌘E` 同入口，格式选择分「可编辑文档（.mindmap）」与「导出产物（SVG / PNG 2x / PDF / Graph JSON）」两组。选择导出格式且当前文档从未保存过时，自动在同目录补写同名 `.mindmap` 并在面板内明示，防止源文档丢失。
 - **SVG**：第一公民、语义化、无 `foreignObject`；文本使用 SVG `<text>/<tspan>`，连接使用 `<path>`，不包含选择框、连接手柄和引导层；同一 canonical 输入必须产生相同 SVG bytes/hash。
 - **PNG**：从同一 SVG scene 生成 2x 位图，`2x` 定义为 scene CSS 尺寸的宽高各乘 2；默认背景策略需在导出 ADR 固定。
 - **PDF**：从同一 SVG scene 生成；单页适合内容还是分页、页面尺寸与字体处理属于 Spike/ADR 门槛。

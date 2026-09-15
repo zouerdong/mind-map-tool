@@ -249,10 +249,10 @@ describe("PRC-025: 权威几何提交屏障集成测试", () => {
       expect(screen.getByText(/字体资源加载失败/)).toBeDefined();
     });
 
-    // 尝试另存（⇧⌘S）：flush 重试仍失败 → 阻断保存，不写入错误几何
+    // 尝试存储为（⇧⌘S）：flush 重试仍失败 → 阻断保存，不写入错误几何
     fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
     await waitFor(() => {
-      expect(screen.getByText(/字体资源加载失败，无法另存文档/)).toBeDefined();
+      expect(screen.getByText(/字体资源加载失败，无法存储为/)).toBeDefined();
     });
     expect(filePort.savedDocuments.length).toBe(0);
   });
