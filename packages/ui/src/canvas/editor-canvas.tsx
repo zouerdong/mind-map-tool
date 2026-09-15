@@ -186,7 +186,7 @@ export function EditorCanvas({
   const initial = useMemo(() => projectDocument(session.current.document), [session]);
 
   const [pendingNodes, setPendingNodes] = useState<
-    Map<string, { id: string; position: Point; text: string }>
+    Map<string, { id: string; position: Point; text: string; emphasis?: boolean }>
   >(new Map());
   const [textOverrides, setTextOverrides] = useState<Map<string, string>>(new Map());
 
@@ -211,7 +211,7 @@ export function EditorCanvas({
               text: p.text,
               runs: undefined,
               kicker: undefined,
-              emphasis: false,
+              emphasis: p.emphasis === true,
               shape: documentDefaults(session.current.document).shape,
               theme: session.current.document.document.theme,
               font: documentDefaults(session.current.document).font,
@@ -614,16 +614,28 @@ export function EditorCanvas({
     (event: React.MouseEvent) => {
       const point = panePointFromEvent(event.nativeEvent, viewport);
       if (!point) return;
+      // OFR-2026-09-15（[from-user] 负责人定稿）：空文档的第一个节点自动强调
+      //（橙色"出发点"卡）；判定含 pending——并发/待提交创建不重复标记。
+      const isOrigin =
+        session.current.document.document.nodes.length === 0 && pendingNodes.size === 0;
       if (
         geometryBarrier &&
         (geometryBarrier.getMetricsState() !== "ready" || geometryBarrier.hasUnresolvedIntents())
       ) {
         const id = (nextNodeId ?? (() => defaultId("n")))();
-        void geometryBarrier.enqueue({ kind: "create-node", id, position: point, text: "" });
-        setPendingNodes((prev) => new Map(prev).set(id, { id, position: point, text: "" }));
+        void geometryBarrier.enqueue({
+          kind: "create-node",
+          id,
+          position: point,
+          text: "",
+          ...(isOrigin ? { emphasis: true } : {}),
+        });
+        setPendingNodes((prev) =>
+          new Map(prev).set(id, { id, position: point, text: "", ...(isOrigin ? { emphasis: true } : {}) }),
+        );
         setEditingId(id);
       } else {
-        const command = controller.createNodeAt(point);
+        const command = controller.createNodeAt(point, "", { origin: isOrigin });
         if (command.kind === "CreateNode" && api.commit(command)) setEditingId(command.id);
       }
     },
@@ -759,16 +771,27 @@ export function EditorCanvas({
       y: Math.round(center.y * 1000) / 1000,
     };
 
+    // OFR-2026-09-15：与双击创建同一"出发点"判定（空文档 + 无 pending）。
+    const isOrigin =
+      session.current.document.document.nodes.length === 0 && pendingNodes.size === 0;
     if (
       geometryBarrier &&
       (geometryBarrier.getMetricsState() !== "ready" || geometryBarrier.hasUnresolvedIntents())
     ) {
-      void geometryBarrier.enqueue({ kind: "create-node", id, position: pos, text: "" });
-      setPendingNodes((prev) => new Map(prev).set(id, { id, position: pos, text: "" }));
+      void geometryBarrier.enqueue({
+        kind: "create-node",
+        id,
+        position: pos,
+        text: "",
+        ...(isOrigin ? { emphasis: true } : {}),
+      });
+      setPendingNodes((prev) =>
+        new Map(prev).set(id, { id, position: pos, text: "", ...(isOrigin ? { emphasis: true } : {}) }),
+      );
       setFocusNodeId(id);
       beginEdit(id);
     } else {
-      const cmd = controller.createNodeAt(pos);
+      const cmd = controller.createNodeAt(pos, "", { origin: isOrigin });
       api.commit(cmd);
       if (cmd.kind === "CreateNode") {
         setFocusNodeId(cmd.id);
@@ -784,6 +807,8 @@ export function EditorCanvas({
     geometryBarrier,
     linking,
     nextNodeId,
+    pendingNodes,
+    session,
   ]);
 
   // 视野框架化（fitViewSignal）：文档加载后组合根自增信号，画布 frame 内容。

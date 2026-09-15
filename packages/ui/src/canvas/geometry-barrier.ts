@@ -29,6 +29,8 @@ export type GeometryIntent =
       text: string;
       shape?: NodeShape;
       runs?: TextRun[];
+      /** 首节点橙色出发点（OFR-2026-09-15）：与 CreateNode.emphasis 同义。 */
+      emphasis?: boolean;
     }
   | {
       kind: "edit-text";
@@ -154,6 +156,7 @@ export class GeometryBarrier {
           id: existing.id,
           position: existing.position,
           text: intent.text,
+          ...(existing.emphasis !== undefined ? { emphasis: existing.emphasis } : {}),
           ...(existing.shape !== undefined ? { shape: existing.shape } : {}),
           ...(intent.runs !== undefined
             ? { runs: intent.runs }
@@ -277,6 +280,7 @@ export class GeometryBarrier {
         size: { width: box.width, height: box.height },
         ...(intent.shape !== undefined ? { shape: intent.shape } : {}),
         ...(intent.runs !== undefined ? { runs: intent.runs } : {}),
+        ...(intent.emphasis !== undefined ? { emphasis: intent.emphasis } : {}),
       };
       this.commitOrThrow(cmd);
     } else if (intent.kind === "edit-text") {

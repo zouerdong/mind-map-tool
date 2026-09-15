@@ -150,7 +150,9 @@ mod imp {
 
     struct FormatDelegateIvars {
         panel: Retained<NSSavePanel>,
-        hint: Retained<NSTextField>,
+        /// 兜底提示容器（两行文本；截断返修 OFR-2026-09-15——单行 330px
+        /// 放不下完整提示，拆两行并让容器随提示区加高）。
+        hint_box: Retained<NSView>,
         /// 文档是否已有保存目标（决定"补写源文件"提示是否出现）。
         document_saved: bool,
     }
@@ -178,7 +180,7 @@ mod imp {
                 let renamed = swap_extension(&current, format.ext());
                 panel.setNameFieldStringValue(&NSString::from_str(&renamed));
                 let show_hint = !format.is_document() && !self.ivars().document_saved;
-                self.ivars().hint.setHidden(!show_hint);
+                self.ivars().hint_box.setHidden(!show_hint);
             }
         }
     );
@@ -187,12 +189,12 @@ mod imp {
         fn new(
             mtm: MainThreadMarker,
             panel: Retained<NSSavePanel>,
-            hint: Retained<NSTextField>,
+            hint_box: Retained<NSView>,
             document_saved: bool,
         ) -> Retained<Self> {
             let this = Self::alloc(mtm).set_ivars(FormatDelegateIvars {
                 panel,
-                hint,
+                hint_box,
                 document_saved,
             });
             unsafe { msg_send![super(this), init] }
@@ -302,13 +304,13 @@ mod imp {
             // accessory view：「格式：」popup（分两组）+ 兜底提示行。
             let container: Retained<NSView> = NSView::initWithFrame(
                 mtm.alloc(),
-                NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(340.0, 52.0)),
+                NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(340.0, 72.0)),
             );
             let label = NSTextField::labelWithString(&NSString::from_str("格式："), mtm);
-            label.setFrame(NSRect::new(NSPoint::new(0.0, 26.0), NSSize::new(46.0, 22.0)));
+            label.setFrame(NSRect::new(NSPoint::new(0.0, 46.0), NSSize::new(46.0, 22.0)));
             let popup = NSPopUpButton::initWithFrame_pullsDown(
                 mtm.alloc(),
-                NSRect::new(NSPoint::new(48.0, 23.0), NSSize::new(280.0, 27.0)),
+                NSRect::new(NSPoint::new(48.0, 43.0), NSSize::new(280.0, 27.0)),
                 false,
             );
             popup.addItemWithTitle(&NSString::from_str("Mind Map 文档 (.mindmap)"));
@@ -319,13 +321,25 @@ mod imp {
             popup.addItemWithTitle(&NSString::from_str("PNG 2x (.png)"));
             popup.addItemWithTitle(&NSString::from_str("PDF (.pdf)"));
             popup.addItemWithTitle(&NSString::from_str("Graph JSON (.json)"));
-            let hint = NSTextField::labelWithString(
-                &NSString::from_str("导出格式不能重新打开编辑；将同时保留可编辑源文件 (.mindmap)"),
+            // 兜底提示拆两行（单行被截断的返修，OFR-2026-09-15 负责人实测）。
+            let hint_box: Retained<NSView> = NSView::initWithFrame(
+                mtm.alloc(),
+                NSRect::new(NSPoint::new(48.0, 0.0), NSSize::new(292.0, 36.0)),
+            );
+            let hint1 = NSTextField::labelWithString(
+                &NSString::from_str("导出格式不能重新打开编辑；"),
                 mtm,
             );
-            hint.setFrame(NSRect::new(NSPoint::new(48.0, 2.0), NSSize::new(330.0, 18.0)));
-            hint.setHidden(true); // 初始为文档格式，提示不显示
-            let delegate = FormatDelegate::new(mtm, panel.clone(), hint.clone(), document_saved);
+            hint1.setFrame(NSRect::new(NSPoint::new(0.0, 18.0), NSSize::new(292.0, 16.0)));
+            let hint2 = NSTextField::labelWithString(
+                &NSString::from_str("将同时保留可编辑源文件（.mindmap）"),
+                mtm,
+            );
+            hint2.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(292.0, 16.0)));
+            hint_box.addSubview(&hint1);
+            hint_box.addSubview(&hint2);
+            hint_box.setHidden(true); // 初始为文档格式，提示不显示
+            let delegate = FormatDelegate::new(mtm, panel.clone(), hint_box.clone(), document_saved);
             unsafe {
                 // SAFETY: delegate 存活至 runModal 返回（下方 drop），panel 持有
                 // accessory view；NSControl 的 target 为弱引用，生命周期已覆盖。
@@ -335,7 +349,7 @@ mod imp {
             }
             container.addSubview(&label);
             container.addSubview(&popup);
-            container.addSubview(&hint);
+            container.addSubview(&hint_box);
             panel.setAccessoryView(Some(&container));
 
             let response = present(&panel, parent);

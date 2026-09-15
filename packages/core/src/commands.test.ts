@@ -57,6 +57,21 @@ describe("命令与逆命令", () => {
     const { back: b1 } = roundTrip(s0, create);
     expect(b1.stateNode.document.document.nodes.length).toBe(0);
 
+    // OFR-2026-09-15：CreateNode 携带 emphasis（首节点"出发点"橙卡）——
+    // 应用即得强调角色；逆命令 DeleteSelection 整体撤销（无残留强调态）。
+    const createEmph: Command = {
+      kind: "CreateNode",
+      id: "n-origin",
+      text: "出发点",
+      position: { x: 0, y: 0 },
+      size: { width: 80, height: 36 },
+      emphasis: true,
+    };
+    const applied = unwrap(applyCommand(s0, createEmph));
+    expect(applied.stateNode.document.document.nodes[0]!.emphasis).toBe(true);
+    const { back } = roundTrip(s0, createEmph);
+    expect(back.stateNode.document.document.nodes.length).toBe(0);
+
     const s1 = unwrap(applyCommand(s0, create)).stateNode;
     const edit: Command = {
       kind: "EditNodeText",

@@ -6,7 +6,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DocumentSession, makeStateNode, type MindMapDocumentV1 } from "@mindmap/core";
+import { DocumentSession, emptyDocument, makeStateNode, type MindMapDocumentV1 } from "@mindmap/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 
 vi.mock("@xyflow/react", () => import("./helpers/rf-stub.js").then((m) => m.rfStubModule()));
@@ -388,6 +388,35 @@ describe("EditorCanvas", () => {
     expect(text.getAttribute("stroke")).toBe("#F5F2EA");
     expect(text.getAttribute("stroke-width")).toBe("0.5"); // 16 × 1/32
     expect(text.getAttribute("font-weight")).toBe("400");
+  });
+
+  it("OFR-2026-09-15：空文档第一个节点自动强调（出发点橙卡），其后节点普通", async () => {
+    // 空白文档起步（renderCanvas 默认夹具自带两节点，不满足"空文档"前提）
+    const session = new DocumentSession(emptyDocument());
+    render(<EditorCanvas session={session} fonts={fakeFonts} />);
+    const pane = screen.getByTestId("rf-pane");
+    fireEvent.doubleClick(pane, { clientX: 200, clientY: 160 });
+    await waitFor(() =>
+      expect(session.current.document.document.nodes[0]?.emphasis).toBe(true),
+    );
+    // 取消编辑退出后创建第二个节点 → 普通角色
+    fireEvent.keyDown(await screen.findByLabelText("编辑节点文本"), { key: "Escape" });
+    fireEvent.doubleClick(pane, { clientX: 420, clientY: 300 });
+    await waitFor(() => expect(session.current.document.document.nodes.length).toBe(2));
+    expect(session.current.document.document.nodes[1]!.emphasis).toBeUndefined();
+  });
+
+  it("OFR-2026-09-15：删光全部节点后重建，新的首节点再次成为出发点", async () => {
+    const { session } = renderCanvas();
+    const canvasHost = document.querySelector('[role="application"]')!;
+    // 清空既有两节点（makeDoc 自带），再重建 → 空文档首节点规则重新生效
+    fireEvent.keyDown(canvasHost, { key: "a", metaKey: true });
+    fireEvent.keyDown(canvasHost, { key: "Backspace" });
+    await waitFor(() => expect(session.current.document.document.nodes.length).toBe(0));
+    fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 300, clientY: 220 });
+    await waitFor(() =>
+      expect(session.current.document.document.nodes[0]?.emphasis).toBe(true),
+    );
   });
 
   it("OFR-2026-09-14 #1：编辑器 textarea 携带 nodrag（全选后单击可放置光标）", async () => {

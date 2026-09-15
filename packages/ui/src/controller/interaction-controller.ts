@@ -32,14 +32,17 @@ export interface NodeDragDelta {
 
 export function createInteractionController(deps: InteractionControllerDeps) {
   return {
-    /** 画布空白双击：任意位置创建节点（空文本，权威 size 由共享 layout 计算）。 */
-    createNodeAt(position: Point, text = ""): Command {
+    /** 画布空白双击：任意位置创建节点（空文本，权威 size 由共享 layout 计算）。
+     *  `origin: true`（空文档的第一个节点）→ emphasis=true（OFR-2026-09-15
+     *  负责人定稿：第一个想法用橙色卡面，标记出发点）。 */
+    createNodeAt(position: Point, text = "", opts?: { origin?: boolean }): Command {
       return {
         kind: "CreateNode",
         id: deps.nextNodeId(),
         text,
         position: { x: round3(position.x), y: round3(position.y) },
         size: deps.measure(text, deps.currentFont()),
+        ...(opts?.origin === true ? { emphasis: true } : {}),
       };
     },
 

@@ -38,6 +38,10 @@ export type Command =
       size: Size;
       shape?: NodeShape;
       runs?: TextRun[];
+      /** OFR-2026-09-15（[from-user] 负责人定稿）：空文档创建的第一个节点
+       *  自动带强调角色（橙色"出发点"卡）；其余创建缺省不派生（ADR 0010
+       *  v1.1.0 例外条款）。 */
+      emphasis?: boolean;
     }
   | { kind: "EditNodeText"; id: string; text: string; size: Size; runs?: TextRun[] }
   | { kind: "SetNodeShape"; id: string; shape: NodeShape | null } // null = 清除覆盖，继承文档默认
@@ -142,6 +146,7 @@ export function applyCommand(stateNode: StateNode, command: Command): ApplyResul
         size: { ...command.size },
         ...(command.shape !== undefined ? { shape: command.shape } : {}),
         ...(command.runs !== undefined ? { runs: command.runs.map((r) => ({ ...r })) } : {}),
+        ...(command.emphasis === true ? { emphasis: true } : {}),
       };
       d.nodes.push(node);
       inverse = { kind: "DeleteSelection", nodeIds: [command.id], edgeIds: [] };
