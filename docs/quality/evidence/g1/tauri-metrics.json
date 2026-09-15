@@ -1,0 +1,45 @@
+{
+  "app": "tauri",
+  "platform": "darwin/arm64",
+  "coldStartMs": {
+    "runs": [
+      1258,
+      345,
+      345,
+      362,
+      334
+    ],
+    "p50": 345,
+    "min": 334,
+    "max": 1258
+  },
+  "rssTreeBytes": {
+    "samples": [
+      117178368,
+      117178368,
+      116768768,
+      116768768,
+      116768768,
+      116768768,
+      116768768,
+      116670464
+    ],
+    "stableP50": 116768768,
+    "note": "main+WebContent process tree via ps"
+  },
+  "binaryBytes": 8360496,
+  "nativePngExport": {
+    "ok": true,
+    "exitCode": 0,
+    "log": "[export-png] 30.2ms 91775B",
+    "ms": 30.2,
+    "bytes": 91775,
+    "sha256": "5a07a5dc8d3cd2483bd481f1f426374c65b67a5c84bf9579254798285c600288"
+  },
+  "gaps": [
+    "20 次启动协议与 P95 统计未执行（MM-090）；本测量为 5 次中位数",
+    ".app bundle（图标/Info.plist/DMG）体积在 MM-100 打包时实测；本数据为 release 二进制",
+    "Finder 文件关联/UTI、IME、系统 DPI 矩阵需打包应用与人工矩阵"
+  ],
+  "generatedAt": "2026-09-15T07:22:40.418Z"
+}

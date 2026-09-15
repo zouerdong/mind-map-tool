@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-09-15T07:19:45.647Z",
+  "platform": "darwin/arm64",
+  "environment": "playwright chromium headless, viewport 1280x800, production vite build",
+  "gaps": [
+    "IME 组合输入与真实 WebView（WKWebView/WebView2）帧行为需 host 轨/人工矩阵补测"
+  ],
+  "results": [
+    {
+      "app": "react-flow",
+      "bundleBytes": 381198,
+      "pan": {
+        "samples": 63,
+        "p50": 16.7,
+        "p95": 17.6,
+        "max": 17.7,
+        "mean": 16.7
+      },
+      "nodeDrag": {
+        "samples": 127,
+        "p50": 0,
+        "p95": 17.2,
+        "max": 17.5,
+        "mean": 8.3
+      },
+      "zoom": {
+        "samples": 182,
+        "p50": 0,
+        "p95": 16.7,
+        "max": 17.8,
+        "mean": 5.5
+      },
+      "probes": {
+        "focusable": 755,
+        "roles": 751,
+        "attribution": "React Flow",
+        "nodeCount": 300
+      }
+    },
+    {
+      "app": "custom-react-view",
+      "bundleBytes": 197407,
+      "pan": {
+        "samples": 63,
+        "p50": 16.7,
+        "p95": 17.1,
+        "max": 17.5,
+        "mean": 16.7
+      },
+      "nodeDrag": {
+        "samples": 125,
+        "p50": 0,
+        "p95": 16.8,
+        "max": 17.2,
+        "mean": 8.3
+      },
+      "zoom": {
+        "samples": 149,
+        "p50": 0,
+        "p95": 16.7,
+        "max": 17.2,
+        "mean": 5.5
+      },
+      "probes": {
+        "focusable": 301,
+        "roles": 301,
+        "attribution": null,
+        "nodeCount": 300
+      }
+    }
+  ]
+}

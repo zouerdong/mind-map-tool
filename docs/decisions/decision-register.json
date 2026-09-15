@@ -14,8 +14,8 @@
           "exitCriteriaVersion": "host-v1",
           "exitEvidence": [
             {
-              "path": ".tmp/runtime-spike/hosts/tauri-metrics.json",
-              "sha256": "a3146df4b1b0d7310f4bcbff595d885cd0967f8af1489d6e529557f7c099215d"
+              "path": "docs/quality/evidence/g1/tauri-metrics.json",
+              "sha256": "059102cebe778704341bf4c919b4da19e71e35ab5f0b3e01769a4acc3d65822c"
             }
           ],
           "blockedReasons": []
@@ -45,8 +45,8 @@
           "exitCriteriaVersion": "canvas-v1",
           "exitEvidence": [
             {
-              "path": ".tmp/runtime-spike/canvas/canvas-metrics.json",
-              "sha256": "75b19a8d9ec5d9c0233779a0c0d13cef4cdfd26194a2c7338840262a9b644ce6"
+              "path": "docs/quality/evidence/g1/canvas-metrics.json",
+              "sha256": "8d0edbd5877bbfa0f6d6ede64f17255a24560e5682da86a936316662a1bc9f48"
             }
           ],
           "blockedReasons": []
@@ -76,8 +76,8 @@
           "exitCriteriaVersion": "export-renderer-v1",
           "exitEvidence": [
             {
-              "path": ".tmp/runtime-spike/export/export-metrics.json",
-              "sha256": "946775a87b34ab78355bf8ccc3d5c1e4aa818e3a8221007c36991fb28c6f79c3"
+              "path": "docs/quality/evidence/g1/export-metrics.json",
+              "sha256": "95b2db299f82856d45ef30dfd798cdb926d4a028da0aa69c6279c77732aeba32"
             }
           ],
           "blockedReasons": []
@@ -111,8 +111,8 @@
           "exitCriteriaVersion": "font-v1",
           "exitEvidence": [
             {
-              "path": ".tmp/runtime-spike/fonts/font-evaluation.json",
-              "sha256": "bda440ee4b64db6b74d5e76f2a915680f0db4d4ba534cde2804c778577e1c849"
+              "path": "docs/quality/evidence/g1/font-evaluation.json",
+              "sha256": "8a63bce7eb21ba08e10ea7675dc87e5ecc92e08ec69f3ba76bb1dfc4d1e25d34"
             }
           ],
           "blockedReasons": []
@@ -167,7 +167,7 @@
         "desktopHost": {
           "value": "tauri",
           "candidateResult": "pass",
-          "candidateEvidenceSha256": "4f502c91525f21e916ef7f5386b06ce3e2cb85cdff4a5bf4b6fb383820df8968",
+          "candidateEvidenceSha256": "3e994477413013956fc0f88aabd03afdd64071fc985a7f952d9a1be88f4f8522",
           "acceptedAdr": {
             "id": "0001-desktop-host",
             "version": "1.0.0",
@@ -177,7 +177,7 @@
         "canvasView": {
           "value": "react-flow",
           "candidateResult": "pass",
-          "candidateEvidenceSha256": "32b16c88ee793cdd4ed3f856eca9c206a1f82e8783ec69bb6d0199a5506e0ade",
+          "candidateEvidenceSha256": "87f87aed306f647b7967c5ea0db6495e8ce0197f1a629f1e4627da22c9b735e2",
           "acceptedAdr": {
             "id": "0002-canvas-view",
             "version": "1.0.0",
@@ -187,7 +187,7 @@
         "exportRenderer": {
           "value": "web-ts-wasm",
           "candidateResult": "pass",
-          "candidateEvidenceSha256": "c4ef18b08c27187b77623b02a2070889cf78b76a48fc3811b408512f20e284bc",
+          "candidateEvidenceSha256": "cba1a2f58cfca53998dd61cff5224c7305673fefd78ea12b3bfc905cf663e740",
           "acceptedAdr": {
             "id": "0004-export-renderer",
             "version": "1.0.0",
@@ -197,7 +197,7 @@
         "font": {
           "value": "noto-sans-sc-regular",
           "candidateResult": "pass",
-          "candidateEvidenceSha256": "957b3e974ef1300f7d9e8501345f39c390d5df741b309eb8e246871292784603",
+          "candidateEvidenceSha256": "80eca0200a8afe005af285881cd81ffdec6791252f7a25fe123850e29a259ec2",
           "acceptedAdr": {
             "id": "0005-export-font-pdf",
             "version": "1.0.0",
@@ -351,5 +351,8 @@
     "MM-010": "Runs verify-decision --phase spike-result. Requires G0.status=approved; writes recommendations only and never changes an ADR to Accepted; G1 may remain pending.",
     "MM-020": "Runs verify-decision --phase bootstrap. Requires top-level status=recommendation-ready, every required track recommendation-ready with a PASS candidate, and G1.status=approved with approvedTracks bound to the immutable sourceSpikeResult sha256 and matching accepted ADR id/version/sha256 entries.",
     "MM-100": "Runs verify-decision --phase packaging. Requires G2 approval for the exact local packaging scope; signing, notarization, credentials, upload, and publication require separate explicit authorization."
-  }
+  },
+  "notes": [
+    "2026-09-15 证据再冻结（[from-user] 负责人批准方案 B）：.tmp/runtime-spike 证据因清理事故灭失，四轨批准候选证据按 harness 再生并迁入版本库 docs/quality/evidence/g1/；计时类指标为再生时刻的新测量值，结论性字段（候选可用性/许可/覆盖）与原记录一致。electron（desktopHost 未批准候选）证据未再生，其 exitEvidence 保留原路径作历史记录。"
+  ]
 }

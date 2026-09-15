@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-09-15T01:24:02.477Z",
+  "platform": "darwin/arm64",
+  "font": {
+    "id": "noto-sans-sc-regular",
+    "family": "Noto Sans SC"
+  },
+  "envProbe": {
+    "utc-c": "ec48ebf28e17da9f4fb7cc1231b1210838f2a91eaa3e36116c5099051d44d081",
+    "shanghai-zh": "ec48ebf28e17da9f4fb7cc1231b1210838f2a91eaa3e36116c5099051d44d081",
+    "sameAsMain": true
+  },
+  "peakRssMb": 989.5,
+  "results": [
+    {
+      "fixture": "chinese-multiline",
+      "scene": {
+        "empty": false,
+        "width": 980,
+        "height": 272
+      },
+      "svg": {
+        "bytes": 1451,
+        "sha256": "ec48ebf28e17da9f4fb7cc1231b1210838f2a91eaa3e36116c5099051d44d081",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": true,
+        "w": 1960,
+        "h": 544,
+        "dimsExact2x": true,
+        "bytes": 41065,
+        "sha256": "02898f5b59b5c20ec46ede278b8b4abe25ea5139a736b9f9d7bd4af525cc668f",
+        "renderMs": 53.8,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 52069,
+        "sha256": "45a561b3809b80a5747ba1a34d50d41d7b52080f31ff801cdd91b4efc8533993",
+        "buildMs": 82,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "dark-theme",
+      "scene": {
+        "empty": false,
+        "width": 440,
+        "height": 220
+      },
+      "svg": {
+        "bytes": 661,
+        "sha256": "22ccbabd7cf4f45d56db3ec420e669aa22fdbaa6edd1328a8c0a1429bf089301",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": true,
+        "w": 880,
+        "h": 440,
+        "dimsExact2x": true,
+        "bytes": 12417,
+        "sha256": "0278a980c5ec4224468660399d0bcb7d9edc1c65df0471c6483f727767529789",
+        "renderMs": 6.5,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 47160,
+        "sha256": "caa4fbe3c11be996c5f70edf8dd782057476ec41e42758e173fa8a46381353b8",
+        "buildMs": 34.4,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "dense-300-450",
+      "scene": {
+        "empty": false,
+        "width": 4450,
+        "height": 2120
+      },
+      "svg": {
+        "bytes": 112533,
+        "sha256": "fc8e865bfb53dfa2d7593fbeaa73fb36d5a128751eeefbb346372b682f6ee068",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": true,
+        "w": 8900,
+        "h": 4240,
+        "dimsExact2x": true,
+        "bytes": 4454165,
+        "sha256": "733be97a1f529e7d4c9621f18d08ccc8ece20fff5b5eee60bad0f45dbf8c4235",
+        "renderMs": 802.7,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 74065,
+        "sha256": "d52e49c6d81502f149b55c78f0de6a1b0a6d934cdd25ab4e5f77a3b227b81acc",
+        "buildMs": 72.1,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "empty-document",
+      "scene": {
+        "empty": true,
+        "width": 0,
+        "height": 0
+      },
+      "svg": {
+        "error": "EXPORT_EMPTY_DOCUMENT"
+      }
+    },
+    {
+      "fixture": "large-bounds",
+      "scene": {
+        "empty": false,
+        "width": 40200,
+        "height": 16124
+      },
+      "svg": {
+        "bytes": 987,
+        "sha256": "f59dfa98055a2a2b4e59e9589efbd896bc61c1127a46b7ed44d4bf8a4f6bf57a",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": false,
+        "code": "EXPORT_SIZE_LIMIT",
+        "message": "导出尺寸 80400x32248 超过上限（单边 ≤ 32767px，总像素 ≤ 120000000）。请缩小画布或改用 SVG。",
+        "w": 80400,
+        "h": 32248
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 43469,
+        "sha256": "b1117a15666b283f2aa32d96d37aa2617775a4c8bc058a0cce673c02ce0c127a",
+        "buildMs": 32.2,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "missing-glyph",
+      "scene": {
+        "empty": false,
+        "width": 300,
+        "height": 124
+      },
+      "svg": {
+        "bytes": 374,
+        "sha256": "2d18bbcbe3d95e7b8ebe6d3db6718b4e1fc7c080a84f7e72cecdb49d63d524ec",
+        "deterministic": true
+      },
+      "missingGlyphs": [
+        "",
+        "",
+        ""
+      ],
+      "png": {
+        "ok": true,
+        "w": 600,
+        "h": 248,
+        "dimsExact2x": true,
+        "bytes": 6722,
+        "sha256": "3b37581f86e012fad85b7d01932bdfb44da1b5af4e501ac73fe417aec3bc6705",
+        "renderMs": 3,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 43640,
+        "sha256": "77d7a82135e24355fefc4c9756bef5c5b242c3a2c5fb5a6d497e9130912a1b93",
+        "buildMs": 52.1,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "negative-coordinates",
+      "scene": {
+        "empty": false,
+        "width": 808,
+        "height": 500
+      },
+      "svg": {
+        "bytes": 649,
+        "sha256": "a687a3947b2dd357bd466562cd209420140413f4dadd8ce0c9e26b168aebe5ba",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": true,
+        "w": 1616,
+        "h": 1000,
+        "dimsExact2x": true,
+        "bytes": 27242,
+        "sha256": "8227df02b948b67a8891dc306310e4f1ff2bd758266a8486f34a22bc6df0be08",
+        "renderMs": 21.7,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 43558,
+        "sha256": "cd8bc837ba84d949e46808388d594360b06c85e19a9a141567e90365ac74b07a",
+        "buildMs": 35.4,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    },
+    {
+      "fixture": "two-linked-nodes",
+      "scene": {
+        "empty": false,
+        "width": 428,
+        "height": 200
+      },
+      "svg": {
+        "bytes": 668,
+        "sha256": "7da74c810fba107446cd9f0b38bc4f5607132fa7167d5a38fdf67b95f24064fc",
+        "deterministic": true
+      },
+      "missingGlyphs": [],
+      "png": {
+        "ok": true,
+        "w": 856,
+        "h": 400,
+        "dimsExact2x": true,
+        "bytes": 11926,
+        "sha256": "d3242f795011adbeaad3e2a903e99d9e058e83260df6cbeda45a5ed608acc129",
+        "renderMs": 5.6,
+        "deterministic": true
+      },
+      "pdf": {
+        "ok": true,
+        "bytes": 44881,
+        "sha256": "198663e431225baad75ad6142d04844c252907309db73df88e86a5a69efa7974",
+        "buildMs": 34.5,
+        "embeddedFont": "NotoSansSC-Regular",
+        "textErrors": [],
+        "deterministic": true
+      }
+    }
+  ]
+}

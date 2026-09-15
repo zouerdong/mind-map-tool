@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-09-15T01:23:59.855Z",
+  "platform": "darwin/arm64",
+  "corpus": {
+    "commonSampleChars": 139,
+    "fixtureDerived": true,
+    "puaExpectedMissing": 4
+  },
+  "results": [
+    {
+      "id": "noto-sans-sc-regular",
+      "family": "Noto Sans SC",
+      "style": "Regular",
+      "license": "SIL OFL 1.1",
+      "licenseUrl": "https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE",
+      "ofl": true,
+      "file": "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/runtime-spike/fonts/noto-sans-sc-regular.otf",
+      "ok": true,
+      "sizeBytes": 8331336,
+      "fontType": "TTF",
+      "numGlyphs": 31036,
+      "coverage": {
+        "corpusSize": 278,
+        "covered": 278,
+        "ratio": 1,
+        "missingSample": []
+      },
+      "puaCorrectlyMissing": true
+    },
+    {
+      "id": "lxgw-wenkai-regular",
+      "family": "LXGW WenKai",
+      "style": "Regular",
+      "license": "SIL OFL 1.1",
+      "licenseUrl": "https://github.com/lxgw/LxgwWenKai/blob/main/LICENSE",
+      "ofl": true,
+      "file": "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/runtime-spike/fonts/lxgw-wenkai-regular.ttf",
+      "ok": true,
+      "sizeBytes": 24744500,
+      "fontType": "TTF",
+      "numGlyphs": 45881,
+      "coverage": {
+        "corpusSize": 278,
+        "covered": 278,
+        "ratio": 1,
+        "missingSample": []
+      },
+      "puaCorrectlyMissing": false
+    },
+    {
+      "id": "source-han-sans-sc-regular",
+      "family": "Source Han Sans SC",
+      "style": "Regular",
+      "license": "SIL OFL 1.1",
+      "licenseUrl": "https://github.com/adobe-fonts/source-han-sans/blob/release/LICENSE",
+      "ofl": true,
+      "file": "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/runtime-spike/fonts/source-han-sans-sc-regular.otf",
+      "ok": false,
+      "error": "HTTP 404 for https://github.com/adobe-fonts/source-han-sans/raw/release/SubsetOTF/SC/SourceHanSansSC-Regular.otf"
+    },
+    {
+      "id": "misans-regular",
+      "family": "MiSans",
+      "style": "Regular",
+      "license": "Xiaomi MiSans license (free commercial use; redistribution terms require review)",
+      "licenseUrl": "https://hyperos.mi.com/font/",
+      "ofl": false,
+      "note": "zip 包含全字重，体积大；license 非 OFL，再分发条款需人工审阅",
+      "file": "/Users/zouerdong/CodexProjects/Mind-map-tool/.tmp/runtime-spike/fonts/misans-regular.zip",
+      "ok": false,
+      "sizeBytes": 227880072,
+      "error": "Unknown font format"
+    }
+  ]
+}
