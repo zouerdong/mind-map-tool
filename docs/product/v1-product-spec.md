@@ -121,6 +121,7 @@
 | 创建连接 | 从节点连接点拖向目标节点 | 首版不强制纯键盘连接 |
 | 删除选择 | 选中后删除 | `Backspace` / `Delete`，macOS/Windows 统一语义 |
 | 撤销/重做 | 菜单 | `Cmd/Ctrl+Z`、`Cmd/Ctrl+Shift+Z`；Windows 可兼容 `Ctrl+Y` |
+| 整理/还原布局 | 浮动按钮/菜单 | `Cmd/Ctrl+Shift+L`；双向开关（OFR-2026-09-15 [from-user] 定稿）：整理后再次触发即还原到整理前布局；还原是正向可撤销命令，不依赖连按撤销、不丢中间编辑 |
 | 保存 | 菜单 | `Cmd/Ctrl+S`；仅可编辑文档 `.mindmap` 一种格式（OFR-2026-09-15 负责人定稿） |
 | 存储为（另存为与导出合并） | 菜单 | `Cmd/Ctrl+Shift+S`；`Cmd/Ctrl+E` 同入口。面板五格式分两组：可编辑文档 `.mindmap`；导出产物 SVG / PNG(2x) / PDF / Graph JSON（OFR-2026-09-15） |
 | 打开 | 菜单 | `Cmd/Ctrl+O` |

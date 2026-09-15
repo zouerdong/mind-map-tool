@@ -265,7 +265,7 @@ describe("EditorCanvas", () => {
     expect(session.isDirty).toBe(true);
   });
 
-  it("已整理布局再次触发 organizeSignal → 返回 no-op，不提交多余命令", async () => {
+  it("已整理布局再次触发 organizeSignal → 还原整理前（OFR-2026-09-15 开关语义，不再是 no-op）", async () => {
     const session = new DocumentSession(makeStateNode(makeDoc()).document);
     const onResult = vi.fn();
 
@@ -277,32 +277,25 @@ describe("EditorCanvas", () => {
         onOrganizeResult={onResult}
       />,
     );
+    const posOf = (i: number) => {
+      const n = session.current.document.document.nodes[i]!;
+      return { x: n.position.x, y: n.position.y };
+    };
+    const before = [posOf(0), posOf(1)];
 
-    // 第一次触发整理
     rerender(
-      <EditorCanvas
-        session={session}
-        fonts={fakeFonts}
-        organizeSignal={1}
-        onOrganizeResult={onResult}
-      />,
+      <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={1} onOrganizeResult={onResult} />,
     );
-
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
     expect(onResult.mock.calls[0]![0].status).toBe("moved");
 
-    // 第二次触发整理
+    // 第二次触发 = 还原（开关语义）
     rerender(
-      <EditorCanvas
-        session={session}
-        fonts={fakeFonts}
-        organizeSignal={2}
-        onOrganizeResult={onResult}
-      />,
+      <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={2} onOrganizeResult={onResult} />,
     );
-
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2));
-    expect(onResult.mock.calls[1]![0].status).toBe("no-op");
+    expect(onResult.mock.calls[1]![0].status).toBe("restored");
+    expect([posOf(0), posOf(1)]).toEqual(before);
   });
 
   it("OFR-2026-09-14 #2：整理后拖动节点——规整态连线实时跟随（不掉回静态路径）", async () => {
@@ -388,6 +381,99 @@ describe("EditorCanvas", () => {
     expect(text.getAttribute("stroke")).toBe("#F5F2EA");
     expect(text.getAttribute("stroke-width")).toBe("0.5"); // 16 × 1/32
     expect(text.getAttribute("font-weight")).toBe("400");
+  });
+
+  it("OFR-2026-09-15：整理开关——再触发还原到整理前位置，且还原可撤销", async () => {
+    const session = new DocumentSession(makeStateNode(makeDoc()).document);
+    const statuses: string[] = [];
+    const utils = render(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={0}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    const posOf = (i: number) => {
+      const n = session.current.document.document.nodes[i]!;
+      return { x: n.position.x, y: n.position.y };
+    };
+    const before = [posOf(0), posOf(1)];
+
+    utils.rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={1}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    await waitFor(() => expect(statuses).toContain("moved"));
+    const organized = [posOf(0), posOf(1)];
+    expect(organized).not.toEqual(before); // 整理确实移动了
+
+    // 再触发 → 还原到整理前（正向 MoveNodes 命令，进历史）
+    utils.rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={2}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    await waitFor(() => expect(statuses).toContain("restored"));
+    expect([posOf(0), posOf(1)]).toEqual(before);
+
+    // 还原本身可撤销（⌘Z → 回到整理态）
+    session.undo();
+    expect([posOf(0), posOf(1)]).toEqual(organized);
+  });
+
+  it("OFR-2026-09-15：整理后手动移动节点，还原仍一步回到整理前（不丢历史）", async () => {
+    const session = new DocumentSession(makeStateNode(makeDoc()).document);
+    const statuses: string[] = [];
+    const utils = render(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={0}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    const posOf = (i: number) => {
+      const n = session.current.document.document.nodes[i]!;
+      return { x: n.position.x, y: n.position.y };
+    };
+    const before = [posOf(0), posOf(1)];
+    utils.rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={1}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    await waitFor(() => expect(statuses).toContain("moved"));
+    // 整理后手动移动 n1（模拟"动了其中一个"）
+    session.commit({
+      kind: "MoveNodes",
+      moves: [{ id: session.current.document.document.nodes[0]!.id, position: { x: 999, y: 888 } }],
+    });
+    expect(posOf(0)).toEqual({ x: 999, y: 888 });
+    // 一次还原 → 直接回整理前（不需要先撤销手动移动）
+    utils.rerender(
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={2}
+        onOrganizeResult={(r) => statuses.push(r.status)}
+      />,
+    );
+    await waitFor(() => expect(statuses).toContain("restored"));
+    expect([posOf(0), posOf(1)]).toEqual(before);
+    // 历史完整：undo 链依次是 还原←手动移动←整理，全部可回退
+    session.undo(); // 撤销还原 → 手动移动态
+    expect(posOf(0)).toEqual({ x: 999, y: 888 });
   });
 
   it("OFR-2026-09-15：空文档第一个节点自动强调（出发点橙卡），其后节点普通", async () => {

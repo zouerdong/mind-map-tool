@@ -64,7 +64,7 @@ describe("一键整理（AC-15）", () => {
     const before = screen.getAllByTestId(/^rf-node-/).map((el) => el.getAttribute("data-testid"));
 
     fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
-    await waitFor(() => expect(screen.getByText(/已整理为分层布局（⌘Z 可撤销）/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
 
     // 画布 focus + ⌘Z：undo 后提示与节点仍在（位置恢复由 core 契约测试锁定）
     const canvasHost = document.querySelector('[role="application"]')!;
@@ -86,21 +86,19 @@ describe("一键整理（AC-15）", () => {
     await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
   });
 
-  it("已整理文档再整理 → 幂等提示，不产生新历史", async () => {
+  it("整理/还原双向开关（OFR-2026-09-15）：第二次 ⇧⌘L 还原整理前，第三次重新整理", async () => {
     setup();
     await createNodeAt(10, 10);
     await createNodeAt(500, 300);
     fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
 
-    const commitSpy = vi.spyOn(
-      // 第二次整理：相同布局 → organizeCommand 返回 null → 不提交命令
-      (await import("./observed-session.js")).ObservedDocumentSession.prototype,
-      "commit",
-    );
+    // 第二次 ⇧⌘L = 还原（开关语义；还原本身产生一条可撤销的正向命令）
     fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
-    await waitFor(() => expect(screen.getByText(/已经是整理好的布局/)).toBeTruthy());
-    expect(commitSpy).not.toHaveBeenCalled();
-    commitSpy.mockRestore();
+    await waitFor(() => expect(screen.getByText(/已还原到整理前的布局/)).toBeTruthy());
+
+    // 第三次 ⇧⌘L = 重新整理
+    fireEvent.keyDown(window, { key: "l", metaKey: true, shiftKey: true });
+    await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
   });
 });

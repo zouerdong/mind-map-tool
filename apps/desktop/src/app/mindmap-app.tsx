@@ -589,11 +589,18 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     setOrganizeSignal((n) => n + 1);
   }, []);
 
+  // 整理开关状态（OFR-2026-09-15）：仅驱动按钮文案；行为权威在画布层 ref。
+  const [organizedNow, setOrganizedNow] = useState(false);
   const handleOrganizeResult = useCallback(
     (result: OrganizeCommandResult) => {
       if (result.status === "moved") {
         bump();
-        setNotice({ tone: "info", text: "已整理为分层布局（⌘Z 可撤销）" });
+        setOrganizedNow(true);
+        setNotice({ tone: "info", text: "已整理为分层布局（再点一次或 ⇧⌘L 还原整理前布局）" });
+      } else if (result.status === "restored") {
+        bump();
+        setOrganizedNow(false);
+        setNotice({ tone: "info", text: "已还原到整理前的布局（⌘Z 可撤销还原）" });
       } else if (result.status === "no-op") {
         setNotice({ tone: "info", text: "已经是整理好的布局" });
       } else {
@@ -1033,7 +1040,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         <button
           type="button"
           data-testid="organize-fab"
-          title="整理（⇧⌘L）"
+          title={organizedNow ? "还原整理前的布局（⇧⌘L）" : "整理（⇧⌘L）"}
           onClick={() => dispatchCommand("view.organize")}
           style={{
             position: "absolute",
@@ -1051,7 +1058,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
             cursor: "pointer",
           }}
         >
-          整理 ⇧⌘L
+          {organizedNow ? "还原布局 ⇧⌘L" : "整理 ⇧⌘L"}
         </button>
       ) : null}
 

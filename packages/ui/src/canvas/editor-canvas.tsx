@@ -266,15 +266,58 @@ export function EditorCanvas({
 
   // 显式整理信号（organizeSignal）
   const lastOrganizeSignalRef = useRef(organizeSignal);
+  // OFR-2026-09-15（负责人实机反馈）：整理是双向开关而非单向命令——
+  // 已整理态再触发 ⇧⌘L/按钮 = 把布局拨回整理前的快照（还原本身是正向
+  //  MoveNodes 命令，进历史、可撤销；整理后的手动位移被快照覆盖但可 ⌘Z 找回）。
+  // 快照仅 session 级（布局快照不入文档文件，与 viewport 同红线）。
+  const preOrganizeRef = useRef<Map<string, Point> | null>(null);
+  const organizedRef = useRef(false);
   useEffect(() => {
     if (organizeSignal === 0 || organizeSignal === lastOrganizeSignalRef.current) return;
     lastOrganizeSignalRef.current = organizeSignal;
 
+    const doc = session.current.document;
+    if (organizedRef.current && preOrganizeRef.current !== null) {
+      // 还原：仅拨回快照中仍存在节点的位置（其间新增节点不动、删除节点丢弃）。
+      // 快照与当前文档零重叠（新建/打开已替换文档）→ 快照失效，退化为正常整理。
+      const snapshot = preOrganizeRef.current;
+      const moves: Array<{ id: string; position: Point }> = [];
+      for (const [id, pos] of snapshot) {
+        const n = doc.document.nodes.find((node) => node.id === id);
+        if (
+          n &&
+          (Math.abs(n.position.x - pos.x) > 1e-6 || Math.abs(n.position.y - pos.y) > 1e-6)
+        ) {
+          moves.push({ id, position: { x: pos.x, y: pos.y } });
+        }
+      }
+      if (snapshot.size > 0 && moves.length === 0 &&
+          !doc.document.nodes.some((n) => snapshot.has(n.id))) {
+        // 零重叠：文档已被替换，快照作废
+        preOrganizeRef.current = null;
+        organizedRef.current = false;
+      } else {
+        organizedRef.current = false;
+        if (moves.length === 0) {
+          onOrganizeResult?.({ status: "no-op" });
+        } else {
+          api.commit({ kind: "MoveNodes", moves });
+          onOrganizeResult?.({ status: "restored" });
+        }
+        return;
+      }
+    }
+
+    // 整理：先快照当前位置（覆盖旧快照），再提交整理命令
+    preOrganizeRef.current = new Map(
+      doc.document.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
+    );
     const result = organizeCommand(session.current.document, { direction: organizeDirection });
-    onOrganizeResult?.(result);
     if (result.status === "moved") {
       api.commit(result.command);
+      organizedRef.current = true;
     }
+    onOrganizeResult?.(result);
   }, [organizeSignal, organizeDirection, onOrganizeResult, api, session]);
 
   // selection（session-only）：从 RF change 流提取，供删除命令与上下文工具条。

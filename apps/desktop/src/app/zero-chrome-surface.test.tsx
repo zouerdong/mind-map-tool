@@ -128,17 +128,22 @@ describe("DFR-030：ADR 0012 v1.1.0 状态化轻量元素（from-user 2026-09-13
     });
   });
 
-  it("整理后再次触发为幂等 no-op（效果只发生一次）", async () => {
+  it("整理是双向开关（OFR-2026-09-15）：再点一次还原整理前布局，按钮文案随态切换", async () => {
     setup();
     await createNodeAt(700, 10);
     fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
     await createNodeAt(30, 500);
     fireEvent.keyDown(screen.getByLabelText("编辑节点文本"), { key: "Escape" });
 
-    fireEvent.click(await screen.findByTestId("organize-fab"));
+    const fab = await screen.findByTestId("organize-fab");
+    expect(fab.textContent).toContain("整理");
+    fireEvent.click(fab);
     await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("organize-fab").textContent).toContain("还原布局"));
+
     fireEvent.click(screen.getByTestId("organize-fab"));
-    await waitFor(() => expect(screen.getByText(/已经是整理好的布局/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/已还原到整理前的布局/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("organize-fab").textContent).toContain("整理 ⇧⌘L"));
   });
 });
 
