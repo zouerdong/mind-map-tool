@@ -126,6 +126,11 @@ export const EDGE_GEOMETRY = {
   laneInset: 24,
   /** 近共线阈值：端点连线与主轴偏差小于此值时直接直连 */
   nearCollinear: 8,
+  /** 直连判定的硬阈值（px）：OFR-2026-09-15 负责人实机反馈——多出边卡的
+   *  端口槽位均分产生数 px 的 dy（如卡高 47、2 出边时槽位偏 7.7px），旧
+   *  规则（<8px 直连）画出轻微斜线，破坏规整态"全正交电路线"观感。
+   *  仅亚像素级偏差（舍入噪声）允许直连；真实 dy 一律走正交圆角微步。 */
+  collinearEpsilon: 0.5,
   /** 散乱曲线控制点距离 = 跨度 × 0.4，并夹在 [40,160]（参考原型） */
   scatterK: 0.4,
   scatterKMin: 40,
@@ -618,8 +623,8 @@ export function planEdgeGeometry(
     }
     const collinear =
       direction === "horizontal"
-        ? Math.abs(p1.y - tip.y) < EDGE_GEOMETRY.nearCollinear
-        : Math.abs(p1.x - tip.x) < EDGE_GEOMETRY.nearCollinear;
+        ? Math.abs(p1.y - tip.y) < EDGE_GEOMETRY.collinearEpsilon
+        : Math.abs(p1.x - tip.x) < EDGE_GEOMETRY.collinearEpsilon;
     const effective: EdgeRoute = collinear && route.kind === "comb" ? { kind: "straight" } : route;
 
     const rawChain = chainOf(p1, tip, effective, direction, gb);

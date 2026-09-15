@@ -108,6 +108,22 @@ describe("规整态正交形态（lineMorph=1，§1.4 全正交电路线）", ()
     expect(g.chain).toHaveLength(2);
   });
 
+  it("OFR-2026-09-15：多出边端口槽位的小 dy（<8px）不再直连出斜线，走正交微步", () => {
+    // 复现负责人截图：出发点（2 出边，端口槽位偏 7.7px）→ 可能的（居中入口）。
+    // 旧规则 dy<8 直连成轻微斜线；规整态契约是全正交电路线。
+    const g = planEdgeGeometry([edge("e", 0, 0, 270, 7.7)], "horizontal", 1).get("e")!;
+    expect(g.route.kind).not.toBe("straight");
+    expect(g.chain.length).toBeGreaterThanOrEqual(4); // 水平出 → 垂直微步 → 水平入
+    for (let i = 1; i < g.chain.length; i++) {
+      const a = g.chain[i - 1]!;
+      const b = g.chain[i]!;
+      expect(
+        Math.abs(a.x - b.x) < 1e-6 || Math.abs(a.y - b.y) < 1e-6,
+        `seg ${i} 必须严格水平/垂直`,
+      ).toBe(true);
+    }
+  });
+
   it("转折落位目标列前（tip - 24 - rank×spacing），全缝唯一", () => {
     const edges: EdgePlanInput[] = [edge("e1", 0, 0, 270, 0), edge("e2", 0, 106, 270, 212)];
     const geoms = planEdgeGeometry(edges, "horizontal", 1);
