@@ -141,9 +141,9 @@ describe("保存闭环（AC-04/06）", () => {
   it("Save As → edit → ordinary save 用新目标且不重弹", async () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
-    filePort.nextSaveDialog = "/docs/saveas.json";
+    filePort.nextSaveDialog = "/docs/saveas.mindmap";
     fireEvent.keyDown(window, { key: "s", metaKey: true, shiftKey: true });
-    await waitFor(() => expect(screen.getByText(/已保存 \/docs\/saveas\.json/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/已保存 \/docs\/saveas\.mindmap/)).toBeTruthy());
 
     fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 10, clientY: 200 });
     await waitFor(() => expect(document.title.startsWith("● ")).toBeTruthy());
@@ -266,17 +266,17 @@ describe("导出（AC-10/11：唯一 owner = web-ts-wasm 通道）", () => {
 });
 
 describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）", () => {
-  it("统一面板路由 Graph JSON（.graph.json）；导出落盘可解析（§3.6）", async () => {
+  it("统一面板路由 Graph JSON（.json）；导出落盘可解析（§3.6）", async () => {
     const { filePort } = setup();
     await createNodeViaCanvas();
 
     // 四格式分组呈现迁移到原生面板（Rust save_panel popup：文档在上、
     // 分隔线后导出四格式，映射由 format_for_index 单测锁定）；此处验证
-    // 统一面板按 .graph.json 扩展名路由且不触碰 renderer 渲染管线。
-    filePort.nextSaveDialog = "/out/map.graph.json";
+    // 统一面板按 .json 扩展名路由且不触碰 renderer 渲染管线。
+    filePort.nextSaveDialog = "/out/map.json";
     fireEvent.keyDown(window, { key: "e", metaKey: true });
-    await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.graph\.json/)).toBeTruthy());
-    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.graph.json")!));
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/map\.json/)).toBeTruthy());
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.json")!));
     expect(g.format).toBe("mindmap-graph-json");
     expect(g.version).toBe(1);
     expect(g.meta.nodeCount).toBeGreaterThanOrEqual(1);
@@ -292,10 +292,10 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     const editor = await screen.findByLabelText("编辑节点文本");
     fireEvent.change(editor, { target: { value: "编辑中的未提交文字" } });
 
-    filePort.nextSaveDialog = "/out/flush.graph.json";
+    filePort.nextSaveDialog = "/out/flush.json";
     fireEvent.keyDown(window, { key: "e", metaKey: true });
-    await waitFor(() => expect(screen.getByText(/已导出 \/out\/flush\.graph\.json/)).toBeTruthy());
-    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/flush.graph.json")!));
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/flush\.json/)).toBeTruthy());
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/flush.json")!));
     expect(g.graph.nodes.some((n: { text: string }) => n.text === "编辑中的未提交文字")).toBe(true);
   });
 
@@ -310,12 +310,12 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     await waitFor(() => expect(screen.getByText("打开的文档")).toBeTruthy());
     renderer.deferFontMetrics().reject(new Error("假字体资源加载失败"));
 
-    filePort.nextSaveDialog = "/out/nofont.graph.json";
+    filePort.nextSaveDialog = "/out/nofont.json";
     fireEvent.keyDown(window, { key: "e", metaKey: true });
-    await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.graph\.json/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.json/)).toBeTruthy());
     expect(renderer.rendered.length).toBe(0); // 渲染管线零调用
     const graph = JSON.parse(
-      new TextDecoder().decode(filePort.files.get("/out/nofont.graph.json")!),
+      new TextDecoder().decode(filePort.files.get("/out/nofont.json")!),
     );
     expect(graph.graph.nodes[0].text).toBe("打开的文档");
   });
@@ -328,10 +328,10 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     await createNodeViaCanvas();
 
     // 统一流程在面板前收敛待提交几何；字体失败时 flush 拒绝 → 阻断且不开面板
-    filePort.nextSaveDialog = "/out/stale.graph.json";
+    filePort.nextSaveDialog = "/out/stale.json";
     fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/字体资源加载失败，无法存储为/)).toBeTruthy());
-    expect(filePort.files.has("/out/stale.graph.json")).toBe(false);
+    expect(filePort.files.has("/out/stale.json")).toBe(false);
     expect(filePort.saveDialogCalls).toBe(0);
   });
 });

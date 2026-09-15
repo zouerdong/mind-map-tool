@@ -613,9 +613,9 @@ describe("统一「存储为…」流程（OFR-2026-09-15 出口合并，PRD §8
     expect(port.files.has("/out/图.pdf")).toBe(true);
   });
 
-  it("graph.json 双段扩展名：兜底剥离正确（分享.graph.json → 分享.mindmap）", async () => {
+  it("Graph JSON（.json）：兜底剥离正确（分享.json → 分享.mindmap）", async () => {
     const port = new FakeFilePort();
-    port.nextSaveDialog = "/out/分享.graph.json";
+    port.nextSaveDialog = "/out/分享.json";
     const session = new DocumentSession(emptyDocument());
     const result = await unifiedSaveFlow(session, { filePort: port, renderer: okRenderer() });
     expect(result.kind).toBe("ok");

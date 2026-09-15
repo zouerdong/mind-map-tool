@@ -490,8 +490,8 @@ pub async fn platform_request_unified_save_authorization(
     }
 
     /// 由（路径, 格式）组装授权 DTO；导出格式 + 未保存文档时补兜底授权。
-    /// 落盘路径先按选择器格式规范化扩展名（AppKit name field 无法无损显示
-    /// `.graph.json` 双段扩展名，会把中段吞掉——选择器才是格式权威）。
+    /// 落盘路径先按选择器格式规范化扩展名（选择器为格式权威；用户手改
+    /// 扩展名不改变格式语义）。
     fn grant_for_choice(
         service: &FileLifecycleService,
         window_label: &str,
@@ -555,7 +555,7 @@ pub async fn platform_request_unified_save_authorization(
             .add_filter("SVG", &["svg"])
             .add_filter("PNG 2x", &["png"])
             .add_filter("PDF", &["pdf"])
-            .add_filter("Graph JSON", &["graph.json"]);
+            .add_filter("Graph JSON", &["json"]);
         if !suggested_name.is_empty() {
             builder = builder.set_file_name(&suggested_name);
         }
@@ -572,8 +572,8 @@ pub async fn platform_request_unified_save_authorization(
             ("png", "png", false)
         } else if lower.ends_with(".pdf") {
             ("pdf", "pdf", false)
-        } else if lower.ends_with(".graph.json") {
-            ("graph-json", "graph.json", false)
+        } else if lower.ends_with(".json") {
+            ("graph-json", "json", false)
         } else {
             ("mindmap", "mindmap", true)
         };

@@ -29,12 +29,12 @@ function docWithGraph(): MindMapDocumentV1 {
 
 
 describe("exportSuggestedName（PRR-070-R2 §3.1）", () => {
-  it("graph-json → .graph.json；视觉格式扩展名不变", () => {
+  it("graph-json → .json；视觉格式扩展名不变", () => {
     const fresh = new DocumentSession(emptyDocument());
-    expect(exportSuggestedName(fresh, "graph-json")).toBe("未命名.graph.json");
+    expect(exportSuggestedName(fresh, "graph-json")).toBe("未命名.json");
     const opened = new DocumentSession(emptyDocument());
     opened.adoptOpenedTarget("fake-doc-1", "tok", "/docs/我的脑图.mindmap");
-    expect(exportSuggestedName(opened, "graph-json")).toBe("我的脑图.graph.json");
+    expect(exportSuggestedName(opened, "graph-json")).toBe("我的脑图.json");
     expect(exportSuggestedName(opened, "svg")).toBe("我的脑图.svg");
     expect(exportSuggestedName(opened, "png")).toBe("我的脑图.png");
     expect(exportSuggestedName(opened, "pdf")).toBe("我的脑图.pdf");
@@ -45,10 +45,10 @@ describe("Graph JSON 导出契约（§3.2/3.3）", () => {
   it("bytes 可解析且结构完整：format/version/meta/graph 节点边与 source/target", async () => {
     const session = new DocumentSession(docWithGraph());
     const filePort = new FakeFilePort();
-    filePort.nextSaveDialog = "/out/map.graph.json";
+    filePort.nextSaveDialog = "/out/map.json";
     const result = await exportFlow(session, { filePort, renderer: okRenderer() }, "graph-json");
-    expect(result).toMatchObject({ kind: "ok", displayPath: "/out/map.graph.json" });
-    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.graph.json")!));
+    expect(result).toMatchObject({ kind: "ok", displayPath: "/out/map.json" });
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/map.json")!));
     expect(g.format).toBe("mindmap-graph-json");
     expect(g.version).toBe(1);
     expect(g.meta.nodeCount).toBe(2);
@@ -66,12 +66,12 @@ describe("Graph JSON 导出契约（§3.2/3.3）", () => {
   it("确定性：同一文档两次输出 bytes 完全一致；无时间戳/机器路径/内部 schemaVersion", async () => {
     const session = new DocumentSession(docWithGraph());
     const filePort = new FakeFilePort();
-    filePort.nextSaveDialog = "/out/a.graph.json";
+    filePort.nextSaveDialog = "/out/a.json";
     await exportFlow(session, { filePort, renderer: okRenderer() }, "graph-json");
-    filePort.nextSaveDialog = "/out/b.graph.json";
+    filePort.nextSaveDialog = "/out/b.json";
     await exportFlow(session, { filePort, renderer: okRenderer() }, "graph-json");
-    const first = filePort.files.get("/out/a.graph.json")!;
-    const second = filePort.files.get("/out/b.graph.json")!;
+    const first = filePort.files.get("/out/a.json")!;
+    const second = filePort.files.get("/out/b.json")!;
     expect(second).toEqual(first);
     const text = new TextDecoder().decode(first);
     expect(text).not.toContain("schemaVersion");
@@ -100,10 +100,10 @@ describe("Graph JSON 导出契约（§3.2/3.3）", () => {
       }
     }
     const filePort = new MutatingDuringDialog();
-    filePort.nextSaveDialog = "/out/frozen.graph.json";
+    filePort.nextSaveDialog = "/out/frozen.json";
     const result = await exportFlow(session, { filePort, renderer: okRenderer() }, "graph-json");
     expect(result.kind).toBe("ok");
-    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/frozen.graph.json")!));
+    const g = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/frozen.json")!));
     expect(g.meta.nodeCount).toBe(2); // 快照是面板打开那一刻，不含对话框期间的新节点
     expect(session.current.document.document.nodes.length).toBe(3); // 会话本身已前进
   });
@@ -122,14 +122,14 @@ describe("渲染器独立性（§3.4）与视觉格式不回归（§3.7）", () 
     };
     const session = new DocumentSession(docWithGraph());
     const filePort = new FakeFilePort();
-    filePort.nextSaveDialog = "/out/norender.graph.json";
+    filePort.nextSaveDialog = "/out/norender.json";
     const result = await exportFlow(session, { filePort, renderer }, "graph-json");
     expect(result).toMatchObject({ kind: "ok" });
     expect(renderer.buildScene).not.toHaveBeenCalled();
     expect(renderer.renderSvg).not.toHaveBeenCalled();
     expect(renderer.renderPng).not.toHaveBeenCalled();
     expect(renderer.renderPdf).not.toHaveBeenCalled();
-    expect(filePort.files.get("/out/norender.graph.json")!.length).toBeGreaterThan(0);
+    expect(filePort.files.get("/out/norender.json")!.length).toBeGreaterThan(0);
   });
 
   it("视觉格式仍走 renderer：buildScene 结构化失败在授权前返回（不回归）", async () => {

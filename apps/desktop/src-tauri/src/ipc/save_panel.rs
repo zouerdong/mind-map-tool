@@ -15,9 +15,8 @@
 //!   生成双授权）。仅 macOS 使用；其他平台仍走 rfd（Windows 通用对话框
 //!   原生显示 filter 下拉）。
 
-/// 已知的可交换扩展名（长后缀优先：`.graph.json` 先于 `.json`）。
-/// 平台无关纯函数区：macOS 面板与 ipc 最终路径规范化共用。
-const KNOWN_EXTS: [&str; 6] = ["graph.json", "mindmap", "svg", "png", "pdf", "json"];
+/// 已知的可交换扩展名。平台无关纯函数区：macOS 面板与 ipc 最终路径规范化共用。
+const KNOWN_EXTS: [&str; 5] = ["mindmap", "svg", "png", "pdf", "json"];
 
 /// 把文件名扩展名换成所选格式；未带已知扩展名时直接追加。
 /// 保留用户输入的基础名与大小写；已带其他扩展名（如 `.txt`）不剥除。
@@ -32,9 +31,8 @@ fn swap_extension(name: &str, ext: &str) -> String {
     format!("{name}.{ext}")
 }
 
-/// 以所选格式为权威，规范化最终落盘路径的扩展名（AppKit name field 不能
-/// 无损显示 `.graph.json` 双段扩展名——会吞掉中段——因此落盘前以选择器
-/// 为准重写；用户手改扩展名不改变格式语义）。
+/// 以所选格式为权威，规范化最终落盘路径的扩展名（用户手改扩展名不改变
+/// 格式语义；选择器才是格式权威）。
 pub fn normalize_path_for_format(path: &mut std::path::PathBuf, ext: &str) {
     let name = path
         .file_name()
@@ -51,11 +49,8 @@ mod pure_tests {
     #[test]
     fn swaps_known_extensions_case_insensitively() {
         assert_eq!(swap_extension("未命名.mindmap", "svg"), "未命名.svg");
-        assert_eq!(swap_extension("未命名.graph.json", "mindmap"), "未命名.mindmap");
         assert_eq!(swap_extension("a.JSON", "pdf"), "a.pdf");
-        assert_eq!(swap_extension("图.png", "graph.json"), "图.graph.json");
-        // 长后缀优先：`.graph.json` 整体被替换，不产生 `图.graph.svg`
-        assert_eq!(swap_extension("图.graph.json", "svg"), "图.svg");
+        assert_eq!(swap_extension("图.png", "json"), "图.json");
     }
 
     #[test]
@@ -65,15 +60,14 @@ mod pure_tests {
     }
 
     #[test]
-    fn normalize_repairs_appkit_mangled_double_extension() {
-        // AppKit name field 把 "未命名.graph.json" 显示/返回为 "未命名.json"，
-        // 落盘前必须按选择器格式修复回双段扩展名。
-        let mut p = std::path::PathBuf::from("/tmp/未命名.json");
-        normalize_path_for_format(&mut p, "graph.json");
-        assert_eq!(p, std::path::PathBuf::from("/tmp/未命名.graph.json"));
-        let mut q = std::path::PathBuf::from("/tmp/未命名.graph.json");
-        normalize_path_for_format(&mut q, "graph.json");
-        assert_eq!(q, std::path::PathBuf::from("/tmp/未命名.graph.json")); // 幂等
+    fn normalize_applies_selector_format() {
+        // 选择器为格式权威：用户手改的扩展名在落盘前被规范为所选格式。
+        let mut p = std::path::PathBuf::from("/tmp/未命名.mindmap");
+        normalize_path_for_format(&mut p, "json");
+        assert_eq!(p, std::path::PathBuf::from("/tmp/未命名.json"));
+        let mut q = std::path::PathBuf::from("/tmp/未命名.svg");
+        normalize_path_for_format(&mut q, "svg");
+        assert_eq!(q, std::path::PathBuf::from("/tmp/未命名.svg")); // 幂等
     }
 }
 
@@ -92,7 +86,7 @@ mod imp {
     };
     use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString};
 
-    use super::swap_extension;
+    use super::{swap_extension, KNOWN_EXTS};
     use crate::file::error::IpcError;
 
     /// 「存储为…」面板的可选格式（分两组：可编辑文档 / 导出产物）。
@@ -106,14 +100,15 @@ mod imp {
     }
 
     impl UnifiedFormat {
-        /// 稳定扩展名；Graph JSON 为双段 `.graph.json`（与 exportSuggestedName 契约一致）。
+        /// 稳定扩展名；Graph JSON 为 `.json`（OFR-2026-09-15：保存侧已无 .json
+    /// 文档选项，导出语境无歧义；AppKit 不能无损显示双段扩展名）。
         pub fn ext(self) -> &'static str {
             match self {
                 Self::Mindmap => "mindmap",
                 Self::Svg => "svg",
                 Self::Png => "png",
                 Self::Pdf => "pdf",
-                Self::GraphJson => "graph.json",
+                Self::GraphJson => "json",
             }
         }
 
@@ -292,11 +287,10 @@ mod imp {
         run_on_main(app, parent_ns_window, move |mtm, parent| {
             let panel = NSSavePanel::savePanel(mtm);
             panel.setCanCreateDirectories(true);
-            // allowedFileTypes 只放合法单段扩展名（AppKit 的扩展名校验不认
-            // `.graph.json` 双段，会把 name field 的中段吞掉）；允许其他类型
-            // 透传，用户手改扩展名与双段扩展名都不被改写——最终落盘路径由
-            // host 按选择器格式规范化（normalize_path_for_format）。
-            let allowed: Vec<Retained<NSString>> = ["mindmap", "svg", "png", "pdf"]
+            // 五种单段扩展名均为合法输入；允许其他类型透传（用户手改扩展名
+            // 不被改写）——最终落盘路径由 host 按选择器格式规范化
+            //（normalize_path_for_format）。
+            let allowed: Vec<Retained<NSString>> = KNOWN_EXTS
                 .iter()
                 .map(|e| NSString::from_str(e))
                 .collect();
@@ -324,7 +318,7 @@ mod imp {
             popup.addItemWithTitle(&NSString::from_str("SVG (.svg)"));
             popup.addItemWithTitle(&NSString::from_str("PNG 2x (.png)"));
             popup.addItemWithTitle(&NSString::from_str("PDF (.pdf)"));
-            popup.addItemWithTitle(&NSString::from_str("Graph JSON (.graph.json)"));
+            popup.addItemWithTitle(&NSString::from_str("Graph JSON (.json)"));
             let hint = NSTextField::labelWithString(
                 &NSString::from_str("导出格式不能重新打开编辑；将同时保留可编辑源文件 (.mindmap)"),
                 mtm,

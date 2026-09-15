@@ -102,7 +102,7 @@ export class FakeFilePort implements FilePort {
         ? "png"
         : lower.endsWith(".pdf")
           ? "pdf"
-          : lower.endsWith(".graph.json")
+          : lower.endsWith(".json")
             ? "graph-json"
             : "mindmap";
     const isDoc = format === "mindmap";
@@ -113,8 +113,8 @@ export class FakeFilePort implements FilePort {
       format,
     };
     if (!isDoc && !documentSaved) {
-      // 剥掉导出扩展名（graph.json 双段）后补 .mindmap
-      const stem = path.replace(/\.graph\.json$/i, "").replace(/\.[^.]*$/, "");
+      // 剥掉导出扩展名后补 .mindmap
+      const stem = path.replace(/\.[^.]*$/, "");
       const backupPath = `${stem}.mindmap`;
       dto.backupAuthorizationRef = await this.grantFor("document", backupPath);
       dto.backupDisplayPath = backupPath;

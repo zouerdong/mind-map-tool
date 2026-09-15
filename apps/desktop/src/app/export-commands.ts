@@ -57,8 +57,10 @@ export class ExportRendererError extends Error {
 export function exportSuggestedName(session: DocumentSession, format: ExportFormat): string {
   const display = session.displayPath;
   const base = (display?.split(/[\\/]/).pop() ?? "未命名").replace(/\.[^.]*$/, "");
-  // graph-json 的稳定扩展名是 .graph.json（双段），不是裸 format 拼接
-  if (format === "graph-json") return `${base}.graph.json`;
+  // graph-json 的扩展名是 .json（OFR-2026-09-15：保存侧已不再提供 .json
+  // 文档选项，导出语境下 .json 无歧义；AppKit name field 无法无损显示
+  // .graph.json 双段扩展名，故放弃双段约定）
+  if (format === "graph-json") return `${base}.json`;
   return `${base}.${format}`;
 }
 
