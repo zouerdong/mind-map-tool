@@ -248,3 +248,7 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 2. **首节点橙卡**（[from-user] 新需求）：空文档第一个节点自动 `emphasis: true`（橙色"出发点"卡，"记得我们的出发点在哪里"）。规则锚定空文档（含 pending 判定），非追溯、可手动开关；CreateNode 命令新增可选 `emphasis`（原子单命令，撤销一次整体回退）；几何屏障 intent 携带传递。ADR 0010 v1.1.0 记录"不自动派生"的例外条款；PRD §6 注记。core/ui 定向测试 4 项（应用/撤销/并发 pending/删光重建）。
 - 实机验证截图：`verify-orange-origin.png`（首节点橙卡）、`verify-hint-twoline.png`（提示两行完整）。
 - 新候选 source `f5e395b`，DMG sha256 `645689e1399e077a…`，已安装 /Applications。
+
+### 追加：整理后斜线修复（`d498b39`，同日闭环）
+
+负责人实机反馈：整理后连线不平行、有轻微斜线，观感难受。根因：多出边卡片的端口槽位沿卡边均分（卡高 47px、2 出边时槽位偏移 7.7px），而路由的"近共线直连"阈值是 8px——数 px 的真实 dy 被判定"近共线"直连成斜线。修复（`edge-geometry.ts`）：直连阈值收紧到亚像素 `collinearEpsilon: 0.5`（仅舍入噪声），真实 dy 一律走正交圆角微步（§1.4"全正交电路线"契约归位）。golden 清单按规程 REGEN（原因已记录）。实机复现负责人同款布局（出发点→可能的/才不是；可能的→第恩/死的/死的思路）整理后截图 `verify-edges-organized.png`：全部连线横平竖直、圆角规整。新候选 DMG sha256 `4f501a1b4bd5eee7…` 已安装。
