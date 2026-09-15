@@ -241,3 +241,10 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 
 - 新候选已安装至 /Applications（DMG `.tmp/dogfood-2026-09-15/Mind Map_0.1.0_aarch64.dmg`）。
 - verify-decision 证据重冻结按负责人批准的方案 B 执行中（证据迁入版本库 docs/quality/evidence/g1/ + register 路径与哈希重冻结）。
+
+### 追加：出口合并轮负责人实机反馈两项（`f5e395b`，同日闭环）
+
+1. **兜底提示截断**：统一面板"导出格式不能重新打开编辑；将同时保留可编辑源文件"单行 330px 放不下被截断——拆两行 + accessory 加高（72px），实机截图验证完整显示。
+2. **首节点橙卡**（[from-user] 新需求）：空文档第一个节点自动 `emphasis: true`（橙色"出发点"卡，"记得我们的出发点在哪里"）。规则锚定空文档（含 pending 判定），非追溯、可手动开关；CreateNode 命令新增可选 `emphasis`（原子单命令，撤销一次整体回退）；几何屏障 intent 携带传递。ADR 0010 v1.1.0 记录"不自动派生"的例外条款；PRD §6 注记。core/ui 定向测试 4 项（应用/撤销/并发 pending/删光重建）。
+- 实机验证截图：`verify-orange-origin.png`（首节点橙卡）、`verify-hint-twoline.png`（提示两行完整）。
+- 新候选 source `f5e395b`，DMG sha256 `645689e1399e077a…`，已安装 /Applications。
