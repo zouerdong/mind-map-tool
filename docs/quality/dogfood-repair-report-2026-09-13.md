@@ -271,3 +271,7 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 - 复现测试转绿后固化为正式回归（`editor-canvas.test.tsx` OFR-2026-09-16，真实 rAF 约 1.1s），一次性 scratch 文件未入库。
 
 验证：pnpm typecheck / lint 干净；test:unit 733/733 全绿（含 verify-decision 重冻结证据）；新候选 source `d6dc8cc` clean worktree，DMG sha256 `53105e742705d34a…`（ULMO/EULA 装配，bundle-gate PASS），已安装 /Applications。原生目视项不变：负责人做一次整理 ⇧⌘L → 还原 ⇧⌘L 循环，确认连线回散乱曲线。
+
+### 追加：还原形态修复负责人实机确认通过（2026-09-16）
+
+负责人对 `d6dc8cc` 候选（DMG sha256 `53105e742705d34a…`）完成整理 ⇧⌘L → 还原 ⇧⌘L 循环目视：连线随还原动画从正交折线回散乱曲线，判定"实现了，可以通过"。OFR-2026-09-16 闭环；2026-09-12 起全部实用反馈项至此均有通过的原生证据。G-FINAL 仍未申请，待负责人明确发起。

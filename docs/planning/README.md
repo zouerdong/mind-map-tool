@@ -1,6 +1,6 @@
 # Planning
 
-2026-09-16 OFR 收口：`还原形态被第二跳投影覆盖已修复（d6dc8cc）/ test:unit 733/733 全绿 / 新候选已安装待负责人目视`。根因为还原 commit 与 app 侧 revision bump 拆成两次投影：第二跳把 reverseTo（morph→0）覆盖回 start（morph→1）；修复为同一文档对象的运行中动画不重启。详见[报告 §十二末条](../quality/dogfood-repair-report-2026-09-13.md)。新候选 DMG sha256 `53105e742705d34a…`；待负责人做整理/还原循环目视确认，G-FINAL 未申请。
+2026-09-16 OFR 收口：`还原形态被第二跳投影覆盖已修复（d6dc8cc）/ 负责人实机目视确认通过 / 待 G-FINAL 决策`。根因为还原 commit 与 app 侧 revision bump 拆成两次投影：第二跳把 reverseTo（morph→0）覆盖回 start（morph→1）；修复为同一文档对象的运行中动画不重启。test:unit 733/733 全绿。候选 source `d6dc8cc`，DMG sha256 `53105e742705d34a…` 已安装并经验收。详见[报告 §十二末两条](../quality/dogfood-repair-report-2026-09-13.md)。2026-09-12 起全部实用反馈项闭环；G-FINAL 未申请，待负责人明确发起。
 
 2026-09-15 出口合并轮：`保存/另存为/导出已合并为统一「存储为…」面板 / 原生全路径 32/32 PASS / 候选已安装待体验`。保存仅 .mindmap；统一面板五格式分组；未保存文档选导出格式自动补写同名源文件。Graph JSON 导出改用纯 .json 扩展名。详见[报告 §十二](../quality/dogfood-repair-report-2026-09-13.md)。verify-decision 证据已按方案 B 迁入版本库并重冻结，test:unit 726/726 全绿。
 
