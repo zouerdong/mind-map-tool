@@ -289,4 +289,6 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 1. **还原布局后马上拖拽 idea 框，框与连线断开**——根因：`reverseTo` 终态 morph=0 的驻留帧仍把静态 `pathD` 写进边数据，`MindEdge` 有 `pathD` 即不消费 RF 实时锚点，而拖拽实时重算（`settledEdgePathsFor`）只对规整态（morph>0）开放。修复确立散乱态不变式：reverseTo 完成时剥离静态 `pathD/arrowD`，连线交回 RF 实时贝塞尔，与从未整理过的文档行为一致（`96a5066`，含真实 rAF 回归测试，红测先验）。验证：format:check/typecheck/lint/test:unit 734/test:integration/test:export 全绿。待负责人本机复验。
 2. **暖白主题橙卡字色**——负责人要求暖白字。实算对比度：暖白 `#F5F2EA` 对橙底 `#D97757` 仅 2.79:1，低于项目 AC-05 正文门 4.5:1（现状深棕 5.31:1）。触及验收合同，已提交三方案对比图（`.tmp/ofr-2026-09-16/accent-card-options.svg`）待负责人决策：① 暖白字+维持橙底并登记对比度例外；② 暖白字+深橙底 `#A84F2E`（4.91:1 达标，橙色明显加深）；③ 维持现状。决策后一次性改 UI/export 双源色板并 REGEN golden。
 
+**决策与收口（2026-09-16）**：负责人就橙卡字色选择③维持现状（`#331708` 深棕字 / `#D97757` 橙底，5.31:1 合同不变），不登记例外、不改色板；同轮确认拖拽脱节修复（`96a5066`）实机无问题，OFR-2026-09-16 ② 收口。
+
 **G-FINAL 影响**：`e75c5f1` 候选（DMG `6185be46…`）因上述发现不再作为最终发布输入；待两笔收口后重建候选并重走验证链。
