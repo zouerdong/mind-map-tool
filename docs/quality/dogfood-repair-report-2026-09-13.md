@@ -281,3 +281,12 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 负责人确认 `d6dc8cc` 候选通过后正式发起 G-FINAL。准备过程中源码门暴露两笔前置欠账并已修复：fd9af9b（09-13 起各轮未跑 format:check 累积的 22 文件 prettier 漂移，机械归零）与 e75c5f1（bd1fdae 引入的 objc2-core-video 未补登 THIRD_PARTY_NOTICES，确定性再生成）。最终候选从 clean HEAD `e75c5f1` 重新构建：DMG sha256 `6185be46b252281a…`（24,353,137B，ULMO，CRC32 VALID，EULA 绑定，未签名），已安装 /Applications。
 
 证据链（全部绑定该候选）：源码门 14 项 PASS（test:unit 733/733；fd9af9b 首跑曾出现 F1-a 计时 flake，隔离重跑 132/132、完整重跑全绿）；JS/Rust advisory 0 漏洞（cargo-audit db 1246 条）；性能 20 样本 overall PASS（sessionFirstLaunch=3005.2ms record-only、conditionedColdStartP95=325.7ms、warmP95=339.3ms、RSS=105.5MB、canvasP95=18ms、saveP95=14ms、PNG P95=1594ms）；原生全路径 32/32 PASS（首启引导断言需 not-started 偏好，运行前临时移除负责人试用留下的 onboardingStatus=completed、运行后逐字节恢复）。请求与报告：`.tmp/release-candidate/e75c5f16e2a29ea300723930fe1de3a89e9fc726/g-final-request.md/json`、`macos-native-candidate-report.json`。状态 `WAITING_FOR_OWNER_G_FINAL`；未签名、未公证、未上传、未发布；PRR-080/090 未派发。
+
+## 十四、OFR-2026-09-16 ②：还原后立即拖拽连线脱节修复（`96a5066`）；橙卡字色决策待负责人
+
+负责人在 G-FINAL 候选（e75c5f1）实机上再报两笔：
+
+1. **还原布局后马上拖拽 idea 框，框与连线断开**——根因：`reverseTo` 终态 morph=0 的驻留帧仍把静态 `pathD` 写进边数据，`MindEdge` 有 `pathD` 即不消费 RF 实时锚点，而拖拽实时重算（`settledEdgePathsFor`）只对规整态（morph>0）开放。修复确立散乱态不变式：reverseTo 完成时剥离静态 `pathD/arrowD`，连线交回 RF 实时贝塞尔，与从未整理过的文档行为一致（`96a5066`，含真实 rAF 回归测试，红测先验）。验证：format:check/typecheck/lint/test:unit 734/test:integration/test:export 全绿。待负责人本机复验。
+2. **暖白主题橙卡字色**——负责人要求暖白字。实算对比度：暖白 `#F5F2EA` 对橙底 `#D97757` 仅 2.79:1，低于项目 AC-05 正文门 4.5:1（现状深棕 5.31:1）。触及验收合同，已提交三方案对比图（`.tmp/ofr-2026-09-16/accent-card-options.svg`）待负责人决策：① 暖白字+维持橙底并登记对比度例外；② 暖白字+深橙底 `#A84F2E`（4.91:1 达标，橙色明显加深）；③ 维持现状。决策后一次性改 UI/export 双源色板并 REGEN golden。
+
+**G-FINAL 影响**：`e75c5f1` 候选（DMG `6185be46…`）因上述发现不再作为最终发布输入；待两笔收口后重建候选并重走验证链。
