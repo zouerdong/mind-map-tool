@@ -519,6 +519,72 @@ describe("EditorCanvas", () => {
     );
   }, 15000);
 
+  it("OFR-2026-09-16 ②：还原完成后立即拖动——散乱态连线交回 RF 实时贝塞尔（不脱节）", async () => {
+    // 实机根因：reverseTo 终态 morph=0 的驻留帧仍写静态 pathD；MindEdge 有
+    // pathD 就不消费 RF 实时锚点，而拖拽实时重算只对规整态（morph>0）开放，
+    // 结果还原后马上拖 idea 框“框动线不动”。修复：reverseTo 完成时剥离静态
+    // pathD/arrowD（散乱态不变式 = 与从未整理过的文档一致）。
+    // 必须真实 rAF：reduced-motion 下多次投影重跑会偶发提前剥离，复现不了。
+    const doc = makeDoc();
+    doc.document.nodes.push({
+      id: "n3",
+      text: "孙节点",
+      position: { x: 520, y: 240 },
+      size: { width: 120, height: 37 },
+    });
+    doc.document.edges.push({ id: "e2", sourceNodeId: "n2", targetNodeId: "n3" });
+    const session = new DocumentSession(makeStateNode(doc).document);
+
+    function AppHarness() {
+      const [signal, setSignal] = useState(0);
+      const [revision, setRevision] = useState(0);
+      const [statuses, setStatuses] = useState<string[]>([]);
+      const handleResult = (r: OrganizeCommandResult) => {
+        setStatuses((s) => [...s, r.status]);
+        if (r.status === "moved" || r.status === "restored") setRevision((v) => v + 1);
+      };
+      return (
+        <>
+          <button data-testid="organize-btn" onClick={() => setSignal((s) => s + 1)}>
+            organize
+          </button>
+          <span data-testid="statuses">{statuses.join(",")}</span>
+          <EditorCanvas
+            session={session}
+            fonts={fakeFonts}
+            revision={revision}
+            organizeSignal={signal}
+            onOrganizeResult={handleResult}
+          />
+        </>
+      );
+    }
+    render(<AppHarness />);
+
+    const edge = await screen.findByTestId("rf-edge-e1");
+    await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
+
+    // 整理 → 规整态静态 pathD
+    fireEvent.click(screen.getByTestId("organize-btn"));
+    await waitFor(() => expect(screen.getByTestId("statuses").textContent).toContain("moved"));
+    await waitFor(() => expect(edge.getAttribute("data-path") ?? "").not.toBe(""), {
+      timeout: 3000,
+    });
+
+    // 还原 → 动画完成后散乱态不变式：pathD 必须被剥离（修复前这里停在中途帧贝塞尔）
+    fireEvent.click(screen.getByTestId("organize-btn"));
+    await waitFor(() => expect(screen.getByTestId("statuses").textContent).toContain("restored"));
+    await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""), { timeout: 3000 });
+
+    // 马上拖动 n2：连线保持 RF 实时贝塞尔（无静态 pathD 滞留），节点位移生效
+    fireEvent.click(screen.getByTestId("rf-drag-n2-pos"));
+    await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
+    await waitFor(() => {
+      const node = screen.getByTestId("rf-node-n2");
+      expect(node).toBeTruthy();
+    });
+  }, 15000);
+
   it("OFR-2026-09-14 #6：文楷粗体段用描边模拟（无合成粗体，宽度不超出度量）", async () => {
     const doc = makeDoc();
     doc.document.font = "lxgw-wenkai";

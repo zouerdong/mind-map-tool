@@ -514,6 +514,20 @@ export function EditorCanvas({
           reducedMotion,
           onFrame,
           onComplete: () => {
+            // 散乱态不变式（OFR-2026-09-16 ②）：reverseTo 终态 morph=0 的
+            // 驻留帧仍写静态 pathD；不剥离则 MindEdge 不再消费 RF 实时锚点，
+            // 随后拖拽“框动线不动”（还原后马上拖 idea 框断开的实机根因）。
+            // 散乱态 ⇒ 连线交回 RF 实时贝塞尔，与从未整理过的文档一致。
+            setRfEdges((prevEdges) =>
+              prevEdges.map((e) =>
+                e.data && (e.data.pathD !== undefined || e.data.arrowD !== undefined)
+                  ? {
+                      ...e,
+                      data: { lineStyle: e.data.lineStyle, theme: e.data.theme },
+                    }
+                  : e,
+              ),
+            );
             onOrganizeComplete?.();
           },
         });
