@@ -300,3 +300,9 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 ## 十六、G-FINAL 批准登记（2026-09-16，阶段 B）
 
 负责人 ErDong Zou 以 [from-user] 原文批准（含批准人、结论、完整 source commit、候选路径、完整 SHA-256 五要素）：接受 source `5c634de93e1f4b5646eb473a90ce1677a15f57a7`、候选 DMG `Mind Map_0.1.0_aarch64.dmg`（SHA-256 `ebdd644df7701d26f7fb546fe8c64bc75e19594f80b0dd02f22780b97149d1e1`）作为 0.1.0 unsigned 发布候选。阶段 B 复核：hash 重算一致、时间拓扑 freeze≤gates≤bundle≤report≤request 全部成立、worktree clean、未重跑任何 runner。独立批准记录：`.tmp/release-candidate/5c634de93e1f4b5646eb473a90ce1677a15f57a7/g-final.json`。**PRR-070 COMPLETE / G-FINAL_RECORDED**。PRR-080 冻结验收包、PRR-090 独立终审与签名/公证/上传/发布均须另行派发授权；本记录不构成 READY_TO_RELEASE。
+
+## 十七、PRR-080 派发与 source/HEAD 绑定修复（2026-09-16）
+
+负责人授权推进 PRR-080（冻结验收包；不含签名/公证/上传/发布）。启动前通读 `verify-evidence.mjs` schema v3 发现结构性冲突：manifest.source.commit 必须等于验证时 HEAD，且 cmd-bundle/cmd-release-performance/cold-conditioning/approvals.gFinal 四处 artifact 的 sourceCommit 都必须与之相等；而 G-FINAL 候选构建于 `5c634de`，其后有两笔 docs-only 提交（`1f0e151`、`98217bb`），HEAD 已漂移。**根因是执行序列错误：候选构建后、PRR-080 冻结前不应再有 tracked 提交**；证据目录在 `.tmp`（untracked）本可保持 worktree clean，但状态叙述提交破坏了绑定。
+
+处置（遵守"approval↔candidate↔HEAD 精确绑定"红线）：本提交为冻结前最后一笔 tracked 变更；随后在当前 HEAD 全链重跑（源码门 → advisory → bundle → 身份/DMG → install-gate → 性能 → 原生矩阵 → 报告 → 第三轮 g-final-request），负责人对新 source commit 重新批准（若重建 DMG 与已批准 `ebdd644d…` 逐字节一致则批准实质零风险），阶段 B 与 PRR-080 冻结在同一 HEAD 内完成，期间零提交。重建 hash 若与已批准值不一致，立即 STOP 回报。
