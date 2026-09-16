@@ -296,3 +296,7 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 ## 十五、G-FINAL 第二轮请求（2026-09-16，source `5c634de`）
 
 负责人决策橙卡维持现状并确认拖拽修复后，从 `5c634de`（含 `96a5066`）重建候选并重走全链：源码门 15 项 PASS（test:unit 734）、advisory 0 漏洞、性能 attempt-02 全预算 PASS（sessionFirstLaunch=331.5ms、conditionedColdStartP95=338.8ms、warmP95=348.8ms、RSS=103.1MB、canvasP95=18ms）、原生全路径 32/32 PASS。新候选 DMG sha256 `ebdd644df7701d26…`（24,353,397B，ULMO，未签名），已安装 /Applications。三笔如实披露（均非产品缺陷，详见 macos-native-candidate-report.json）：性能 attempt-01 conditioning 瞬时超时判 INCOMPLETE（未补样，attempt-02 全新独立采样）；原生驱动首跑 S6 SVG 断言为 AX 探针时序抖动（截图证明行为正确，探针容错后重跑 32/32）；首启引导断言临时移除/恢复 onboardingStatus。状态 `WAITING_FOR_OWNER_G_FINAL`；请求与证据见 `.tmp/release-candidate/5c634de93e1f4b5646eb473a90ce1677a15f57a7/`。未签名、未公证、未上传、未发布；PRR-080/090 未派发。
+
+## 十六、G-FINAL 批准登记（2026-09-16，阶段 B）
+
+负责人 ErDong Zou 以 [from-user] 原文批准（含批准人、结论、完整 source commit、候选路径、完整 SHA-256 五要素）：接受 source `5c634de93e1f4b5646eb473a90ce1677a15f57a7`、候选 DMG `Mind Map_0.1.0_aarch64.dmg`（SHA-256 `ebdd644df7701d26f7fb546fe8c64bc75e19594f80b0dd02f22780b97149d1e1`）作为 0.1.0 unsigned 发布候选。阶段 B 复核：hash 重算一致、时间拓扑 freeze≤gates≤bundle≤report≤request 全部成立、worktree clean、未重跑任何 runner。独立批准记录：`.tmp/release-candidate/5c634de93e1f4b5646eb473a90ce1677a15f57a7/g-final.json`。**PRR-070 COMPLETE / G-FINAL_RECORDED**。PRR-080 冻结验收包、PRR-090 独立终审与签名/公证/上传/发布均须另行派发授权；本记录不构成 READY_TO_RELEASE。
