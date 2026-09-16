@@ -7,7 +7,7 @@ Mind Map Tool（© 2026 ErDong Zou，专有软件 / All Rights Reserved，见根
 与 `assets/fonts/` 登记确定性生成；`pnpm license:scan` 校验每个条目均被覆盖）。
 
 - JavaScript packages（direct + transitive）：306
-- Cargo packages：486
+- Cargo packages：487
 - Fonts / license texts：4
 
 ## Fonts（随应用分发的字体）
@@ -557,6 +557,7 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `objc2-core-image@0.3.2` — License: Zlib OR Apache-2.0 OR MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
 - `objc2-core-location@0.3.2` — License: Zlib OR Apache-2.0 OR MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
 - `objc2-core-text@0.3.2` — License: Zlib OR Apache-2.0 OR MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
+- `objc2-core-video@0.3.2` — License: Zlib OR Apache-2.0 OR MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
 - `objc2-encode@4.1.0` — License: MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
 - `objc2-exception-helper@0.1.1` — License: Zlib OR Apache-2.0 OR MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
 - `objc2-foundation@0.3.2` — License: MIT — Source: https://github.com/madsmtm/objc2 — Text: (包内未随附独立文本文件)
