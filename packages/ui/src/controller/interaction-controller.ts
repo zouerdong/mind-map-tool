@@ -14,7 +14,12 @@ import type {
 } from "@mindmap/core";
 import { remapRunsForTextChange } from "./runs-remap.js";
 
-export type MeasureText = (text: string, fontId: FontToken, kicker?: string, runs?: TextRun[]) => Size;
+export type MeasureText = (
+  text: string,
+  fontId: FontToken,
+  kicker?: string,
+  runs?: TextRun[],
+) => Size;
 
 export interface InteractionControllerDeps {
   nextNodeId(): string;

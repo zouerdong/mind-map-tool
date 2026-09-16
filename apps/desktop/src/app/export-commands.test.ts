@@ -27,7 +27,6 @@ function docWithGraph(): MindMapDocumentV1 {
   return doc;
 }
 
-
 describe("exportSuggestedName（PRR-070-R2 §3.1）", () => {
   it("graph-json → .json；视觉格式扩展名不变", () => {
     const fresh = new DocumentSession(emptyDocument());

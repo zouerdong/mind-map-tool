@@ -14,8 +14,14 @@ const { EditorCanvas } = await import("../src/canvas/editor-canvas.js");
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
-  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  regular: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
+  bold: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
 };
 
 function doc(): MindMapDocumentV1 {
@@ -67,22 +73,22 @@ describe("上下文工具条（VRA-050）", () => {
     await selectNode("b");
     fireEvent.click(screen.getByTitle("字号 +2"));
     await waitFor(() => {
-      expect(
-        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
-      ).toEqual([{ start: 0, end: 2, fontSize: 18 }]);
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.runs).toEqual([
+        { start: 0, end: 2, fontSize: 18 },
+      ]);
     });
     fireEvent.click(screen.getByTitle("整节点粗体"));
     await waitFor(() => {
-      expect(
-        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
-      ).toEqual([{ start: 0, end: 2, fontSize: 18, bold: true }]);
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.runs).toEqual([
+        { start: 0, end: 2, fontSize: 18, bold: true },
+      ]);
     });
     // 再点粗体关闭：字号仍保留（显式 false 不丢其他属性）
     fireEvent.click(screen.getByTitle("整节点粗体"));
     await waitFor(() => {
-      expect(
-        session.current.document.document.nodes.find((x) => x.id === "b")?.runs,
-      ).toEqual([{ start: 0, end: 2, fontSize: 18, bold: false }]);
+      expect(session.current.document.document.nodes.find((x) => x.id === "b")?.runs).toEqual([
+        { start: 0, end: 2, fontSize: 18, bold: false },
+      ]);
     });
   });
 
@@ -157,9 +163,9 @@ describe("上下文工具条（VRA-050）", () => {
     await waitFor(() => {
       expect(session.current.document.document.font).toBe("noto-sans-sc");
       expect(screen.getByText("起点").getAttribute("font-family")).toContain("Noto Sans SC");
-      expect(
-        session.current.document.document.nodes.find((n) => n.id === "a")?.size.width,
-      ).toBe(widthBefore);
+      expect(session.current.document.document.nodes.find((n) => n.id === "a")?.size.width).toBe(
+        widthBefore,
+      );
     });
   });
 

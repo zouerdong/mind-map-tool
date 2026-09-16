@@ -98,9 +98,10 @@ describe("remapRunsForTextChange", () => {
 
 describe("uniformRunsStyle", () => {
   it("整节点统一 runs → 编辑态渲染样式", () => {
-    expect(
-      uniformRunsStyle([{ start: 0, end: 4, bold: true, fontSize: 20 }], 4),
-    ).toEqual({ bold: true, fontSize: 20 });
+    expect(uniformRunsStyle([{ start: 0, end: 4, bold: true, fontSize: 20 }], 4)).toEqual({
+      bold: true,
+      fontSize: 20,
+    });
   });
 
   it("混合/部分覆盖 runs → null（编辑态退回纯文本渲染）", () => {

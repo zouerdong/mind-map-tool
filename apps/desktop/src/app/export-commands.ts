@@ -147,7 +147,10 @@ async function renderAndCommit(
     if (frozen.bytes !== null) bytes = frozen.bytes;
     else if (format === "svg") bytes = await deps.renderer.renderSvg(frozen.scene);
     else if (format === "png")
-      bytes = await deps.renderer.renderPng(await deps.renderer.renderSvg(frozen.scene), frozen.scene);
+      bytes = await deps.renderer.renderPng(
+        await deps.renderer.renderSvg(frozen.scene),
+        frozen.scene,
+      );
     else bytes = await deps.renderer.renderPdf(frozen.scene);
   } catch (e) {
     return toError(e);

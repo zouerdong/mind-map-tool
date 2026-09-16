@@ -58,8 +58,7 @@ export function OnboardingFlow({
         if (warning) onPreferenceWarning?.(warning);
         // OFR-2026-09-14 #7：首次使用（not-started）按 presentOnFirstRun
         // 自动呈现 welcome；其余状态仍遵 presentRestoredState。
-        const present =
-          status === "not-started" && presentOnFirstRun ? true : presentRestoredState;
+        const present = status === "not-started" && presentOnFirstRun ? true : presentRestoredState;
         dispatch({ type: "restore", status, present });
         // 用户可能在异步偏好读取完成前已调用显式入口；restore 之后重放
         // show，避免启动策略把刚打开的引导再次隐藏。

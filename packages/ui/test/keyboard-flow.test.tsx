@@ -25,8 +25,14 @@ beforeAll(() => {
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
-  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  regular: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
+  bold: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
 };
 
 function setup() {

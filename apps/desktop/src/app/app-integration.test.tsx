@@ -314,9 +314,7 @@ describe("Graph JSON 导出（PRR-070-R2：第四格式，不进渲染管线）"
     fireEvent.keyDown(window, { key: "e", metaKey: true });
     await waitFor(() => expect(screen.getByText(/已导出 \/out\/nofont\.json/)).toBeTruthy());
     expect(renderer.rendered.length).toBe(0); // 渲染管线零调用
-    const graph = JSON.parse(
-      new TextDecoder().decode(filePort.files.get("/out/nofont.json")!),
-    );
+    const graph = JSON.parse(new TextDecoder().decode(filePort.files.get("/out/nofont.json")!));
     expect(graph.graph.nodes[0].text).toBe("打开的文档");
   });
 

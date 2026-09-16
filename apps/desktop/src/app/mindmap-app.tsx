@@ -362,7 +362,6 @@ export function MindMapApp({ ports }: MindMapAppProps) {
     bump();
   }, [bump, deps, geometryBarrier, reportSaveResult, session]);
 
-
   // ---- 原生关闭三分支控制器（MRT-003 / CR-003）----
   // host fail-closed 持有 pending request；此处只做应答：clean 直接放行；
   // dirty 弹 Save/Discard/Cancel；pending save 受控等待现有保存链自然终态。
@@ -517,52 +516,49 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       setCloseError(e instanceof Error ? e.message : String(e));
     }
   }, [applyCloseState, closePort]);
-  const onStoreAs = useCallback(
-    async () => {
-      try {
-        // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
-        // 必须包含未提交的编辑中文字）。
-        activeEditorRef.current?.flush();
-        // 仅存在待提交几何时才必须收敛 barrier（PRC-025：fallback 尺寸绝不
-        // 落盘）；无待提交几何但字体资源失败时，文档/Graph JSON 使用既有
-        // core 数据不依赖字体（§3.4），视觉格式由 renderer buildScene 结构化
-        // 失败收口——不在此粗粒度拦截。
-        if (geometryBarrier.hasPendingIntents()) await geometryBarrier.flush();
-      } catch (e) {
-        setNotice({
-          tone: "error",
-          text: `字体资源加载失败，无法存储为：${e instanceof Error ? e.message : String(e)}`,
-        });
-        return;
-      }
-      // OFR-2026-09-15 出口合并（PRD §8.2）：另存为与导出同一原生面板，
-      // 按所选格式路由文档授权或导出授权；未保存文档选导出格式时 host 已
-      // 签发同名 .mindmap 兜底授权，导出成功后补写并绑定为文档目标。
-      const result = await unifiedSaveFlow(session, {
-        filePort: ports.filePort,
-        renderer: ports.renderer,
+  const onStoreAs = useCallback(async () => {
+    try {
+      // 当前编辑文字先 flush（所有格式共用——Graph JSON 的 snapshot 同样
+      // 必须包含未提交的编辑中文字）。
+      activeEditorRef.current?.flush();
+      // 仅存在待提交几何时才必须收敛 barrier（PRC-025：fallback 尺寸绝不
+      // 落盘）；无待提交几何但字体资源失败时，文档/Graph JSON 使用既有
+      // core 数据不依赖字体（§3.4），视觉格式由 renderer buildScene 结构化
+      // 失败收口——不在此粗粒度拦截。
+      if (geometryBarrier.hasPendingIntents()) await geometryBarrier.flush();
+    } catch (e) {
+      setNotice({
+        tone: "error",
+        text: `字体资源加载失败，无法存储为：${e instanceof Error ? e.message : String(e)}`,
       });
-      if (result.kind === "ok") {
-        bump();
-        if (result.format === "mindmap") {
-          reportSaveResult({ kind: "ok", value: { receipt: result.receipt } });
-        } else {
-          session.notifyExported();
-          if (result.backupPath !== undefined) session.notifySaved(); // 兜底源文件已落盘
-          setNotice({
-            tone: "info",
-            text:
-              result.backupPath !== undefined
-                ? `已导出 ${result.exportPath}；已同时保留可编辑源文件 ${result.backupPath}`
-                : `已导出 ${result.exportPath}`,
-          });
-        }
-      } else if (result.kind !== "cancelled") {
-        setNotice({ tone: "error", text: result.message });
+      return;
+    }
+    // OFR-2026-09-15 出口合并（PRD §8.2）：另存为与导出同一原生面板，
+    // 按所选格式路由文档授权或导出授权；未保存文档选导出格式时 host 已
+    // 签发同名 .mindmap 兜底授权，导出成功后补写并绑定为文档目标。
+    const result = await unifiedSaveFlow(session, {
+      filePort: ports.filePort,
+      renderer: ports.renderer,
+    });
+    if (result.kind === "ok") {
+      bump();
+      if (result.format === "mindmap") {
+        reportSaveResult({ kind: "ok", value: { receipt: result.receipt } });
+      } else {
+        session.notifyExported();
+        if (result.backupPath !== undefined) session.notifySaved(); // 兜底源文件已落盘
+        setNotice({
+          tone: "info",
+          text:
+            result.backupPath !== undefined
+              ? `已导出 ${result.exportPath}；已同时保留可编辑源文件 ${result.backupPath}`
+              : `已导出 ${result.exportPath}`,
+        });
       }
-    },
-    [bump, geometryBarrier, ports.filePort, ports.renderer, reportSaveResult, session],
-  );
+    } else if (result.kind !== "cancelled") {
+      setNotice({ tone: "error", text: result.message });
+    }
+  }, [bump, geometryBarrier, ports.filePort, ports.renderer, reportSaveResult, session]);
 
   // 全局热键设置（MM-088；默认 ⌥Space，键位专项讨论定稿 2026-08-29）。
   const openShortcutPanel = useCallback(async () => {

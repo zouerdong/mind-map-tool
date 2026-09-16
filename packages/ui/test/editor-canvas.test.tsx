@@ -7,7 +7,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DocumentSession, emptyDocument, makeStateNode, type MindMapDocumentV1, type OrganizeCommandResult } from "@mindmap/core";
+import {
+  DocumentSession,
+  emptyDocument,
+  makeStateNode,
+  type MindMapDocumentV1,
+  type OrganizeCommandResult,
+} from "@mindmap/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 
 vi.mock("@xyflow/react", () => import("./helpers/rf-stub.js").then((m) => m.rfStubModule()));
@@ -18,8 +24,14 @@ const { makeDoc } = await import("./projection.test.js");
 afterEach(cleanup);
 
 const fakeFonts: FontResolver = {
-  regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
-  bold: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+  regular: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
+  bold: () => ({
+    advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+    ascentRatio: 0.8,
+  }),
 };
 
 function renderCanvas(extra?: { revision?: number }) {
@@ -285,14 +297,24 @@ describe("EditorCanvas", () => {
     const before = [posOf(0), posOf(1)];
 
     rerender(
-      <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={1} onOrganizeResult={onResult} />,
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={1}
+        onOrganizeResult={onResult}
+      />,
     );
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
     expect(onResult.mock.calls[0]![0].status).toBe("moved");
 
     // 第二次触发 = 还原（开关语义）
     rerender(
-      <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={2} onOrganizeResult={onResult} />,
+      <EditorCanvas
+        session={session}
+        fonts={fakeFonts}
+        organizeSignal={2}
+        onOrganizeResult={onResult}
+      />,
     );
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2));
     expect(onResult.mock.calls[1]![0].status).toBe("restored");
@@ -388,21 +410,36 @@ describe("EditorCanvas", () => {
       const session = new DocumentSession(makeStateNode(doc).document);
       const onResult = vi.fn();
       const { rerender } = render(
-        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={0} onOrganizeResult={onResult} />,
+        <EditorCanvas
+          session={session}
+          fonts={fakeFonts}
+          organizeSignal={0}
+          onOrganizeResult={onResult}
+        />,
       );
       const edge = await screen.findByTestId("rf-edge-e1");
       // 散乱初态：无自定义 pathD（mind-edge 回退 getBezierPath 贝塞尔曲线）
       await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
 
       rerender(
-        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={1} onOrganizeResult={onResult} />,
+        <EditorCanvas
+          session={session}
+          fonts={fakeFonts}
+          organizeSignal={1}
+          onOrganizeResult={onResult}
+        />,
       );
       await waitFor(() => expect(onResult.mock.calls.length).toBe(1));
       // 整理态：正交圆角折线（L/Q，无贝塞尔 C）
       await waitFor(() => expect(edge.getAttribute("data-path") ?? "").not.toContain("C"));
 
       rerender(
-        <EditorCanvas session={session} fonts={fakeFonts} organizeSignal={2} onOrganizeResult={onResult} />,
+        <EditorCanvas
+          session={session}
+          fonts={fakeFonts}
+          organizeSignal={2}
+          onOrganizeResult={onResult}
+        />,
       );
       await waitFor(() => expect(onResult.mock.calls.length).toBe(2));
       expect(onResult.mock.calls[1]![0].status).toBe("restored");
@@ -487,12 +524,19 @@ describe("EditorCanvas", () => {
     doc.document.font = "lxgw-wenkai";
     doc.document.nodes[0]!.runs = [{ start: 0, end: 3, bold: true }];
     const wenkaiFonts: FontResolver = {
-      regular: () => ({ advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 }),
+      regular: () => ({
+        advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2),
+        ascentRatio: 0.8,
+      }),
       // 文楷无真粗体（与生产 FontResolver 一致）
       bold: (fontId) =>
         fontId === "lxgw-wenkai"
           ? null
-          : { advance: (ch: string, size: number) => (ch.codePointAt(0)! > 0x2e7f ? size : size / 2), ascentRatio: 0.8 },
+          : {
+              advance: (ch: string, size: number) =>
+                ch.codePointAt(0)! > 0x2e7f ? size : size / 2,
+              ascentRatio: 0.8,
+            },
     };
     const session = new DocumentSession(makeStateNode(doc).document);
     render(<EditorCanvas session={session} fonts={wenkaiFonts} />);
@@ -602,9 +646,7 @@ describe("EditorCanvas", () => {
     render(<EditorCanvas session={session} fonts={fakeFonts} />);
     const pane = screen.getByTestId("rf-pane");
     fireEvent.doubleClick(pane, { clientX: 200, clientY: 160 });
-    await waitFor(() =>
-      expect(session.current.document.document.nodes[0]?.emphasis).toBe(true),
-    );
+    await waitFor(() => expect(session.current.document.document.nodes[0]?.emphasis).toBe(true));
     // 取消编辑退出后创建第二个节点 → 普通角色
     fireEvent.keyDown(await screen.findByLabelText("编辑节点文本"), { key: "Escape" });
     fireEvent.doubleClick(pane, { clientX: 420, clientY: 300 });
@@ -620,9 +662,7 @@ describe("EditorCanvas", () => {
     fireEvent.keyDown(canvasHost, { key: "Backspace" });
     await waitFor(() => expect(session.current.document.document.nodes.length).toBe(0));
     fireEvent.doubleClick(screen.getByTestId("rf-pane"), { clientX: 300, clientY: 220 });
-    await waitFor(() =>
-      expect(session.current.document.document.nodes[0]?.emphasis).toBe(true),
-    );
+    await waitFor(() => expect(session.current.document.document.nodes[0]?.emphasis).toBe(true));
   });
 
   it("OFR-2026-09-14 #1：编辑器 textarea 携带 nodrag（全选后单击可放置光标）", async () => {

@@ -31,10 +31,7 @@ import {
   type FilePort,
   type OpenedDocument,
 } from "@mindmap/platform";
-import {
-  exportWithGrant,
-  type ExportRendererLike,
-} from "./export-commands.js";
+import { exportWithGrant, type ExportRendererLike } from "./export-commands.js";
 
 export type FlowResult<T = undefined> =
   | ({ kind: "ok" } & (T extends undefined ? Record<string, never> : { value: T }))

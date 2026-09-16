@@ -286,15 +286,15 @@ export function EditorCanvas({
       const moves: Array<{ id: string; position: Point }> = [];
       for (const [id, pos] of snapshot) {
         const n = doc.document.nodes.find((node) => node.id === id);
-        if (
-          n &&
-          (Math.abs(n.position.x - pos.x) > 1e-6 || Math.abs(n.position.y - pos.y) > 1e-6)
-        ) {
+        if (n && (Math.abs(n.position.x - pos.x) > 1e-6 || Math.abs(n.position.y - pos.y) > 1e-6)) {
           moves.push({ id, position: { x: pos.x, y: pos.y } });
         }
       }
-      if (snapshot.size > 0 && moves.length === 0 &&
-          !doc.document.nodes.some((n) => snapshot.has(n.id))) {
+      if (
+        snapshot.size > 0 &&
+        moves.length === 0 &&
+        !doc.document.nodes.some((n) => snapshot.has(n.id))
+      ) {
         // 零重叠：文档已被替换，快照作废
         preOrganizeRef.current = null;
         organizedRef.current = false;
@@ -689,7 +689,12 @@ export function EditorCanvas({
           ...(isOrigin ? { emphasis: true } : {}),
         });
         setPendingNodes((prev) =>
-          new Map(prev).set(id, { id, position: point, text: "", ...(isOrigin ? { emphasis: true } : {}) }),
+          new Map(prev).set(id, {
+            id,
+            position: point,
+            text: "",
+            ...(isOrigin ? { emphasis: true } : {}),
+          }),
         );
         setEditingId(id);
       } else {
@@ -844,7 +849,12 @@ export function EditorCanvas({
         ...(isOrigin ? { emphasis: true } : {}),
       });
       setPendingNodes((prev) =>
-        new Map(prev).set(id, { id, position: pos, text: "", ...(isOrigin ? { emphasis: true } : {}) }),
+        new Map(prev).set(id, {
+          id,
+          position: pos,
+          text: "",
+          ...(isOrigin ? { emphasis: true } : {}),
+        }),
       );
       setFocusNodeId(id);
       beginEdit(id);

@@ -182,7 +182,11 @@ describe("节点测量（kicker + runs 正文，UI/导出同源）", () => {
     expect(latin.lines.map((l) => l.segments.map((s2) => s2.text).join("")).join("")).toBe(
       "alpha beta gamma delta epsilon zeta",
     );
-    expect(latin.lines[0]!.segments.map((s2) => s2.text).join("").endsWith(" ")).toBe(true);
+    expect(
+      latin.lines[0]!.segments.map((s2) => s2.text)
+        .join("")
+        .endsWith(" "),
+    ).toBe(true);
     // CJK 硬折：14 字/行（14×16=224≤228，15×16=240>228）
     const cjkText = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十"; // 30 字
     const cjk = layoutNodeVisual({ text: cjkText }, "card", "noto-sans-sc", fonts);

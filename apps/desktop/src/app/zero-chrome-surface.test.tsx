@@ -139,11 +139,15 @@ describe("DFR-030：ADR 0012 v1.1.0 状态化轻量元素（from-user 2026-09-13
     expect(fab.textContent).toContain("整理");
     fireEvent.click(fab);
     await waitFor(() => expect(screen.getByText(/已整理为分层布局/)).toBeTruthy());
-    await waitFor(() => expect(screen.getByTestId("organize-fab").textContent).toContain("还原布局"));
+    await waitFor(() =>
+      expect(screen.getByTestId("organize-fab").textContent).toContain("还原布局"),
+    );
 
     fireEvent.click(screen.getByTestId("organize-fab"));
     await waitFor(() => expect(screen.getByText(/已还原到整理前的布局/)).toBeTruthy());
-    await waitFor(() => expect(screen.getByTestId("organize-fab").textContent).toContain("整理 ⇧⌘L"));
+    await waitFor(() =>
+      expect(screen.getByTestId("organize-fab").textContent).toContain("整理 ⇧⌘L"),
+    );
   });
 });
 

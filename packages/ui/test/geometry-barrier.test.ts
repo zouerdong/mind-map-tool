@@ -758,7 +758,12 @@ describe("DFR-090 F1：ready 提交失败的意图保留（与 pending 同规则
     expect(direct.ok).toBe(true);
 
     // 提交失败：意图不得丢失——hasPendingIntents 为 true，用户文本保留
-    await barrier.enqueue({ kind: "create-node", id: "dup", position: { x: 9, y: 9 }, text: "冲突草稿" });
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "dup",
+      position: { x: 9, y: 9 },
+      text: "冲突草稿",
+    });
     expect(onError).toHaveBeenCalledTimes(1);
     expect(barrier.hasPendingIntents()).toBe(true);
     expect(barrier.getPendingIntents()[0]).toMatchObject({
@@ -789,7 +794,12 @@ describe("DFR-090 F1：ready 提交失败的意图保留（与 pending 同规则
       size: { width: 120, height: 50 },
     });
 
-    await barrier.enqueue({ kind: "create-node", id: "dup", position: { x: 9, y: 9 }, text: "冲突" });
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "dup",
+      position: { x: 9, y: 9 },
+      text: "冲突",
+    });
     await expect(barrier.flush()).rejects.toThrow();
     expect(barrier.hasPendingIntents()).toBe(true);
     // 文档未被误改
@@ -805,7 +815,12 @@ describe("DFR-090 F1：ready 提交失败的意图保留（与 pending 同规则
     });
     const barrier = readyBarrier(session, { onError, onCommitted });
 
-    await barrier.enqueue({ kind: "create-node", id: "n1", position: { x: 0, y: 0 }, text: "通知失败" });
+    await barrier.enqueue({
+      kind: "create-node",
+      id: "n1",
+      position: { x: 0, y: 0 },
+      text: "通知失败",
+    });
     expect(onError).toHaveBeenCalledTimes(1);
     // 命令已提交且不得重入队——否则 flush 会以 NODE_ALREADY_EXISTS 重复提交
     expect(barrier.hasPendingIntents()).toBe(false);
