@@ -260,3 +260,14 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 ### 追加：还原布局连同线形态（`c4170b4`，同日闭环）
 
 负责人实机反馈：还原布局只回了位置，连线仍是整理后的折线而非散乱曲线——不算还原。根因：还原提交按"前向命令"走 `start()` 动画通道（lineMorph→1 正交折线驻留）。修复：还原提交经标记改走 undo 同款 `reverseTo()` 通道（位置插值 + lineMorph→0 散乱曲线），含单节点位移场景。单元验证（reduced-motion 确定性）：散乱（无自定义 pathD=贝塞尔）→ 整理（正交折线）→ 还原（pathD 清空回贝塞尔）全链路断言。位置还原的原生精度已在前轮用相对坐标逐点证明；形态切换的原生目视因锁屏未拍到最终帧，由负责人下次整理/还原循环即见（不对再报）。新候选 DMG sha256 `75c61ad16170588b…` 已安装。
+
+### 追加：还原形态被第二跳投影覆盖（`d6dc8cc`，2026-09-16 实机反馈闭环）
+
+负责人实机反馈：还原布局后连线仍是正交折线，`c4170b4` 的 reverseTo 通道在实机不生效。根因（比上轮更深一层）：还原 commit 与 app 侧 `handleOrganizeResult` 的 revision bump 拆成**两次投影运行**——第一跳正确走 `reverseTo()`（morph→0），第二跳紧随 ~1ms 到达时 displayPositions 仍在半途（movedCount≥2）、`restoreMotionRef` 已消费、`canRedo=false` → 误判前向 `start()`（morph→1）覆盖终态。reduced-motion 单元测试同步完成、没有第二跳窗口，所以上轮测试全绿却在实机复现；这也解释了为何"原生目视未拍到最终帧"恰恰漏掉了它。
+
+复现与修复：
+- 先用生产同款接线（`onOrganizeResult` 内 bump revision + 真实 rAF 动画、非 reduced-motion）写一次性复现测试，红：`start` 3 次、`reverseTo` 1 次，还原终态 pathD 仍为正交折线；
+- 修复：`MotionCoordinator` 新增 `isAnimatingDoc()`——core 每次 commit/undo/redo 都产生新文档对象（`applyCommand` 克隆、undo/redo 只移 cursor），引用相等 ⟺ 文档无实质变更；投影动画分支入口遇"同一文档对象的运行中动画"直接跳过重启，不动 `restoreMotion` 消费时序、不改 undo/redo/编辑中途动画的既有重启语义；
+- 复现测试转绿后固化为正式回归（`editor-canvas.test.tsx` OFR-2026-09-16，真实 rAF 约 1.1s），一次性 scratch 文件未入库。
+
+验证：pnpm typecheck / lint 干净；test:unit 733/733 全绿（含 verify-decision 重冻结证据）；新候选 source `d6dc8cc` clean worktree，DMG sha256 `53105e742705d34a…`（ULMO/EULA 装配，bundle-gate PASS），已安装 /Applications。原生目视项不变：负责人做一次整理 ⇧⌘L → 还原 ⇧⌘L 循环，确认连线回散乱曲线。
