@@ -292,3 +292,7 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 **决策与收口（2026-09-16）**：负责人就橙卡字色选择③维持现状（`#331708` 深棕字 / `#D97757` 橙底，5.31:1 合同不变），不登记例外、不改色板；同轮确认拖拽脱节修复（`96a5066`）实机无问题，OFR-2026-09-16 ② 收口。
 
 **G-FINAL 影响**：`e75c5f1` 候选（DMG `6185be46…`）因上述发现不再作为最终发布输入；待两笔收口后重建候选并重走验证链。
+
+## 十五、G-FINAL 第二轮请求（2026-09-16，source `5c634de`）
+
+负责人决策橙卡维持现状并确认拖拽修复后，从 `5c634de`（含 `96a5066`）重建候选并重走全链：源码门 15 项 PASS（test:unit 734）、advisory 0 漏洞、性能 attempt-02 全预算 PASS（sessionFirstLaunch=331.5ms、conditionedColdStartP95=338.8ms、warmP95=348.8ms、RSS=103.1MB、canvasP95=18ms）、原生全路径 32/32 PASS。新候选 DMG sha256 `ebdd644df7701d26…`（24,353,397B，ULMO，未签名），已安装 /Applications。三笔如实披露（均非产品缺陷，详见 macos-native-candidate-report.json）：性能 attempt-01 conditioning 瞬时超时判 INCOMPLETE（未补样，attempt-02 全新独立采样）；原生驱动首跑 S6 SVG 断言为 AX 探针时序抖动（截图证明行为正确，探针容错后重跑 32/32）；首启引导断言临时移除/恢复 onboardingStatus。状态 `WAITING_FOR_OWNER_G_FINAL`；请求与证据见 `.tmp/release-candidate/5c634de93e1f4b5646eb473a90ce1677a15f57a7/`。未签名、未公证、未上传、未发布；PRR-080/090 未派发。
