@@ -475,6 +475,11 @@ export function EditorCanvas({
     const restoreMotion = restoreMotionRef.current;
     restoreMotionRef.current = false;
     if (movedCount >= 2 || restoreMotion || coordinatorRef.current.getPhase() === "running") {
+      // 同一文档对象的重复投影信号（commit 后紧随的外部 revision 第二跳）：
+      // 动画已在向该文档目标位运行，重启会把 reverseTo 的 morph→0 覆盖回
+      // start 的 morph→1——还原后连线仍正交折线的实机根因（OFR-2026-09-16）。
+      // core 每次 commit/undo/redo 产生新文档对象，引用相等 ⟺ 无实质变更。
+      if (coordinatorRef.current.isAnimatingDoc(doc)) return;
       const isUndo = session.canRedo || restoreMotion; // undo 或整理还原导致的重排
       const onFrame = (frame: MotionFrame) => {
         setRfNodes((prevNodes) =>

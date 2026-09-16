@@ -5,8 +5,9 @@
 // RF 内部拖拽/命中/连线手势由库负责且已经 MM-010 Spike 实测。
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DocumentSession, emptyDocument, makeStateNode, type MindMapDocumentV1 } from "@mindmap/core";
+import { DocumentSession, emptyDocument, makeStateNode, type MindMapDocumentV1, type OrganizeCommandResult } from "@mindmap/core";
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 
 vi.mock("@xyflow/react", () => import("./helpers/rf-stub.js").then((m) => m.rfStubModule()));
@@ -411,6 +412,75 @@ describe("EditorCanvas", () => {
       globalThis.matchMedia = originalMatchMedia;
     }
   });
+
+  it("OFR-2026-09-16：生产接线（revision 第二跳 + 真实 rAF 动画）下还原形态不被 start 覆盖", async () => {
+    // 实机根因：还原 commit 与 app 侧 revision bump 拆成两次投影——第一跳
+    // 正确走 reverseTo（morph→0），第二跳 displayPositions 仍在半途、
+    // restoreMotion 已消费、canRedo=false → 误判 start（morph→1），终态
+    // 正交折线。reduced-motion 测试复现不了（同步完成无第二跳窗口），
+    // 必须用真实 rAF + app 同款 onOrganizeResult→bump revision 接线。
+    const doc = makeDoc();
+    doc.document.nodes.push({
+      id: "n3",
+      text: "孙节点",
+      position: { x: 520, y: 240 },
+      size: { width: 120, height: 37 },
+    });
+    doc.document.edges.push({ id: "e2", sourceNodeId: "n2", targetNodeId: "n3" });
+    const session = new DocumentSession(makeStateNode(doc).document);
+
+    function AppHarness() {
+      const [signal, setSignal] = useState(0);
+      const [revision, setRevision] = useState(0);
+      const [statuses, setStatuses] = useState<string[]>([]);
+      const handleResult = (r: OrganizeCommandResult) => {
+        setStatuses((s) => [...s, r.status]);
+        if (r.status === "moved" || r.status === "restored") setRevision((v) => v + 1);
+      };
+      return (
+        <>
+          <button data-testid="organize-btn" onClick={() => setSignal((s) => s + 1)}>
+            organize
+          </button>
+          <span data-testid="statuses">{statuses.join(",")}</span>
+          <EditorCanvas
+            session={session}
+            fonts={fakeFonts}
+            revision={revision}
+            organizeSignal={signal}
+            onOrganizeResult={handleResult}
+          />
+        </>
+      );
+    }
+    render(<AppHarness />);
+
+    const edge = await screen.findByTestId("rf-edge-e1");
+    await waitFor(() => expect(edge.getAttribute("data-path") ?? "").toBe(""));
+
+    // 整理（真实动画 ~800ms）：终态正交折线（无贝塞尔 C）
+    fireEvent.click(screen.getByTestId("organize-btn"));
+    await waitFor(() => expect(screen.getByTestId("statuses").textContent).toContain("moved"));
+    await waitFor(
+      () => {
+        const p = edge.getAttribute("data-path") ?? "";
+        expect(p).not.toBe("");
+        expect(p).not.toContain("C");
+      },
+      { timeout: 3000 },
+    );
+
+    // 还原（真实动画 ~600ms）：终态必须回散乱曲线（pathD 清空或贝塞尔 C）
+    fireEvent.click(screen.getByTestId("organize-btn"));
+    await waitFor(() => expect(screen.getByTestId("statuses").textContent).toContain("restored"));
+    await waitFor(
+      () => {
+        const p = edge.getAttribute("data-path") ?? "";
+        expect(p === "" || p.includes("C")).toBe(true);
+      },
+      { timeout: 3000 },
+    );
+  }, 15000);
 
   it("OFR-2026-09-14 #6：文楷粗体段用描边模拟（无合成粗体，宽度不超出度量）", async () => {
     const doc = makeDoc();

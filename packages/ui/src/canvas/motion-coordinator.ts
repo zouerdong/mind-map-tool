@@ -401,6 +401,17 @@ export class MotionCoordinator {
   }
 
   /**
+   * 是否正在向该文档对象的目标位运行（OFR-2026-09-16 实机返修）。
+   * core 每次 commit/undo/redo 都产生新文档对象，因此引用相等 ⟺ 文档无
+   * 实质变更——此时进入动画分支的只是重复投影信号（如 commit 后紧随的
+   * 外部 revision 第二跳），调用方不得重启动画：重启会把 reverseTo 的
+   * morph→0 覆盖回 start 的 morph→1（还原后连线仍正交折线的根因）。
+   */
+  public isAnimatingDoc(doc: MindMapDocumentV1): boolean {
+    return this.phase === "running" && this.activeDoc === doc;
+  }
+
+  /**
    * 规整态驻留（DFR-020）：整理完成后再次编辑/单节点拖动走的是普通重投影，
    * 不能把连线掉回贝塞尔——用最新 doc（位置/尺寸已变）按驻留 lineMorph
    * 重算整态连线几何。散乱态（morph ≤ 0）返回 null，走投影默认曲线。
