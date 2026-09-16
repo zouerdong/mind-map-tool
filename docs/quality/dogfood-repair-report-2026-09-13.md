@@ -275,3 +275,9 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 ### 追加：还原形态修复负责人实机确认通过（2026-09-16）
 
 负责人对 `d6dc8cc` 候选（DMG sha256 `53105e742705d34a…`）完成整理 ⇧⌘L → 还原 ⇧⌘L 循环目视：连线随还原动画从正交折线回散乱曲线，判定"实现了，可以通过"。OFR-2026-09-16 闭环；2026-09-12 起全部实用反馈项至此均有通过的原生证据。G-FINAL 仍未申请，待负责人明确发起。
+
+## 十三、G-FINAL 请求（2026-09-16，负责人发起）
+
+负责人确认 `d6dc8cc` 候选通过后正式发起 G-FINAL。准备过程中源码门暴露两笔前置欠账并已修复：fd9af9b（09-13 起各轮未跑 format:check 累积的 22 文件 prettier 漂移，机械归零）与 e75c5f1（bd1fdae 引入的 objc2-core-video 未补登 THIRD_PARTY_NOTICES，确定性再生成）。最终候选从 clean HEAD `e75c5f1` 重新构建：DMG sha256 `6185be46b252281a…`（24,353,137B，ULMO，CRC32 VALID，EULA 绑定，未签名），已安装 /Applications。
+
+证据链（全部绑定该候选）：源码门 14 项 PASS（test:unit 733/733；fd9af9b 首跑曾出现 F1-a 计时 flake，隔离重跑 132/132、完整重跑全绿）；JS/Rust advisory 0 漏洞（cargo-audit db 1246 条）；性能 20 样本 overall PASS（sessionFirstLaunch=3005.2ms record-only、conditionedColdStartP95=325.7ms、warmP95=339.3ms、RSS=105.5MB、canvasP95=18ms、saveP95=14ms、PNG P95=1594ms）；原生全路径 32/32 PASS（首启引导断言需 not-started 偏好，运行前临时移除负责人试用留下的 onboardingStatus=completed、运行后逐字节恢复）。请求与报告：`.tmp/release-candidate/e75c5f16e2a29ea300723930fe1de3a89e9fc726/g-final-request.md/json`、`macos-native-candidate-report.json`。状态 `WAITING_FOR_OWNER_G_FINAL`；未签名、未公证、未上传、未发布；PRR-080/090 未派发。

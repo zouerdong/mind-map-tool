@@ -1,5 +1,7 @@
 # Planning
 
+2026-09-16 G-FINAL 请求已生成：`WAITING_FOR_OWNER_G_FINAL`。候选 source `e75c5f1`（含两个 G-FINAL 前置提交：fd9af9b prettier 漂移归零、e75c5f1 notices 补登），DMG sha256 `6185be46b252281a…`，已安装 /Applications。源码门 14 项、advisory、性能 20 样本（conditionedColdStartP95=325.7ms）、原生全路径 32/32 全部 PASS；证据与请求见 `.tmp/release-candidate/e75c5f16e2a29ea300723930fe1de3a89e9fc726/`（g-final-request.md/json + macos-native-candidate-report.json）。待负责人按请求内格式给出 [from-user] 原文后方进入阶段 B 记录 g-final.json；PRR-080/090 未派发。
+
 2026-09-16 OFR 收口：`还原形态被第二跳投影覆盖已修复（d6dc8cc）/ 负责人实机目视确认通过 / 待 G-FINAL 决策`。根因为还原 commit 与 app 侧 revision bump 拆成两次投影：第二跳把 reverseTo（morph→0）覆盖回 start（morph→1）；修复为同一文档对象的运行中动画不重启。test:unit 733/733 全绿。候选 source `d6dc8cc`，DMG sha256 `53105e742705d34a…` 已安装并经验收。详见[报告 §十二末两条](../quality/dogfood-repair-report-2026-09-13.md)。2026-09-12 起全部实用反馈项闭环；G-FINAL 未申请，待负责人明确发起。
 
 2026-09-15 出口合并轮：`保存/另存为/导出已合并为统一「存储为…」面板 / 原生全路径 32/32 PASS / 候选已安装待体验`。保存仅 .mindmap；统一面板五格式分组；未保存文档选导出格式自动补写同名源文件。Graph JSON 导出改用纯 .json 扩展名。详见[报告 §十二](../quality/dogfood-repair-report-2026-09-13.md)。verify-decision 证据已按方案 B 迁入版本库并重冻结，test:unit 726/726 全绿。
