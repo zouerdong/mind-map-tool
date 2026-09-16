@@ -525,12 +525,8 @@ pub async fn platform_request_unified_save_authorization(
         let parent = window.ns_window().map_err(|e| {
             crate::file::error::IpcError::new("FILE_IO_ERROR", format!("窗口句柄不可用：{e}"))
         })?;
-        let Some(choice) = save_panel::pick_unified_save_target(
-            &app,
-            parent,
-            &suggested_name,
-            document_saved,
-        )?
+        let Some(choice) =
+            save_panel::pick_unified_save_target(&app, parent, &suggested_name, document_saved)?
         else {
             return Ok(None); // 用户取消
         };

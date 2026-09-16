@@ -82,7 +82,7 @@ mod imp {
     use objc2::runtime::AnyObject;
     use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
-        NSModalResponseOK, NSMenuItem, NSPopUpButton, NSSavePanel, NSTextField, NSView, NSWindow,
+        NSMenuItem, NSModalResponseOK, NSPopUpButton, NSSavePanel, NSTextField, NSView, NSWindow,
     };
     use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString};
 
@@ -101,7 +101,7 @@ mod imp {
 
     impl UnifiedFormat {
         /// 稳定扩展名；Graph JSON 为 `.json`（OFR-2026-09-15：保存侧已无 .json
-    /// 文档选项，导出语境无歧义；AppKit 不能无损显示双段扩展名）。
+        /// 文档选项，导出语境无歧义；AppKit 不能无损显示双段扩展名）。
         pub fn ext(self) -> &'static str {
             match self {
                 Self::Mindmap => "mindmap",
@@ -211,8 +211,7 @@ mod imp {
         let parent_addr = parent_ns_window as usize;
         app.run_on_main_thread(move || {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let mtm =
-                    MainThreadMarker::new().expect("run_on_main_thread 必须在主线程执行");
+                let mtm = MainThreadMarker::new().expect("run_on_main_thread 必须在主线程执行");
                 // SAFETY: 指针来自 tauri WebviewWindow::ns_window()；调用方在
                 // 命令线程阻塞等待结果，窗口在面板 modal 期间保持存活。
                 let parent = unsafe { Retained::retain(parent_addr as *mut NSWindow) };
@@ -292,10 +291,8 @@ mod imp {
             // 五种单段扩展名均为合法输入；允许其他类型透传（用户手改扩展名
             // 不被改写）——最终落盘路径由 host 按选择器格式规范化
             //（normalize_path_for_format）。
-            let allowed: Vec<Retained<NSString>> = KNOWN_EXTS
-                .iter()
-                .map(|e| NSString::from_str(e))
-                .collect();
+            let allowed: Vec<Retained<NSString>> =
+                KNOWN_EXTS.iter().map(|e| NSString::from_str(e)).collect();
             #[allow(deprecated)]
             panel.setAllowedFileTypes(Some(&NSArray::from_retained_slice(&allowed)));
             panel.setAllowsOtherFileTypes(true);
@@ -307,7 +304,10 @@ mod imp {
                 NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(340.0, 72.0)),
             );
             let label = NSTextField::labelWithString(&NSString::from_str("格式："), mtm);
-            label.setFrame(NSRect::new(NSPoint::new(0.0, 46.0), NSSize::new(46.0, 22.0)));
+            label.setFrame(NSRect::new(
+                NSPoint::new(0.0, 46.0),
+                NSSize::new(46.0, 22.0),
+            ));
             let popup = NSPopUpButton::initWithFrame_pullsDown(
                 mtm.alloc(),
                 NSRect::new(NSPoint::new(48.0, 43.0), NSSize::new(280.0, 27.0)),
@@ -330,16 +330,23 @@ mod imp {
                 &NSString::from_str("导出格式不能重新打开编辑；"),
                 mtm,
             );
-            hint1.setFrame(NSRect::new(NSPoint::new(0.0, 18.0), NSSize::new(292.0, 16.0)));
+            hint1.setFrame(NSRect::new(
+                NSPoint::new(0.0, 18.0),
+                NSSize::new(292.0, 16.0),
+            ));
             let hint2 = NSTextField::labelWithString(
                 &NSString::from_str("将同时保留可编辑源文件（.mindmap）"),
                 mtm,
             );
-            hint2.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(292.0, 16.0)));
+            hint2.setFrame(NSRect::new(
+                NSPoint::new(0.0, 0.0),
+                NSSize::new(292.0, 16.0),
+            ));
             hint_box.addSubview(&hint1);
             hint_box.addSubview(&hint2);
             hint_box.setHidden(true); // 初始为文档格式，提示不显示
-            let delegate = FormatDelegate::new(mtm, panel.clone(), hint_box.clone(), document_saved);
+            let delegate =
+                FormatDelegate::new(mtm, panel.clone(), hint_box.clone(), document_saved);
             unsafe {
                 // SAFETY: delegate 存活至 runModal 返回（下方 drop），panel 持有
                 // accessory view；NSControl 的 target 为弱引用，生命周期已覆盖。

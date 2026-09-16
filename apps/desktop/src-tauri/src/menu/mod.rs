@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn native_accelerators_match_shortcut_contract() {
-    assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
+        assert_eq!(ACCEL_FILE_CLOSE_WINDOW, "CmdOrCtrl+W");
         assert_eq!(ACCEL_EDIT_UNDO, "CmdOrCtrl+Z");
         assert_eq!(ACCEL_EDIT_REDO, "CmdOrCtrl+Shift+Z");
     }
