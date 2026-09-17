@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-技术选型已由 G1 批准（2026-08-26）：**Tauri 2 + React/TypeScript + React Flow + web-ts-wasm 导出（SVG/2x PNG/PDF）**；字体 Noto Sans SC（基础）+ 霞鹜文楷（手写可选）。Bootstrap（MM-020）已完成，正在按任务卡实现各模块。尚未公开发布。
+技术选型已由 G1 批准（2026-08-26）：**Tauri 2 + React/TypeScript + React Flow + web-ts-wasm 导出（SVG/2x PNG/PDF）**；字体 Noto Sans SC（基础）+ 霞鹜文楷（手写可选）。2026-09-17 起新增 Agent 无头导出接口（ADR 0014：MCP stdio + 树状大纲 → 脑图文件，默认 PNG）。尚未公开发布（首发将改为开源发布，日期待定）。
 
 ## 标准命令（唯一来源）
 
