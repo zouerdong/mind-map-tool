@@ -46,6 +46,9 @@ const FORBIDDEN_IN_CORE = [
 const FORBIDDEN_IN_EXPORT = ["react", "react-dom", "@xyflow/react", "@tauri-apps/api"];
 const FORBIDDEN_IN_PLATFORM = ["react", "react-dom", "@xyflow/react"];
 const FORBIDDEN_IN_UI = ["@tauri-apps/api", "electron", "tauri"];
+// ADR 0014：无头包与 MCP bridge 同为宿主适配层，禁 UI/桌面框架依赖
+const FORBIDDEN_IN_HEADLESS = ["react", "react-dom", "@xyflow/react", "@tauri-apps/api"];
+const FORBIDDEN_IN_MCP_BRIDGE = ["react", "react-dom", "@xyflow/react", "@tauri-apps/api"];
 
 async function assertDeps(pkgRel, forbidden, label) {
   const pkg = await readPkg(pkgRel);
@@ -60,6 +63,8 @@ await assertDeps("packages/core/package.json", FORBIDDEN_IN_CORE, "packages/core
 await assertDeps("packages/export/package.json", FORBIDDEN_IN_EXPORT, "packages/export");
 await assertDeps("packages/platform/package.json", FORBIDDEN_IN_PLATFORM, "packages/platform");
 await assertDeps("packages/ui/package.json", FORBIDDEN_IN_UI, "packages/ui");
+await assertDeps("packages/headless/package.json", FORBIDDEN_IN_HEADLESS, "packages/headless");
+await assertDeps("apps/mcp-bridge/package.json", FORBIDDEN_IN_MCP_BRIDGE, "apps/mcp-bridge");
 
 // source-level scan: banned imports in core/export/platform
 const BANNED_IMPORT_PATTERNS = {

@@ -22,6 +22,8 @@ const SCAN_DIRS = [
   "packages/export/src",
   "packages/ui/src",
   "packages/platform/src",
+  "packages/headless/src",
+  "apps/mcp-bridge/src",
   "apps/desktop/src",
   "apps/desktop/src-tauri/src",
 ];

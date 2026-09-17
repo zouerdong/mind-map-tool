@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mindmap": {
+      "command": "pnpm",
+      "args": ["--filter", "@mindmap/mcp-bridge", "--silent", "start"],
+      "description": "Mind Map 无头导出：树状大纲 → 脑图文件（默认 PNG 2x，ADR 0014）"
+    }
+  }
+}

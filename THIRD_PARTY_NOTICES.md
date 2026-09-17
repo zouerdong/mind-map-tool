@@ -6,7 +6,7 @@ Mind Map Tool（© 2026 ErDong Zou，专有软件 / All Rights Reserved，见根
 由 `scripts/quality/generate-third-party-notices.mjs` 从 pnpm store、`cargo metadata --locked`
 与 `assets/fonts/` 登记确定性生成；`pnpm license:scan` 校验每个条目均被覆盖）。
 
-- JavaScript packages（direct + transitive）：306
+- JavaScript packages（direct + transitive）：391
 - Cargo packages：487
 - Fonts / license texts：4
 
@@ -56,6 +56,7 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `@csstools/css-tokenizer@3.0.4` — License: MIT — Source: https://github.com/csstools/postcss-plugins — Text: node_modules/.pnpm/@asamuzakjp+css-color@3.2.0/node_modules/@csstools/css-tokenizer/LICENSE.md
 - `@esbuild/darwin-arm64@0.21.5` — License: MIT — Source: https://github.com/evanw/esbuild — Text: (包内未随附独立文本文件)
 - `@esbuild/darwin-arm64@0.25.12` — License: MIT — Source: https://github.com/evanw/esbuild — Text: (包内未随附独立文本文件)
+- `@esbuild/darwin-arm64@0.28.2` — License: MIT — Source: https://github.com/evanw/esbuild — Text: (包内未随附独立文本文件)
 - `@eslint-community/eslint-utils@4.10.1` — License: MIT — Source: https://github.com/eslint-community/eslint-utils — Text: node_modules/.pnpm/@eslint-community+eslint-utils@4.10.1_eslint@9.39.5/node_modules/@eslint-community/eslint-utils/LICENSE
 - `@eslint-community/regexpp@4.12.2` — License: MIT — Source: https://github.com/eslint-community/regexpp — Text: node_modules/.pnpm/@eslint-community+regexpp@4.12.2/node_modules/@eslint-community/regexpp/LICENSE
 - `@eslint/config-array@0.21.2` — License: Apache-2.0 — Source: https://github.com/eslint/rewrite — Text: node_modules/.pnpm/@eslint+config-array@0.21.2/node_modules/@eslint/config-array/LICENSE
@@ -65,6 +66,7 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 ★ - `@eslint/js@9.39.5` — License: MIT — Source: https://github.com/eslint/eslint — Text: node_modules/.pnpm/@eslint+js@9.39.5/node_modules/@eslint/js/LICENSE
 - `@eslint/object-schema@2.1.7` — License: Apache-2.0 — Source: https://github.com/eslint/rewrite — Text: node_modules/.pnpm/@eslint+config-array@0.21.2/node_modules/@eslint/object-schema/LICENSE
 - `@eslint/plugin-kit@0.4.1` — License: Apache-2.0 — Source: https://github.com/eslint/rewrite — Text: node_modules/.pnpm/@eslint+plugin-kit@0.4.1/node_modules/@eslint/plugin-kit/LICENSE
+- `@hono/node-server@2.1.1` — License: MIT — Source: https://github.com/honojs/node-server — Text: node_modules/.pnpm/@hono+node-server@2.1.1_hono@4.13.8/node_modules/@hono/node-server/LICENSE
 - `@humanfs/core@0.19.2` — License: Apache-2.0 — Source: https://github.com/humanwhocodes/humanfs — Text: node_modules/.pnpm/@humanfs+core@0.19.2/node_modules/@humanfs/core/LICENSE
 - `@humanfs/node@0.16.8` — License: Apache-2.0 — Source: https://github.com/humanwhocodes/humanfs — Text: node_modules/.pnpm/@humanfs+node@0.16.8/node_modules/@humanfs/node/LICENSE
 - `@humanfs/types@0.15.0` — License: Apache-2.0 — Source: https://github.com/humanwhocodes/humanfs — Text: (包内未随附独立文本文件)
@@ -76,6 +78,7 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `@jridgewell/source-map@0.3.11` — License: MIT — Source: https://github.com/jridgewell/sourcemaps — Text: node_modules/.pnpm/@jridgewell+source-map@0.3.11/node_modules/@jridgewell/source-map/LICENSE
 - `@jridgewell/sourcemap-codec@1.5.5` — License: MIT — Source: https://github.com/jridgewell/sourcemaps — Text: node_modules/.pnpm/@jridgewell+gen-mapping@0.3.13/node_modules/@jridgewell/sourcemap-codec/LICENSE
 - `@jridgewell/trace-mapping@0.3.31` — License: MIT — Source: https://github.com/jridgewell/sourcemaps — Text: node_modules/.pnpm/@babel+generator@7.29.8/node_modules/@jridgewell/trace-mapping/LICENSE
+- `@modelcontextprotocol/sdk@1.30.0` — License: MIT — Source: https://github.com/modelcontextprotocol/typescript-sdk — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/LICENSE
 ★ - `@pdf-lib/fontkit@1.1.1` — License: MIT — Source: https://github.com/Hopding/fontkit — Text: (包内未随附独立文本文件)
 - `@pdf-lib/standard-fonts@1.0.0` — License: MIT — Source: https://github.com/Hopding/standard-fonts — Text: node_modules/.pnpm/@pdf-lib+standard-fonts@1.0.0/node_modules/@pdf-lib/standard-fonts/LICENSE.md
 - `@pdf-lib/upng@1.0.1` — License: MIT — Source: https://github.com/Hopding/upng — Text: node_modules/.pnpm/@pdf-lib+upng@1.0.1/node_modules/@pdf-lib/upng/LICENSE
@@ -124,10 +127,13 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `@vitest/utils@2.1.9` — License: MIT — Source: https://github.com/vitest-dev/vitest — Text: node_modules/.pnpm/@vitest+expect@2.1.9/node_modules/@vitest/utils/LICENSE
 ★ - `@xyflow/react@12.11.5` — License: MIT — Source: https://github.com/xyflow/xyflow — Text: node_modules/.pnpm/@xyflow+react@12.11.5_@types+react-dom@19.2.5_@types+react@19.2.18__@types+react@19.2.18_reac_xn5bnmkngsnhtzfbdvhw7ezyyy/node_modules/@xyflow/react/LICENSE
 - `@xyflow/system@0.0.81` — License: MIT — Source: https://github.com/xyflow/xyflow — Text: node_modules/.pnpm/@xyflow+react@12.11.5_@types+react-dom@19.2.5_@types+react@19.2.18__@types+react@19.2.18_reac_xn5bnmkngsnhtzfbdvhw7ezyyy/node_modules/@xyflow/system/LICENSE
+- `accepts@2.0.0` — License: MIT — Source: jshttp/accepts — Text: node_modules/.pnpm/accepts@2.0.0/node_modules/accepts/LICENSE
 - `acorn-jsx@5.3.2` — License: MIT — Source: https://github.com/acornjs/acorn-jsx — Text: node_modules/.pnpm/acorn-jsx@5.3.2_acorn@8.18.0/node_modules/acorn-jsx/LICENSE
 - `acorn@8.18.0` — License: MIT — Source: https://github.com/acornjs/acorn — Text: node_modules/.pnpm/acorn-jsx@5.3.2_acorn@8.18.0/node_modules/acorn/LICENSE
 - `agent-base@7.1.4` — License: MIT — Source: https://github.com/TooTallNate/proxy-agents — Text: node_modules/.pnpm/agent-base@7.1.4/node_modules/agent-base/LICENSE
+- `ajv-formats@3.0.1` — License: MIT — Source: https://github.com/ajv-validator/ajv-formats — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/ajv-formats/LICENSE
 - `ajv@6.15.0` — License: MIT — Source: https://github.com/ajv-validator/ajv — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/ajv/LICENSE
+- `ajv@8.20.0` — License: MIT — Source: ajv-validator/ajv — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/ajv/LICENSE
 - `ansi-regex@5.0.1` — License: MIT — Source: chalk/ansi-regex — Text: node_modules/.pnpm/ansi-regex@5.0.1/node_modules/ansi-regex/LICENSE
 - `ansi-styles@4.3.0` — License: MIT — Source: chalk/ansi-styles — Text: node_modules/.pnpm/ansi-styles@4.3.0/node_modules/ansi-styles/LICENSE
 - `ansi-styles@5.2.0` — License: MIT — Source: chalk/ansi-styles — Text: node_modules/.pnpm/ansi-styles@5.2.0/node_modules/ansi-styles/LICENSE
@@ -139,12 +145,16 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `balanced-match@4.0.4` — License: MIT — Source: https://github.com/juliangruber/balanced-match — Text: node_modules/.pnpm/balanced-match@4.0.4/node_modules/balanced-match/LICENSE.md
 - `base64-js@1.5.1` — License: MIT — Source: https://github.com/beatgammit/base64-js — Text: node_modules/.pnpm/base64-js@1.5.1/node_modules/base64-js/LICENSE
 - `baseline-browser-mapping@2.11.19` — License: Apache-2.0 — Source: https://github.com/web-platform-dx/baseline-browser-mapping — Text: node_modules/.pnpm/baseline-browser-mapping@2.11.19/node_modules/baseline-browser-mapping/LICENSE.txt
+- `body-parser@2.3.0` — License: MIT — Source: expressjs/body-parser — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/body-parser/LICENSE
 - `brace-expansion@1.1.18` — License: MIT — Source: https://github.com/juliangruber/brace-expansion — Text: node_modules/.pnpm/brace-expansion@1.1.18/node_modules/brace-expansion/LICENSE
 - `brace-expansion@5.0.9` — License: MIT — Source: https://github.com/juliangruber/brace-expansion — Text: node_modules/.pnpm/brace-expansion@5.0.9/node_modules/brace-expansion/LICENSE
 - `brotli@1.3.3` — License: MIT — Source: https://github.com/devongovett/brotli.js — Text: (包内未随附独立文本文件)
 - `browserslist@4.28.8` — License: MIT — Source: browserslist/browserslist — Text: node_modules/.pnpm/@babel+helper-compilation-targets@7.29.7/node_modules/browserslist/LICENSE
 - `buffer-from@1.1.2` — License: MIT — Source: LinusU/buffer-from — Text: node_modules/.pnpm/buffer-from@1.1.2/node_modules/buffer-from/LICENSE
+- `bytes@3.1.2` — License: MIT — Source: visionmedia/bytes.js — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/bytes/LICENSE
 - `cac@6.7.14` — License: MIT — Source: egoist/cac — Text: node_modules/.pnpm/cac@6.7.14/node_modules/cac/LICENSE
+- `call-bind-apply-helpers@1.0.2` — License: MIT — Source: https://github.com/ljharb/call-bind-apply-helpers — Text: node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/LICENSE
+- `call-bound@1.0.4` — License: MIT — Source: https://github.com/ljharb/call-bound — Text: node_modules/.pnpm/call-bound@1.0.4/node_modules/call-bound/LICENSE
 - `callsites@3.1.0` — License: MIT — Source: sindresorhus/callsites — Text: node_modules/.pnpm/callsites@3.1.0/node_modules/callsites/LICENSE
 - `caniuse-lite@1.0.30001810` — License: CC-BY-4.0 — Source: browserslist/caniuse-lite — Text: node_modules/.pnpm/browserslist@4.28.8/node_modules/caniuse-lite/LICENSE
 - `chai@5.3.3` — License: MIT — Source: https://github.com/chaijs/chai — Text: node_modules/.pnpm/@vitest+expect@2.1.9/node_modules/chai/LICENSE
@@ -156,8 +166,14 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `color-name@1.1.4` — License: MIT — Source: git@github.com:colorjs/color-name — Text: node_modules/.pnpm/color-convert@2.0.1/node_modules/color-name/LICENSE
 - `commander@2.20.3` — License: MIT — Source: https://github.com/tj/commander.js — Text: node_modules/.pnpm/commander@2.20.3/node_modules/commander/LICENSE
 - `concat-map@0.0.1` — License: MIT — Source: https://github.com/substack/node-concat-map — Text: node_modules/.pnpm/brace-expansion@1.1.18/node_modules/concat-map/LICENSE
+- `content-disposition@1.1.0` — License: MIT — Source: jshttp/content-disposition — Text: node_modules/.pnpm/content-disposition@1.1.0/node_modules/content-disposition/LICENSE
+- `content-type@1.0.5` — License: MIT — Source: jshttp/content-type — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/content-type/LICENSE
+- `content-type@2.1.0` — License: MIT — Source: jshttp/content-type — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/content-type/LICENSE
 - `convert-source-map@2.0.0` — License: MIT — Source: https://github.com/thlorenz/convert-source-map — Text: node_modules/.pnpm/@babel+core@7.29.7/node_modules/convert-source-map/LICENSE
-- `cross-spawn@7.0.6` — License: MIT — Source: git@github.com:moxystudio/node-cross-spawn — Text: node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/LICENSE
+- `cookie-signature@1.2.2` — License: MIT — Source: https://github.com/visionmedia/node-cookie-signature — Text: node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature/LICENSE
+- `cookie@0.7.2` — License: MIT — Source: jshttp/cookie — Text: node_modules/.pnpm/cookie@0.7.2/node_modules/cookie/LICENSE
+- `cors@2.8.6` — License: MIT — Source: expressjs/cors — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/cors/LICENSE
+- `cross-spawn@7.0.6` — License: MIT — Source: git@github.com:moxystudio/node-cross-spawn — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/cross-spawn/LICENSE
 - `cssstyle@4.6.0` — License: MIT — Source: jsdom/cssstyle — Text: node_modules/.pnpm/cssstyle@4.6.0/node_modules/cssstyle/LICENSE
 - `csstype@3.2.3` — License: MIT — Source: https://github.com/frenic/csstype — Text: node_modules/.pnpm/@types+react@19.2.18/node_modules/csstype/LICENSE
 - `d3-color@3.1.0` — License: ISC — Source: https://github.com/d3/d3-color — Text: node_modules/.pnpm/d3-color@3.1.0/node_modules/d3-color/LICENSE
@@ -174,15 +190,24 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `decimal.js@10.6.0` — License: MIT — Source: https://github.com/MikeMcl/decimal.js — Text: node_modules/.pnpm/decimal.js@10.6.0/node_modules/decimal.js/LICENCE.md
 - `deep-eql@5.0.2` — License: MIT — Source: git@github.com:chaijs/deep-eql — Text: node_modules/.pnpm/chai@5.3.3/node_modules/deep-eql/LICENSE
 - `deep-is@0.1.4` — License: MIT — Source: http://github.com/thlorenz/deep-is — Text: node_modules/.pnpm/deep-is@0.1.4/node_modules/deep-is/LICENSE
+- `depd@2.0.0` — License: MIT — Source: dougwilson/nodejs-depd — Text: node_modules/.pnpm/depd@2.0.0/node_modules/depd/LICENSE
 - `dequal@2.0.3` — License: MIT — Source: lukeed/dequal — Text: node_modules/.pnpm/aria-query@5.3.0/node_modules/dequal/LICENSE
 - `dfa@1.2.0` — License: MIT — Source: https://github.com/devongovett/dfa — Text: (包内未随附独立文本文件)
 - `dom-accessibility-api@0.5.16` — License: MIT — Source: https://github.com/eps1lon/dom-accessibility-api — Text: node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/dom-accessibility-api/LICENSE.md
+- `dunder-proto@1.0.1` — License: MIT — Source: https://github.com/es-shims/dunder-proto — Text: node_modules/.pnpm/dunder-proto@1.0.1/node_modules/dunder-proto/LICENSE
+- `ee-first@1.1.1` — License: MIT — Source: jonathanong/ee-first — Text: node_modules/.pnpm/ee-first@1.1.1/node_modules/ee-first/LICENSE
 - `electron-to-chromium@1.5.415` — License: ISC — Source: https://github.com/Kilian/electron-to-chromium — Text: node_modules/.pnpm/browserslist@4.28.8/node_modules/electron-to-chromium/LICENSE
+- `encodeurl@2.0.0` — License: MIT — Source: pillarjs/encodeurl — Text: node_modules/.pnpm/encodeurl@2.0.0/node_modules/encodeurl/LICENSE
 - `entities@6.0.1` — License: BSD-2-Clause — Source: https://github.com/fb55/entities — Text: node_modules/.pnpm/entities@6.0.1/node_modules/entities/LICENSE
+- `es-define-property@1.0.1` — License: MIT — Source: https://github.com/ljharb/es-define-property — Text: node_modules/.pnpm/es-define-property@1.0.1/node_modules/es-define-property/LICENSE
+- `es-errors@1.3.0` — License: MIT — Source: https://github.com/ljharb/es-errors — Text: node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/es-errors/LICENSE
 - `es-module-lexer@1.7.0` — License: MIT — Source: https://github.com/guybedford/es-module-lexer — Text: node_modules/.pnpm/es-module-lexer@1.7.0/node_modules/es-module-lexer/LICENSE
+- `es-object-atoms@1.1.2` — License: MIT — Source: https://github.com/ljharb/es-object-atoms — Text: node_modules/.pnpm/es-object-atoms@1.1.2/node_modules/es-object-atoms/LICENSE
 - `esbuild@0.21.5` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/LICENSE.md
 - `esbuild@0.25.12` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/LICENSE.md
+- `esbuild@0.28.2` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/LICENSE.md
 - `escalade@3.2.0` — License: MIT — Source: lukeed/escalade — Text: node_modules/.pnpm/escalade@3.2.0/node_modules/escalade/LICENSE
+- `escape-html@1.0.3` — License: MIT — Source: component/escape-html — Text: node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/LICENSE
 - `escape-string-regexp@4.0.0` — License: MIT — Source: sindresorhus/escape-string-regexp — Text: node_modules/.pnpm/escape-string-regexp@4.0.0/node_modules/escape-string-regexp/LICENSE
 - `eslint-scope@8.4.0` — License: BSD-2-Clause — Source: https://github.com/eslint/js — Text: node_modules/.pnpm/eslint-scope@8.4.0/node_modules/eslint-scope/LICENSE
 - `eslint-visitor-keys@3.4.3` — License: Apache-2.0 — Source: eslint/eslint-visitor-keys — Text: node_modules/.pnpm/@eslint-community+eslint-utils@4.10.1_eslint@9.39.5/node_modules/eslint-visitor-keys/LICENSE
@@ -195,40 +220,65 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `estraverse@5.3.0` — License: BSD-2-Clause — Source: http://github.com/estools/estraverse — Text: node_modules/.pnpm/eslint-scope@8.4.0/node_modules/estraverse/LICENSE.BSD
 - `estree-walker@3.0.3` — License: MIT — Source: https://github.com/Rich-Harris/estree-walker — Text: node_modules/.pnpm/@vitest+mocker@2.1.9_vite@5.4.21_@types+node@24.13.3_terser@5.51.2_/node_modules/estree-walker/LICENSE
 - `esutils@2.0.3` — License: BSD-2-Clause — Source: http://github.com/estools/esutils — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/esutils/LICENSE.BSD
+- `etag@1.8.1` — License: MIT — Source: jshttp/etag — Text: node_modules/.pnpm/etag@1.8.1/node_modules/etag/LICENSE
+- `eventsource-parser@3.1.1` — License: MIT — Source: https://github.com/rexxars/eventsource-parser — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/eventsource-parser/LICENSE
+- `eventsource@3.0.7` — License: MIT — Source: https://git@github.com/EventSource/eventsource — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/eventsource/LICENSE
 - `expect-type@1.4.0` — License: Apache-2.0 — Source: https://github.com/mmkal/expect-type — Text: node_modules/.pnpm/expect-type@1.4.0/node_modules/expect-type/LICENSE
+- `express-rate-limit@8.7.0` — License: MIT — Source: https://github.com/express-rate-limit/express-rate-limit — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/express-rate-limit/LICENSE
+- `express@5.2.1` — License: MIT — Source: expressjs/express — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/express/LICENSE
 - `fast-deep-equal@3.1.3` — License: MIT — Source: https://github.com/epoberezkin/fast-deep-equal — Text: node_modules/.pnpm/ajv@6.15.0/node_modules/fast-deep-equal/LICENSE
 - `fast-json-stable-stringify@2.1.0` — License: MIT — Source: https://github.com/epoberezkin/fast-json-stable-stringify — Text: node_modules/.pnpm/ajv@6.15.0/node_modules/fast-json-stable-stringify/LICENSE
 - `fast-levenshtein@2.0.6` — License: MIT — Source: https://github.com/hiddentao/fast-levenshtein — Text: node_modules/.pnpm/fast-levenshtein@2.0.6/node_modules/fast-levenshtein/LICENSE.md
+- `fast-uri@3.1.8` — License: BSD-3-Clause — Source: https://github.com/fastify/fast-uri — Text: node_modules/.pnpm/ajv@8.20.0/node_modules/fast-uri/LICENSE
 - `fdir@6.5.0` — License: MIT — Source: https://github.com/thecodrr/fdir — Text: node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.7/node_modules/fdir/LICENSE
 - `file-entry-cache@8.0.0` — License: MIT — Source: jaredwray/file-entry-cache — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/file-entry-cache/LICENSE
+- `finalhandler@2.1.1` — License: MIT — Source: pillarjs/finalhandler — Text: node_modules/.pnpm/express@5.2.1/node_modules/finalhandler/LICENSE
 - `find-up@5.0.0` — License: MIT — Source: sindresorhus/find-up — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/find-up/LICENSE
 - `flat-cache@4.0.1` — License: MIT — Source: jaredwray/flat-cache — Text: node_modules/.pnpm/file-entry-cache@8.0.0/node_modules/flat-cache/LICENSE
 - `flatted@3.4.4` — License: ISC — Source: https://github.com/WebReflection/flatted — Text: node_modules/.pnpm/flat-cache@4.0.1/node_modules/flatted/LICENSE
 ★ - `fontkit@2.0.4` — License: MIT — Source: https://github.com/foliojs/fontkit — Text: (包内未随附独立文本文件)
+- `forwarded@0.2.0` — License: MIT — Source: jshttp/forwarded — Text: node_modules/.pnpm/forwarded@0.2.0/node_modules/forwarded/LICENSE
+- `fresh@2.0.0` — License: MIT — Source: jshttp/fresh — Text: node_modules/.pnpm/express@5.2.1/node_modules/fresh/LICENSE
 - `fsevents@2.3.2` — License: MIT — Source: https://github.com/fsevents/fsevents — Text: node_modules/.pnpm/fsevents@2.3.2/node_modules/fsevents/LICENSE
 - `fsevents@2.3.3` — License: MIT — Source: https://github.com/fsevents/fsevents — Text: node_modules/.pnpm/fsevents@2.3.3/node_modules/fsevents/LICENSE
+- `function-bind@1.1.2` — License: MIT — Source: https://github.com/Raynos/function-bind — Text: node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/function-bind/LICENSE
 - `gensync@1.0.0-beta.2` — License: MIT — Source: https://github.com/loganfsmyth/gensync — Text: node_modules/.pnpm/@babel+core@7.29.7/node_modules/gensync/LICENSE
+- `get-intrinsic@1.3.0` — License: MIT — Source: https://github.com/ljharb/get-intrinsic — Text: node_modules/.pnpm/call-bound@1.0.4/node_modules/get-intrinsic/LICENSE
+- `get-proto@1.0.1` — License: MIT — Source: https://github.com/ljharb/get-proto — Text: node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/get-proto/LICENSE
 - `glob-parent@6.0.2` — License: ISC — Source: gulpjs/glob-parent — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/glob-parent/LICENSE
 - `globals@14.0.0` — License: MIT — Source: sindresorhus/globals — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/globals/LICENSE
+- `gopd@1.2.0` — License: MIT — Source: https://github.com/ljharb/gopd — Text: node_modules/.pnpm/dunder-proto@1.0.1/node_modules/gopd/LICENSE
 - `has-flag@4.0.0` — License: MIT — Source: sindresorhus/has-flag — Text: node_modules/.pnpm/has-flag@4.0.0/node_modules/has-flag/LICENSE
+- `has-symbols@1.1.0` — License: MIT — Source: https://github.com/inspect-js/has-symbols — Text: node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/has-symbols/LICENSE
+- `hasown@2.0.4` — License: MIT — Source: https://github.com/inspect-js/hasOwn — Text: node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/hasown/LICENSE
+- `hono@4.13.8` — License: MIT — Source: https://github.com/honojs/hono — Text: node_modules/.pnpm/@hono+node-server@2.1.1_hono@4.13.8/node_modules/hono/LICENSE
 - `html-encoding-sniffer@4.0.0` — License: MIT — Source: jsdom/html-encoding-sniffer — Text: node_modules/.pnpm/html-encoding-sniffer@4.0.0/node_modules/html-encoding-sniffer/LICENSE.txt
+- `http-errors@2.0.1` — License: MIT — Source: jshttp/http-errors — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/http-errors/LICENSE
 - `http-proxy-agent@7.0.2` — License: MIT — Source: https://github.com/TooTallNate/proxy-agents — Text: node_modules/.pnpm/http-proxy-agent@7.0.2/node_modules/http-proxy-agent/LICENSE
 - `https-proxy-agent@7.0.6` — License: MIT — Source: https://github.com/TooTallNate/proxy-agents — Text: node_modules/.pnpm/https-proxy-agent@7.0.6/node_modules/https-proxy-agent/LICENSE
 - `iconv-lite@0.6.3` — License: MIT — Source: https://github.com/ashtuchkin/iconv-lite — Text: node_modules/.pnpm/iconv-lite@0.6.3/node_modules/iconv-lite/LICENSE
+- `iconv-lite@0.7.3` — License: MIT — Source: https://github.com/pillarjs/iconv-lite — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/iconv-lite/LICENSE
 - `ignore@5.3.2` — License: MIT — Source: git@github.com:kaelzhang/node-ignore — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/ignore/LICENSE-MIT
 - `ignore@7.0.6` — License: MIT — Source: git@github.com:kaelzhang/node-ignore — Text: node_modules/.pnpm/@typescript-eslint+eslint-plugin@8.68.0_@typescript-eslint+parser@8.68.0_eslint@9.39.5_typesc_xrzdpqnaxc7i73xaavdcoxmsay/node_modules/ignore/LICENSE-MIT
 - `import-fresh@3.3.1` — License: MIT — Source: sindresorhus/import-fresh — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/import-fresh/LICENSE
 - `imurmurhash@0.1.4` — License: MIT — Source: https://github.com/jensyt/imurmurhash-js — Text: (包内未随附独立文本文件)
+- `inherits@2.0.4` — License: ISC — Source: https://github.com/isaacs/inherits — Text: node_modules/.pnpm/http-errors@2.0.1/node_modules/inherits/LICENSE
+- `ip-address@10.7.2` — License: MIT — Source: https://github.com/beaugunderson/ip-address — Text: node_modules/.pnpm/express-rate-limit@8.7.0_express@5.2.1/node_modules/ip-address/LICENSE
+- `ipaddr.js@1.9.1` — License: MIT — Source: https://github.com/whitequark/ipaddr.js — Text: node_modules/.pnpm/ipaddr.js@1.9.1/node_modules/ipaddr.js/LICENSE
 - `is-extglob@2.1.1` — License: MIT — Source: jonschlinkert/is-extglob — Text: node_modules/.pnpm/is-extglob@2.1.1/node_modules/is-extglob/LICENSE
 - `is-glob@4.0.3` — License: MIT — Source: micromatch/is-glob — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/is-glob/LICENSE
 - `is-potential-custom-element-name@1.0.1` — License: MIT — Source: https://github.com/mathiasbynens/is-potential-custom-element-name — Text: node_modules/.pnpm/is-potential-custom-element-name@1.0.1/node_modules/is-potential-custom-element-name/LICENSE-MIT.txt
+- `is-promise@4.0.0` — License: MIT — Source: https://github.com/then/is-promise — Text: node_modules/.pnpm/is-promise@4.0.0/node_modules/is-promise/LICENSE
 - `isexe@2.0.0` — License: ISC — Source: https://github.com/isaacs/isexe — Text: node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/LICENSE
+- `jose@6.2.12` — License: MIT — Source: panva/jose — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/jose/LICENSE.md
 - `js-tokens@4.0.0` — License: MIT — Source: lydell/js-tokens — Text: node_modules/.pnpm/@babel+code-frame@7.29.7/node_modules/js-tokens/LICENSE
 - `js-yaml@4.3.1` — License: MIT — Source: nodeca/js-yaml — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/js-yaml/LICENSE
 ★ - `jsdom@26.1.0` — License: MIT — Source: https://github.com/jsdom/jsdom — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/jsdom/LICENSE.txt
 - `jsesc@3.1.0` — License: MIT — Source: https://github.com/mathiasbynens/jsesc — Text: node_modules/.pnpm/@babel+generator@7.29.8/node_modules/jsesc/LICENSE-MIT.txt
 - `json-buffer@3.0.1` — License: MIT — Source: https://github.com/dominictarr/json-buffer — Text: node_modules/.pnpm/json-buffer@3.0.1/node_modules/json-buffer/LICENSE
 - `json-schema-traverse@0.4.1` — License: MIT — Source: https://github.com/epoberezkin/json-schema-traverse — Text: node_modules/.pnpm/ajv@6.15.0/node_modules/json-schema-traverse/LICENSE
+- `json-schema-traverse@1.0.0` — License: MIT — Source: https://github.com/epoberezkin/json-schema-traverse — Text: node_modules/.pnpm/ajv@8.20.0/node_modules/json-schema-traverse/LICENSE
+- `json-schema-typed@8.0.2` — License: BSD-2-Clause — Source: https://github.com/RemyRylan/json-schema-typed — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/json-schema-typed/LICENSE.md
 - `json-stable-stringify-without-jsonify@1.0.1` — License: MIT — Source: https://github.com/samn/json-stable-stringify — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/json-stable-stringify-without-jsonify/LICENSE
 - `json5@2.2.3` — License: MIT — Source: https://github.com/json5/json5 — Text: node_modules/.pnpm/@babel+core@7.29.7/node_modules/json5/LICENSE.md
 - `keyv@4.5.4` — License: MIT — Source: https://github.com/jaredwray/keyv — Text: (包内未随附独立文本文件)
@@ -240,13 +290,23 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `lru-cache@5.1.1` — License: ISC — Source: https://github.com/isaacs/node-lru-cache — Text: node_modules/.pnpm/@babel+helper-compilation-targets@7.29.7/node_modules/lru-cache/LICENSE
 - `lz-string@1.5.0` — License: MIT — Source: https://github.com/pieroxy/lz-string — Text: node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/lz-string/LICENSE
 - `magic-string@0.30.21` — License: MIT — Source: https://github.com/Rich-Harris/magic-string — Text: node_modules/.pnpm/@vitest+mocker@2.1.9_vite@5.4.21_@types+node@24.13.3_terser@5.51.2_/node_modules/magic-string/LICENSE
+- `math-intrinsics@1.1.0` — License: MIT — Source: https://github.com/es-shims/math-intrinsics — Text: node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/math-intrinsics/LICENSE
+- `media-typer@1.1.1` — License: MIT — Source: jshttp/media-typer — Text: node_modules/.pnpm/media-typer@1.1.1/node_modules/media-typer/LICENSE
+- `merge-descriptors@2.0.0` — License: MIT — Source: sindresorhus/merge-descriptors — Text: node_modules/.pnpm/express@5.2.1/node_modules/merge-descriptors/LICENSE
+- `mime-db@1.54.0` — License: MIT — Source: jshttp/mime-db — Text: node_modules/.pnpm/mime-db@1.54.0/node_modules/mime-db/LICENSE
+- `mime-types@3.0.2` — License: MIT — Source: jshttp/mime-types — Text: node_modules/.pnpm/accepts@2.0.0/node_modules/mime-types/LICENSE
 - `minimatch@10.2.6` — License: BlueOak-1.0.0 — Source: git@github.com:isaacs/minimatch — Text: node_modules/.pnpm/@typescript-eslint+typescript-estree@8.68.0_typescript@5.9.3/node_modules/minimatch/LICENSE.md
 - `minimatch@3.1.5` — License: ISC — Source: https://github.com/isaacs/minimatch — Text: node_modules/.pnpm/@eslint+config-array@0.21.2/node_modules/minimatch/LICENSE
 - `ms@2.1.3` — License: MIT — Source: vercel/ms — Text: node_modules/.pnpm/debug@4.4.3/node_modules/ms/LICENSE.md
 - `nanoid@3.3.18` — License: MIT — Source: ai/nanoid — Text: node_modules/.pnpm/nanoid@3.3.18/node_modules/nanoid/LICENSE
 - `natural-compare@1.4.0` — License: MIT — Source: https://github.com/litejs/natural-compare-lite — Text: (包内未随附独立文本文件)
+- `negotiator@1.1.0` — License: MIT — Source: jshttp/negotiator — Text: node_modules/.pnpm/accepts@2.0.0/node_modules/negotiator/LICENSE
 - `node-releases@2.0.53` — License: MIT — Source: https://github.com/chicoxyzzy/node-releases — Text: node_modules/.pnpm/browserslist@4.28.8/node_modules/node-releases/LICENSE
 - `nwsapi@2.2.24` — License: MIT — Source: https://github.com/dperini/nwsapi — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/nwsapi/LICENSE
+- `object-assign@4.1.1` — License: MIT — Source: sindresorhus/object-assign — Text: node_modules/.pnpm/cors@2.8.6/node_modules/object-assign/LICENSE
+- `object-inspect@1.13.4` — License: MIT — Source: https://github.com/inspect-js/object-inspect — Text: node_modules/.pnpm/object-inspect@1.13.4/node_modules/object-inspect/LICENSE
+- `on-finished@2.4.1` — License: MIT — Source: jshttp/on-finished — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/on-finished/LICENSE
+- `once@1.4.0` — License: ISC — Source: https://github.com/isaacs/once — Text: node_modules/.pnpm/express@5.2.1/node_modules/once/LICENSE
 - `optionator@0.9.4` — License: MIT — Source: https://github.com/gkz/optionator — Text: node_modules/.pnpm/eslint@9.39.5/node_modules/optionator/LICENSE
 - `p-limit@3.1.0` — License: MIT — Source: sindresorhus/p-limit — Text: node_modules/.pnpm/p-limit@3.1.0/node_modules/p-limit/LICENSE
 - `p-locate@5.0.0` — License: MIT — Source: sindresorhus/p-locate — Text: node_modules/.pnpm/locate-path@6.0.0/node_modules/p-locate/LICENSE
@@ -254,40 +314,57 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `pako@1.0.11` — License: (MIT AND Zlib) — Source: nodeca/pako — Text: node_modules/.pnpm/@pdf-lib+fontkit@1.1.1/node_modules/pako/LICENSE
 - `parent-module@1.0.1` — License: MIT — Source: sindresorhus/parent-module — Text: node_modules/.pnpm/import-fresh@3.3.1/node_modules/parent-module/LICENSE
 - `parse5@7.3.0` — License: MIT — Source: https://github.com/inikulin/parse5 — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/parse5/LICENSE
+- `parseurl@1.3.3` — License: MIT — Source: pillarjs/parseurl — Text: node_modules/.pnpm/express@5.2.1/node_modules/parseurl/LICENSE
 - `path-exists@4.0.0` — License: MIT — Source: sindresorhus/path-exists — Text: node_modules/.pnpm/find-up@5.0.0/node_modules/path-exists/LICENSE
 - `path-key@3.1.1` — License: MIT — Source: sindresorhus/path-key — Text: node_modules/.pnpm/cross-spawn@7.0.6/node_modules/path-key/LICENSE
+- `path-to-regexp@8.4.2` — License: MIT — Source: https://github.com/pillarjs/path-to-regexp — Text: node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp/LICENSE
 - `pathe@1.1.2` — License: MIT — Source: unjs/pathe — Text: node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/pathe/LICENSE
 - `pathval@2.0.1` — License: MIT — Source: https://github.com/chaijs/pathval — Text: node_modules/.pnpm/chai@5.3.3/node_modules/pathval/LICENSE
 ★ - `pdf-lib@1.17.1` — License: MIT — Source: https://github.com/Hopding/pdf-lib — Text: node_modules/.pnpm/pdf-lib@1.17.1/node_modules/pdf-lib/LICENSE.md
 - `picocolors@1.1.1` — License: ISC — Source: alexeyraspopov/picocolors — Text: node_modules/.pnpm/@babel+code-frame@7.29.7/node_modules/picocolors/LICENSE
 - `picomatch@4.0.7` — License: MIT — Source: micromatch/picomatch — Text: node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.7/node_modules/picomatch/LICENSE
+- `pkce-challenge@5.0.1` — License: MIT — Source: https://github.com/crouchcd/pkce-challenge — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/pkce-challenge/LICENSE
 - `playwright-core@1.62.1` — License: Apache-2.0 — Source: https://github.com/microsoft/playwright — Text: node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/LICENSE
 ★ - `playwright@1.62.1` — License: Apache-2.0 — Source: https://github.com/microsoft/playwright — Text: node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/LICENSE
 - `postcss@8.5.26` — License: MIT — Source: postcss/postcss — Text: node_modules/.pnpm/postcss@8.5.26/node_modules/postcss/LICENSE
 - `prelude-ls@1.2.1` — License: MIT — Source: https://github.com/gkz/prelude-ls — Text: node_modules/.pnpm/levn@0.4.1/node_modules/prelude-ls/LICENSE
 ★ - `prettier@3.9.6` — License: MIT — Source: prettier/prettier — Text: node_modules/.pnpm/prettier@3.9.6/node_modules/prettier/LICENSE
 - `pretty-format@27.5.1` — License: MIT — Source: https://github.com/facebook/jest — Text: node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/pretty-format/LICENSE
+- `proxy-addr@2.0.8` — License: MIT — Source: jshttp/proxy-addr — Text: node_modules/.pnpm/express@5.2.1/node_modules/proxy-addr/LICENSE
 - `punycode@2.3.1` — License: MIT — Source: https://github.com/mathiasbynens/punycode.js — Text: node_modules/.pnpm/punycode@2.3.1/node_modules/punycode/LICENSE-MIT.txt
+- `qs@6.16.0` — License: BSD-3-Clause — Source: https://github.com/ljharb/qs — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/qs/LICENSE.md
+- `range-parser@1.3.0` — License: MIT — Source: jshttp/range-parser — Text: node_modules/.pnpm/express@5.2.1/node_modules/range-parser/LICENSE
+- `raw-body@3.0.2` — License: MIT — Source: stream-utils/raw-body — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/raw-body/LICENSE
 ★ - `react-dom@19.2.8` — License: MIT — Source: https://github.com/react/react — Text: node_modules/.pnpm/@testing-library+react@16.3.2_@testing-library+dom@10.4.1_@types+react-dom@19.2.5_@types+reac_vx6xrca6ouinon4cq6e6wplemy/node_modules/react-dom/LICENSE
 - `react-is@17.0.2` — License: MIT — Source: https://github.com/facebook/react — Text: node_modules/.pnpm/pretty-format@27.5.1/node_modules/react-is/LICENSE
 - `react-refresh@0.17.0` — License: MIT — Source: https://github.com/facebook/react — Text: node_modules/.pnpm/@vitejs+plugin-react@4.7.0_vite@6.4.3_@types+node@24.13.3_terser@5.51.2_/node_modules/react-refresh/LICENSE
 ★ - `react@19.2.8` — License: MIT — Source: https://github.com/react/react — Text: node_modules/.pnpm/@testing-library+react@16.3.2_@testing-library+dom@10.4.1_@types+react-dom@19.2.5_@types+reac_vx6xrca6ouinon4cq6e6wplemy/node_modules/react/LICENSE
+- `require-from-string@2.0.2` — License: MIT — Source: floatdrop/require-from-string — Text: node_modules/.pnpm/ajv@8.20.0/node_modules/require-from-string/LICENSE
 - `resolve-from@4.0.0` — License: MIT — Source: sindresorhus/resolve-from — Text: node_modules/.pnpm/import-fresh@3.3.1/node_modules/resolve-from/LICENSE
 - `restructure@3.0.2` — License: MIT — Source: https://github.com/devongovett/restructure — Text: node_modules/.pnpm/fontkit@2.0.4/node_modules/restructure/LICENSE
 - `rollup@4.63.0` — License: MIT — Source: https://github.com/rollup/rollup — Text: node_modules/.pnpm/rollup@4.63.0/node_modules/rollup/LICENSE.md
+- `router@2.2.0` — License: MIT — Source: pillarjs/router — Text: node_modules/.pnpm/express@5.2.1/node_modules/router/LICENSE
 - `rrweb-cssom@0.8.0` — License: MIT — Source: rrweb-io/CSSOM — Text: node_modules/.pnpm/cssstyle@4.6.0/node_modules/rrweb-cssom/LICENSE.txt
 - `safer-buffer@2.1.2` — License: MIT — Source: https://github.com/ChALkeR/safer-buffer — Text: node_modules/.pnpm/iconv-lite@0.6.3/node_modules/safer-buffer/LICENSE
 - `saxes@6.0.0` — License: ISC — Source: https://github.com/lddubeau/saxes — Text: (包内未随附独立文本文件)
 - `scheduler@0.27.0` — License: MIT — Source: https://github.com/facebook/react — Text: node_modules/.pnpm/react-dom@19.2.8_react@19.2.8/node_modules/scheduler/LICENSE
 - `semver@6.3.1` — License: ISC — Source: https://github.com/npm/node-semver — Text: node_modules/.pnpm/@babel+core@7.29.7/node_modules/semver/LICENSE
 - `semver@7.8.5` — License: ISC — Source: https://github.com/npm/node-semver — Text: node_modules/.pnpm/@typescript-eslint+typescript-estree@8.68.0_typescript@5.9.3/node_modules/semver/LICENSE
+- `send@1.2.1` — License: MIT — Source: pillarjs/send — Text: node_modules/.pnpm/express@5.2.1/node_modules/send/LICENSE
+- `serve-static@2.2.1` — License: MIT — Source: expressjs/serve-static — Text: node_modules/.pnpm/express@5.2.1/node_modules/serve-static/LICENSE
+- `setprototypeof@1.2.0` — License: ISC — Source: https://github.com/wesleytodd/setprototypeof — Text: node_modules/.pnpm/http-errors@2.0.1/node_modules/setprototypeof/LICENSE
 - `shebang-command@2.0.0` — License: MIT — Source: kevva/shebang-command — Text: node_modules/.pnpm/cross-spawn@7.0.6/node_modules/shebang-command/LICENSE
 - `shebang-regex@3.0.0` — License: MIT — Source: sindresorhus/shebang-regex — Text: node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-regex/LICENSE
+- `side-channel-list@1.0.1` — License: MIT — Source: https://github.com/ljharb/side-channel-list — Text: node_modules/.pnpm/side-channel-list@1.0.1/node_modules/side-channel-list/LICENSE
+- `side-channel-map@1.0.1` — License: MIT — Source: https://github.com/ljharb/side-channel-map — Text: node_modules/.pnpm/side-channel-map@1.0.1/node_modules/side-channel-map/LICENSE
+- `side-channel-weakmap@1.0.2` — License: MIT — Source: https://github.com/ljharb/side-channel-weakmap — Text: node_modules/.pnpm/side-channel-weakmap@1.0.2/node_modules/side-channel-weakmap/LICENSE
+- `side-channel@1.1.1` — License: MIT — Source: https://github.com/ljharb/side-channel — Text: node_modules/.pnpm/qs@6.16.0/node_modules/side-channel/LICENSE
 - `siginfo@2.0.0` — License: ISC — Source: https://github.com/emilbayes/siginfo — Text: node_modules/.pnpm/siginfo@2.0.0/node_modules/siginfo/LICENSE
 - `source-map-js@1.2.1` — License: BSD-3-Clause — Source: 7rulnik/source-map-js — Text: node_modules/.pnpm/postcss@8.5.26/node_modules/source-map-js/LICENSE
 - `source-map-support@0.5.21` — License: MIT — Source: https://github.com/evanw/node-source-map-support — Text: node_modules/.pnpm/source-map-support@0.5.21/node_modules/source-map-support/LICENSE.md
 - `source-map@0.6.1` — License: BSD-3-Clause — Source: http://github.com/mozilla/source-map — Text: node_modules/.pnpm/source-map-support@0.5.21/node_modules/source-map/LICENSE
 - `stackback@0.0.2` — License: MIT — Source: https://github.com/shtylman/node-stackback — Text: (包内未随附独立文本文件)
+- `statuses@2.0.2` — License: MIT — Source: jshttp/statuses — Text: node_modules/.pnpm/express@5.2.1/node_modules/statuses/LICENSE
 - `std-env@3.10.0` — License: MIT — Source: unjs/std-env — Text: node_modules/.pnpm/std-env@3.10.0/node_modules/std-env/LICENCE
 - `strip-json-comments@3.1.1` — License: MIT — Source: sindresorhus/strip-json-comments — Text: node_modules/.pnpm/@eslint+eslintrc@3.3.6/node_modules/strip-json-comments/LICENSE
 - `supports-color@7.2.0` — License: MIT — Source: chalk/supports-color — Text: node_modules/.pnpm/chalk@4.1.2/node_modules/supports-color/LICENSE
@@ -302,20 +379,25 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `tinyspy@3.0.2` — License: MIT — Source: https://github.com/tinylibs/tinyspy — Text: node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/tinyspy/LICENCE
 - `tldts-core@6.1.86` — License: MIT — Source: https://github.com/remusao/tldts — Text: node_modules/.pnpm/tldts-core@6.1.86/node_modules/tldts-core/LICENSE
 - `tldts@6.1.86` — License: MIT — Source: https://github.com/remusao/tldts — Text: node_modules/.pnpm/tldts@6.1.86/node_modules/tldts/LICENSE
+- `toidentifier@1.0.1` — License: MIT — Source: component/toidentifier — Text: node_modules/.pnpm/http-errors@2.0.1/node_modules/toidentifier/LICENSE
 - `tough-cookie@5.1.2` — License: BSD-3-Clause — Source: https://github.com/salesforce/tough-cookie — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/tough-cookie/LICENSE
 - `tr46@5.1.1` — License: MIT — Source: https://github.com/jsdom/tr46 — Text: node_modules/.pnpm/tr46@5.1.1/node_modules/tr46/LICENSE.md
 - `ts-api-utils@2.5.0` — License: MIT — Source: https://github.com/JoshuaKGoldberg/ts-api-utils — Text: node_modules/.pnpm/@typescript-eslint+eslint-plugin@8.68.0_@typescript-eslint+parser@8.68.0_eslint@9.39.5_typesc_xrzdpqnaxc7i73xaavdcoxmsay/node_modules/ts-api-utils/LICENSE.md
 - `tslib@1.14.1` — License: 0BSD — Source: https://github.com/Microsoft/tslib — Text: node_modules/.pnpm/pdf-lib@1.17.1/node_modules/tslib/LICENSE.txt
 - `tslib@2.8.1` — License: 0BSD — Source: https://github.com/Microsoft/tslib — Text: node_modules/.pnpm/@swc+helpers@0.5.23/node_modules/tslib/LICENSE.txt
+- `tsx@4.23.13` — License: MIT — Source: privatenumber/tsx — Text: node_modules/.pnpm/tsx@4.23.13/node_modules/tsx/LICENSE
 - `type-check@0.4.0` — License: MIT — Source: https://github.com/gkz/type-check — Text: node_modules/.pnpm/levn@0.4.1/node_modules/type-check/LICENSE
+- `type-is@2.1.0` — License: MIT — Source: jshttp/type-is — Text: node_modules/.pnpm/body-parser@2.3.0/node_modules/type-is/LICENSE
 ★ - `typescript-eslint@8.68.0` — License: MIT — Source: https://github.com/typescript-eslint/typescript-eslint — Text: node_modules/.pnpm/typescript-eslint@8.68.0_eslint@9.39.5_typescript@5.9.3/node_modules/typescript-eslint/LICENSE
 ★ - `typescript@5.9.3` — License: Apache-2.0 — Source: https://github.com/microsoft/TypeScript — Text: node_modules/.pnpm/@typescript-eslint+eslint-plugin@8.68.0_@typescript-eslint+parser@8.68.0_eslint@9.39.5_typesc_xrzdpqnaxc7i73xaavdcoxmsay/node_modules/typescript/LICENSE.txt
 - `undici-types@7.18.2` — License: MIT — Source: https://github.com/nodejs/undici — Text: node_modules/.pnpm/@types+node@24.13.3/node_modules/undici-types/LICENSE
 - `unicode-properties@1.4.1` — License: MIT — Source: https://github.com/devongovett/unicode-properties — Text: node_modules/.pnpm/fontkit@2.0.4/node_modules/unicode-properties/LICENSE
 - `unicode-trie@2.0.0` — License: MIT — Source: https://github.com/devongovett/unicode-trie — Text: node_modules/.pnpm/fontkit@2.0.4/node_modules/unicode-trie/LICENSE
+- `unpipe@1.0.0` — License: MIT — Source: stream-utils/unpipe — Text: node_modules/.pnpm/raw-body@3.0.2/node_modules/unpipe/LICENSE
 - `update-browserslist-db@1.3.1` — License: MIT — Source: browserslist/update-db — Text: node_modules/.pnpm/browserslist@4.28.8/node_modules/update-browserslist-db/LICENSE
 - `uri-js@4.4.1` — License: BSD-2-Clause — Source: http://github.com/garycourt/uri-js — Text: node_modules/.pnpm/ajv@6.15.0/node_modules/uri-js/LICENSE
 - `use-sync-external-store@1.6.0` — License: MIT — Source: https://github.com/facebook/react — Text: node_modules/.pnpm/use-sync-external-store@1.6.0_react@19.2.8/node_modules/use-sync-external-store/LICENSE
+- `vary@1.1.2` — License: MIT — Source: jshttp/vary — Text: node_modules/.pnpm/cors@2.8.6/node_modules/vary/LICENSE
 - `vite-node@2.1.9` — License: MIT — Source: https://github.com/vitest-dev/vitest — Text: node_modules/.pnpm/vite-node@2.1.9_@types+node@24.13.3_terser@5.51.2/node_modules/vite-node/LICENSE
 ★ - `vite@5.4.21` — License: MIT — Source: https://github.com/vitejs/vite — Text: node_modules/.pnpm/@vitest+mocker@2.1.9_vite@5.4.21_@types+node@24.13.3_terser@5.51.2_/node_modules/vite/LICENSE.md
 ★ - `vite@6.4.3` — License: MIT — Source: https://github.com/vitejs/vite — Text: node_modules/.pnpm/@vitejs+plugin-react@4.7.0_vite@6.4.3_@types+node@24.13.3_terser@5.51.2_/node_modules/vite/LICENSE.md
@@ -328,11 +410,14 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `which@2.0.2` — License: ISC — Source: https://github.com/isaacs/node-which — Text: node_modules/.pnpm/cross-spawn@7.0.6/node_modules/which/LICENSE
 - `why-is-node-running@2.3.0` — License: MIT — Source: https://github.com/mafintosh/why-is-node-running — Text: node_modules/.pnpm/vitest@2.1.9_@types+node@24.13.3_jsdom@26.1.0_terser@5.51.2/node_modules/why-is-node-running/LICENSE
 - `word-wrap@1.2.5` — License: MIT — Source: jonschlinkert/word-wrap — Text: node_modules/.pnpm/optionator@0.9.4/node_modules/word-wrap/LICENSE
+- `wrappy@1.0.2` — License: ISC — Source: https://github.com/npm/wrappy — Text: node_modules/.pnpm/once@1.4.0/node_modules/wrappy/LICENSE
 - `ws@8.21.3` — License: MIT — Source: https://github.com/websockets/ws — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/ws/LICENSE
 - `xml-name-validator@5.0.0` — License: Apache-2.0 — Source: jsdom/xml-name-validator — Text: node_modules/.pnpm/jsdom@26.1.0/node_modules/xml-name-validator/LICENSE.txt
 - `xmlchars@2.2.0` — License: MIT — Source: https://github.com/lddubeau/xmlchars — Text: node_modules/.pnpm/saxes@6.0.0/node_modules/xmlchars/LICENSE
 - `yallist@3.1.1` — License: ISC — Source: https://github.com/isaacs/yallist — Text: node_modules/.pnpm/lru-cache@5.1.1/node_modules/yallist/LICENSE
 - `yocto-queue@0.1.0` — License: MIT — Source: sindresorhus/yocto-queue — Text: node_modules/.pnpm/p-limit@3.1.0/node_modules/yocto-queue/LICENSE
+- `zod-to-json-schema@3.25.2` — License: ISC — Source: https://github.com/StefanTerdell/zod-to-json-schema — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/zod-to-json-schema/LICENSE
+- `zod@3.25.76` — License: MIT — Source: https://github.com/colinhacks/zod — Text: node_modules/.pnpm/@modelcontextprotocol+sdk@1.30.0_zod@3.25.76/node_modules/zod/LICENSE
 - `zustand@4.5.7` — License: MIT — Source: https://github.com/pmndrs/zustand — Text: node_modules/.pnpm/@xyflow+react@12.11.5_@types+react-dom@19.2.5_@types+react@19.2.18__@types+react@19.2.18_reac_xn5bnmkngsnhtzfbdvhw7ezyyy/node_modules/zustand/LICENSE
 
 ## Cargo packages
@@ -1088,37 +1173,39 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### BSD-3-Clause
 
-代表性全文来源：`node_modules/.pnpm/d3-ease@3.0.1/node_modules/d3-ease/LICENSE`
+代表性全文来源：`node_modules/.pnpm/ajv@8.20.0/node_modules/fast-uri/LICENSE`
 
 ```text
-Copyright 2010-2021 Mike Bostock
-Copyright 2001 Robert Penner
+Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
+Copyright (c) 2021-present The Fastify team <https://github.com/fastify/fastify#team>
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of the author nor the names of contributors may be used to
-  endorse or promote products derived from this software without specific prior
-  written permission.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * The names of any contributors may not be used to endorse or promote
+      products derived from this software without specific prior written
+      permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS AND CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+                                  *   *   *
+
+The complete list of contributors can be found at:
+- https://github.com/garycourt/uri-js/graphs/contributors
 ```
 
 ### BlueOak-1.0.0
