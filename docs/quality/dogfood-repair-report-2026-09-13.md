@@ -306,3 +306,33 @@ macOS 文档保存改走自承载 NSSavePanel + accessory view（`apps/desktop/s
 负责人授权推进 PRR-080（冻结验收包；不含签名/公证/上传/发布）。启动前通读 `verify-evidence.mjs` schema v3 发现结构性冲突：manifest.source.commit 必须等于验证时 HEAD，且 cmd-bundle/cmd-release-performance/cold-conditioning/approvals.gFinal 四处 artifact 的 sourceCommit 都必须与之相等；而 G-FINAL 候选构建于 `5c634de`，其后有两笔 docs-only 提交（`1f0e151`、`98217bb`），HEAD 已漂移。**根因是执行序列错误：候选构建后、PRR-080 冻结前不应再有 tracked 提交**；证据目录在 `.tmp`（untracked）本可保持 worktree clean，但状态叙述提交破坏了绑定。
 
 处置（遵守"approval↔candidate↔HEAD 精确绑定"红线）：本提交为冻结前最后一笔 tracked 变更；随后在当前 HEAD 全链重跑（源码门 → advisory → bundle → 身份/DMG → install-gate → 性能 → 原生矩阵 → 报告 → 第三轮 g-final-request），负责人对新 source commit 重新批准（若重建 DMG 与已批准 `ebdd644d…` 逐字节一致则批准实质零风险），阶段 B 与 PRR-080 冻结在同一 HEAD 内完成，期间零提交。重建 hash 若与已批准值不一致，立即 STOP 回报。
+
+## 十八、G-FINAL 第三轮批准与 PRR-080 冻结收口（2026-09-16）
+
+按 §十七确立的"冻结前最后一笔 tracked 变更"规则，`a87d7b3` 先将 cargo fmt 机械格式化漂移归零（PRR-080 门前置，纯格式化、零行为变更），随后在同一 HEAD 零提交完成全链重跑与冻结：
+
+- **源码门 18 项全部 exit 0**：format-check / typecheck / lint / test:unit 734 / test:integration / test:a11y / test:visual / test:export / build / icon:verify / net:scan / license:scan / boundaries / verify-decision[packaging] / git-diff-check / cargo fmt / cargo test 214 / cargo clippy -D warnings（`gates-summary.tsv`）。
+- **advisory**：JS `pnpm audit --prod` 0 漏洞；Rust cargo-audit 0.22.2（advisory-db 1246 条，2026-09-16 拉取）0 漏洞、7 条 allowed warnings 如实披露。
+- **候选构建**：bundle-gate 严格校验 G2 授权与 candidate-root 边界后 Tauri app-only 构建 + assemble-dmg ULMO 装配；DMG `Mind Map_0.1.0_aarch64.dmg` 24,353,385B，sha256 `f1bee2135229b08cc881c7153de66de3eecc2e14e4177212a7e83ed1e9a96b85`，未签名；身份/DMG 检查（bundle id、0.1.0、bundleVersion 1、arm64、minOS 11.0、.mindmap UTI、EULA、LICENSE/THIRD_PARTY_NOTICES 随包）通过。
+- **install-gate**：G2 批准 deletionBoundaries 内沙箱安装/卸载 PASS。
+- **性能（双指标协议，attempt-01 一次通过，20 样本）**：判定指标 conditionedColdStartP95=341.8ms ≤1500；record-only sessionFirstLaunch=1819.3ms；warm/canvas/edit/save/PNG/RSS/包体均在 Accepted ADR 预算内；cold-conditioning 独立 artifact 绑定完整。
+- **原生全路径 32/32 PASS**：`ofr-native-evidence.json` + 十张要求截图齐全。
+- **run-all**：suite=all 20 阶段全 PASS；verify-evidence 独立运行 + run-all releasePerformance/evidence 两阶段共三次复算 PASS。
+- **G-FINAL 第三轮**：负责人 ErDong Zou 2026-09-16T08:25:14Z 以 [from-user] 原文批准 source `a87d7b347d4ec9238241ec714e0afe8c1b548099` 与上述 DMG 作为 0.1.0 unsigned 发布候选（五要素齐全）；阶段 B 复核 hash 重算一致、worktree clean、未重跑任何 runner；批准后 DMG 立即入 frozen-artifacts。独立批准记录 `g-final.json`。第一/二轮批准（`e75c5f1`、`5c634de`）作废。
+- **PRR-080 冻结**：2026-09-16T08:43:22Z 生成 `acceptance-request.json`（status `READY_FOR_INDEPENDENT_REVIEW`）与 `acceptance-index.json`（全部验收包文件 sha256 钉死）；readiness-manifest（caseId `PRR-080-2026-09-16`，schemaVersion 3，overall `READY`）。/Applications 已安装该候选（可执行 hash `fc17c227…587ee`，与 bundle 记录一致）。
+
+**P2 处置（如实披露，均未掩盖）**：① Windows 实机为既有 deferred 决策（v1 仅 macOS，decisionRef=docs/product/v1-product-spec.md）；② VoiceOver 按负责人 2026-09-12 指令不作 v0.1.0 自动化硬门；③ 计时敏感 flake 两笔（F1-a EULA 探针、run-all 集成阶段 app-integration 保存闭环）隔离与全量重跑均绿，判定为负载时序抖动。无未决 P0/P1。
+
+**红线未执行**：签名、公证、凭据访问、上传、git push、公开发布、系统信任/安全策略修改。本记录不构成 READY_TO_RELEASE。冻结至终审结论期间保持零 tracked 提交；本节与 README 顶部段按规则在 PRR-090 结论之后入账（见 §十九）。
+
+## 十九、PRR-090 独立终审：MM-110 ACCEPT（2026-09-16）
+
+PRR-090 由 fresh-context 独立验收 Agent 执行（未参与 PRR-000～080 实现、证据生成或此前任何审阅；派发单 `.tmp/prr-090-dispatch/prr-090-dispatch-brief.md`）。终审期间 HEAD 保持 `a87d7b3`、worktree 前后均 clean、零 tracked 提交。
+
+- **身份钉死**：source / .app / DMG / g-final / manifest 全部 hash 独立复算一致；approval.sourceCommit = bundle-inventory.sourceCommit = dmgAssembly.gitHead = manifest.source.commit = HEAD 三点绑定成立；acceptance-index 64/64 项 sha256+bytes 复算 0 MISMATCH / 0 MISSING。
+- **统计与预算复算**：由 raw 样本独立复算全部 percentile（conditionedColdStartP95=341.8、warm=364.7、edit=17.0、save=12、png=1616、canvas=18、RSS=102.8、sessionFirstLaunch=1819.3 record-only）与 summary 全 MATCH；八项预算与 `release-budgets.mjs` 逐字一致；installerBytes 24,353,385 ≤ 25,000,000；Info.plist 身份与 manifest 时间拓扑（freeze≤gates≤bundle≤…≤request，23 个 command 窗口单调）程序化核验通过。
+- **抽测重跑**：test:unit 734、test:integration、test:export 18、install-gate --plan（零写入）、verify-evidence、license:scan 全 PASS；原生性能 20 样本复测（`prr-090-review/perf-recheck/`）全 PASS，与原始分布同量级且远低于预算。
+- **越权检查**：`git log a87d7b3..HEAD` 空、reflog 无冻结后提交、无 remote 无 push 痕迹、无签名/公证/凭据痕迹。
+- **STOP 核查**：派发单六项 STOP 均未触发；P2 三项处置（Windows deferred、VoiceOver notRun、两笔 flake 披露）经独立判断均成立。
+
+**结论：MM-110 ACCEPT**。状态仅达 `READY_FOR_RELEASE_EXECUTION_REVIEW (UNSIGNED / NOT_PUBLISHED)`；新交接包 `prr-090-review/release-handoff-packet.md`（checksum / 支持系统 / 许可 / 证据索引 / 签名公证发布待办 / 回退方案）。**本结论不构成发布授权**；签名、公证、上传、push、公开发布仍须负责人另行授权并另开任务。终审报告：`prr-090-review/mm-110-independent-review.md`。
