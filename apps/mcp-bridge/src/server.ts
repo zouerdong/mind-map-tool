@@ -55,6 +55,10 @@ server.registerTool(
         .enum(["horizontal", "vertical"])
         .optional()
         .describe("整理布局方向，默认 horizontal"),
+      balanced: z
+        .boolean()
+        .optional()
+        .describe("horizontal 时使用平衡双侧布局（根居中、分支均分两侧，宽而浅形态），默认 true"),
       saveSource: z.boolean().optional().describe("是否同时写出 .mindmap 源文件，默认 true"),
       emphasisRoot: z.boolean().optional().describe("根节点是否强调角色（橙卡），默认 true"),
     },
@@ -66,6 +70,7 @@ server.registerTool(
       ...(args.format !== undefined ? { format: args.format } : {}),
       ...(args.font !== undefined ? { font: args.font } : {}),
       ...(args.direction !== undefined ? { direction: args.direction } : {}),
+      ...(args.balanced !== undefined ? { balanced: args.balanced } : {}),
       ...(args.saveSource !== undefined ? { saveSource: args.saveSource } : {}),
       ...(args.emphasisRoot !== undefined ? { emphasisRoot: args.emphasisRoot } : {}),
     });

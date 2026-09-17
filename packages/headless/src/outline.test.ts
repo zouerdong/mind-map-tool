@@ -1,7 +1,7 @@
 // outline.test.ts — 大纲契约与命令层构建（ADR 0014 §3/产品规格 AC-3）。
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { validateDocument } from "@mindmap/core";
+import { validateDocument, type MindMapDocumentV1 } from "@mindmap/core";
 import { createExportRenderer, type ExportRenderer } from "@mindmap/export";
 import { loadFontBundle, loadResvgWasm } from "./assets.js";
 import { buildDocumentFromOutline } from "./outline.js";
@@ -83,5 +83,76 @@ describe("buildDocumentFromOutline", () => {
     const hp = h.document.document.nodes.map((n) => n.position);
     const vp = v.document.document.nodes.map((n) => n.position);
     expect(hp).not.toEqual(vp);
+  });
+});
+
+describe("平衡双侧布局（ADR 0014 v1.1.0）", () => {
+  const wide = {
+    text: "根",
+    children: [1, 2, 3, 4, 5].map((i) => ({
+      text: `分支 ${i}`,
+      children: [1, 2, 3].map((j) => ({ text: `叶子 ${i}-${j}` })),
+    })),
+  };
+  const extent = (doc: MindMapDocumentV1) => {
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    for (const n of doc.document.nodes) {
+      minX = Math.min(minX, n.position.x);
+      maxX = Math.max(maxX, n.position.x + n.size.width);
+      minY = Math.min(minY, n.position.y);
+      maxY = Math.max(maxY, n.position.y + n.size.height);
+    }
+    return { width: maxX - minX, height: maxY - minY };
+  };
+
+  it("默认落地 balanced：分支均分两侧（根两侧均有节点）", () => {
+    const r = buildDocumentFromOutline(renderer, sample);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.layout).toBe("balanced");
+    const root = r.document.document.nodes[0]!;
+    const xs = r.document.document.nodes.slice(1).map((n) => n.position.x);
+    expect(xs.some((x) => x < root.position.x)).toBe(true);
+    expect(xs.some((x) => x > root.position.x)).toBe(true);
+  });
+
+  it("宽而浅树：balanced 显著降低总高、增大总宽（对比 balanced:false）", () => {
+    const b = buildDocumentFromOutline(renderer, wide);
+    const l = buildDocumentFromOutline(renderer, wide, { balanced: false });
+    expect(b.ok && l.ok).toBe(true);
+    if (!b.ok || !l.ok) return;
+    expect(b.layout).toBe("balanced");
+    expect(l.layout).toBe("layered");
+    const be = extent(b.document);
+    const le = extent(l.document);
+    expect(be.height).toBeLessThan(le.height * 0.75);
+    expect(be.width).toBeGreaterThan(le.width * 1.5);
+    // 单侧层叠时全部非根节点都在根右侧
+    const rootL = l.document.document.nodes[0]!;
+    for (const n of l.document.document.nodes.slice(1))
+      expect(n.position.x).toBeGreaterThan(rootL.position.x);
+  });
+
+  it("回退守卫：单分支树不做双侧，layout=layered", () => {
+    const r = buildDocumentFromOutline(renderer, {
+      text: "根",
+      children: [{ text: "独支", children: [{ text: "叶" }] }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.layout).toBe("layered");
+    const root = r.document.document.nodes[0]!;
+    for (const n of r.document.document.nodes.slice(1))
+      expect(n.position.x).toBeGreaterThan(root.position.x);
+  });
+
+  it("vertical 方向不应用双侧变换", () => {
+    const r = buildDocumentFromOutline(renderer, wide, { direction: "vertical" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.layout).toBe("layered");
   });
 });

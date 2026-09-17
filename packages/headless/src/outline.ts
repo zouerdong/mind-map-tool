@@ -15,6 +15,7 @@ import {
   type StateNode,
 } from "@mindmap/core";
 import type { ExportRenderer } from "@mindmap/export";
+import { balanceHorizontalLayout } from "./balance-layout.js";
 
 /** 树状大纲节点。text 必填非空；children 缺省为叶子。 */
 export interface OutlineNode {
@@ -29,6 +30,9 @@ export interface BuildOptions {
   direction?: OrganizeDirection;
   /** 根节点强调角色（橙色"出发点"卡）；缺省 true，对齐 GUI 空文档首节点行为。 */
   emphasisRoot?: boolean;
+  /** 平衡双侧布局（horizontal 时生效，宽而浅树的默认形态，ADR 0014 v1.1.0）；
+   *  缺省 true；非单根树自动回退单侧层叠。 */
+  balanced?: boolean;
 }
 
 export type OutlineError =
@@ -38,7 +42,14 @@ export type OutlineError =
   | { code: "ORGANIZE_FAILED"; span: number; max: number };
 
 export type BuildResult =
-  | { ok: true; document: MindMapDocumentV1; nodeCount: number; edgeCount: number }
+  | {
+      ok: true;
+      document: MindMapDocumentV1;
+      nodeCount: number;
+      edgeCount: number;
+      /** 实际落地的布局：balanced = 平衡双侧，layered = organize 单侧层叠（含回退）。 */
+      layout: "balanced" | "layered";
+    }
   | { ok: false; error: OutlineError };
 
 /** 校验并展开大纲为 (id, text, parentId) 先序序列；迭代栈，10k 深链不爆调用栈。 */
@@ -159,7 +170,16 @@ export function buildDocumentFromOutline(
       error: { code: "ORGANIZE_FAILED", span: layout.error.span, max: layout.error.max },
     };
   }
-  const moves = [...layout.positions.entries()].map(([id, position]) => ({ id, position }));
+  let finalPositions = layout.positions;
+  let layoutKind: "balanced" | "layered" = "layered";
+  if ((options.direction ?? "horizontal") === "horizontal" && (options.balanced ?? true)) {
+    const balancedResult = balanceHorizontalLayout(state.document);
+    if (balancedResult.balanced) {
+      finalPositions = balancedResult.positions;
+      layoutKind = "balanced";
+    }
+  }
+  const moves = [...finalPositions.entries()].map(([id, position]) => ({ id, position }));
   if (moves.length > 0) {
     const err = apply({ kind: "MoveNodes", moves }, "MoveNodes(organize)");
     if (err) return { ok: false, error: err };
@@ -170,5 +190,6 @@ export function buildDocumentFromOutline(
     document: state.document,
     nodeCount: entries.length,
     edgeCount: entries.length - 1,
+    layout: layoutKind,
   };
 }
