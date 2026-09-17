@@ -73,12 +73,12 @@ describe("端口方向（§1.4：横向右出左入；纵向底出顶入）", ()
   });
 });
 
-describe("端点 gap 与箭头（§1.4：gap 4px；实心三角 9×7）", () => {
-  it("主线起终点离卡边界 gap 4px", () => {
+describe("端点 gap 与箭头（ADR 0015：gap 0 贴卡缘；实心三角 9×7）", () => {
+  it("主线起终点贴卡边界（gap 0）", () => {
     const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
-    expect(g.start.x).toBeCloseTo(192, 6); // 188 + 4
-    expect(g.tip.x).toBeCloseTo(266, 6); // 270 - 4
-    expect(g.lineEnd.x).toBeCloseTo(266 - 9, 6); // 箭头长 9
+    expect(g.start.x).toBeCloseTo(188, 6); // 卡缘确切位置
+    expect(g.tip.x).toBeCloseTo(270, 6);
+    expect(g.lineEnd.x).toBeCloseTo(270 - 9, 6); // 箭头长 9
     const d = Math.hypot(g.tip.x - g.lineEnd.x, g.tip.y - g.lineEnd.y);
     expect(d).toBeCloseTo(9, 6);
     const half = Math.hypot(g.arrowBase[0].x - g.lineEnd.x, g.arrowBase[0].y - g.lineEnd.y);
@@ -87,7 +87,7 @@ describe("端点 gap 与箭头（§1.4：gap 4px；实心三角 9×7）", () => 
 
   it("箭头独立 path：闭合三角、方向指向目标", () => {
     const g = planEdgeGeometry([edge("e", 0, 0, 270, 0)], "horizontal", 1).get("e")!;
-    expect(arrowD(g)).toBe(`M 266 ${g.tip.y} L 257 ${g.tip.y + 3.5} L 257 ${g.tip.y - 3.5} Z`);
+    expect(arrowD(g)).toBe(`M 270 ${g.tip.y} L 261 ${g.tip.y + 3.5} L 261 ${g.tip.y - 3.5} Z`);
     expect(arrowD(g).endsWith(" Z")).toBe(true);
   });
 });

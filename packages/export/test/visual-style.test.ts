@@ -71,7 +71,7 @@ describe("视觉 token 与文档一致（docs/product/visual-state-tokens-2026-0
     expect([...EDGE_VISUAL.dashDotted]).toEqual([0.1, 5]);
     expect(EDGE_VISUAL.arrowLength).toBe(9);
     expect(EDGE_VISUAL.arrowHalfWidth).toBe(3.5);
-    expect(EDGE_VISUAL.endpointGap).toBe(4);
+    expect(EDGE_VISUAL.endpointGap).toBe(0); // ADR 0015：贴卡缘
     expect(EDGE_VISUAL.filletRadius).toBe(12);
   });
 

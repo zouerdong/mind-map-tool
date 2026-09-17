@@ -119,8 +119,8 @@ export const EDGE_VISUAL = {
   arrowLength: 9,
   /** 箭头半宽（§1.4 宽 7） */
   arrowHalfWidth: 3.5,
-  /** 端点 gap：卡边界外留缝（§1.4 端点 gap 4px） */
-  endpointGap: 4,
+  /** 端点 gap：卡边界外留缝。原型 §1.4 为 4px；ADR 0015（2026-09-17 负责人 dogfood 定稿）改为 0——线头/箭头尖贴卡缘。 */
+  endpointGap: 0,
   /** 规整态拐角圆角 r（§1.4 拐点圆角 r≈12px） */
   filletRadius: 12,
 } as const;
