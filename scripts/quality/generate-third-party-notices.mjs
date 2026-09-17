@@ -290,7 +290,7 @@ function row(entry) {
 const lines = [];
 lines.push("# Third-Party Notices");
 lines.push("");
-lines.push("Mind Map Tool（© 2026 ErDong Zou，专有软件 / All Rights Reserved，见根 LICENSE）");
+lines.push("Mind Map Tool（© 2026 ErDong Zou，MIT License，见根 LICENSE）");
 lines.push("包含以下第三方组件与资产。各条目按其原始许可分发，权利归各自权利人所有；");
 lines.push("本文件完整枚举实际分发的 JavaScript、Cargo 与字体资产及其许可（生成于 PRR-060，");
 lines.push(

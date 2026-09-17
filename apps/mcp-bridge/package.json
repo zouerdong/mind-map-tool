@@ -2,7 +2,7 @@
   "name": "@mindmap/mcp-bridge",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "MCP stdio 桥：Agent 参数化调用无头脑图导出（ADR 0014 §2）",
   "main": "src/server.ts",

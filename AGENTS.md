@@ -1,6 +1,6 @@
 # Mind Map Tool 工程规则
 
-2026-09-12 当前派发更新：`PRR-070-R2_ACCEPTED / LOCAL_DOGFOOD_REJECTED / RUNTIME_FIX_READY / UX_DECISION_REQUIRED / G-FINAL_NOT_REQUESTED`。负责人首次实用复现字体切换后整页 `projection drift`；根因为上下文工具条绕过统一 commit/version 通道，以及 ready 字体屏障延迟版本通知。审阅者已在 `9483634` 原子化提交与通知，并在 `f6d4e6d` 移除无数据保护作用的生产 render 崩溃断言；`12f8f92` 又修复新建/编辑仍使用旧 `measureNodeBox` 而产生微型节点的问题，恢复 G-VIS 完整卡片几何与双击后直接输入。90 项定向测试、typecheck、lint 通过。旧 DMG `21d2…b1ed` 作废，不得继续试用或进入发布。另确认 ADR 0012 把“干净画布”过度实现为删除创建提示和显式整理入口；视觉/命令面需负责人决定修订方向后再实现。此前不生成新 DMG，不申请 G-FINAL、不执行 PRR-080/090、不签名、公证、上传或发布。
+2026-09-17 当前派发更新：`OPEN_SOURCE_RELEASE_PREP / DUAL_PLATFORM_V1 / G-FINAL_NOT_REQUESTED`。负责人决定：放弃 Apple 渠道发行（无凭据且不愿投入），软件以 **MIT 完全开源免费**发布到本人 GitHub（ADR 0016，取代 ADR 0007 专有许可）；**Windows 进入首发**（ADR 0017，macOS aarch64 + Windows x64 双平台同批，含"冒烟暴露文件层深坑则 Windows 降为 Beta"的降级阀门）；公开发布推迟到 Agent 无头导出就绪后（ADR 0014 已落地：MCP stdio + 宽而浅分栏布局 v1.2.0 + endpointGap 0 贴卡缘 ADR 0015，dogfood 三轮通过）。下一步：建公开仓库跑 CI 双平台构建 → Windows 冒烟/dogfood → 双平台候选冻结 + 窄门重验 → GitHub Release（签名/公证/上传/push/公开发布仍为逐项授权红线）。
 
 ## 项目阶段
 

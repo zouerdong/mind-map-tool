@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Mind Map Tool（© 2026 ErDong Zou，专有软件 / All Rights Reserved，见根 LICENSE）
+Mind Map Tool（© 2026 ErDong Zou，MIT License，见根 LICENSE）
 包含以下第三方组件与资产。各条目按其原始许可分发，权利归各自权利人所有；
 本文件完整枚举实际分发的 JavaScript、Cargo 与字体资产及其许可（生成于 PRR-060，
 由 `scripts/quality/generate-third-party-notices.mjs` 从 pnpm store、`cargo metadata --locked`

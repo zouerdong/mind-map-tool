@@ -1,7 +1,7 @@
 {
   "name": "mind-map-tool",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "version": "0.1.0",
   "description": "极简自由脑图桌面工具（macOS 优先；Tauri 2 + React/TypeScript）",
   "packageManager": "pnpm@9.15.9",

@@ -25,7 +25,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": ["app", "dmg", "nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
@@ -36,7 +36,7 @@
       "icons/icon.ico"
     ],
     "category": "Productivity",
-    "copyright": "© 2026 ErDong Zou. All rights reserved.",
+    "copyright": "© 2026 ErDong Zou. MIT License.",
     "licenseFile": "../../../LICENSE",
     "resources": {
       "../../../LICENSE": "LICENSE",

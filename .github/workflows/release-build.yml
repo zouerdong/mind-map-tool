@@ -1,0 +1,80 @@
+# release-build — 双平台候选构建（ADR 0017）。
+# 触发：仅手动 workflow_dispatch。不自动发布、不上传 GitHub Release（公开发布动作逐项授权）。
+# 产物：CI artifacts（macOS .app/.dmg 为可复现性交叉验证，正式 macOS 候选仍走本地受控管线；
+# Windows NSIS 为本项目唯一 Windows 构建路径，其 run id + sha256 纳入发布证据）。
+name: release-build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact-glob: |
+              apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+              apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact-glob: |
+              apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          key: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build Tauri bundle (unsigned)
+        run: pnpm --filter @mindmap/desktop exec tauri build -- --target ${{ matrix.target }} --ci
+
+      - name: Package .app as tar.gz (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          APP_DIR="apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+          if [ -d "$APP_DIR" ]; then tar -czf "$APP_DIR/Mind Map.app.tar.gz" -C "$APP_DIR" "Mind Map.app"; fi
+
+      - name: Record artifact sha256
+        shell: bash
+        run: |
+          cd apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle || exit 1
+          find . -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.tar.gz" \) \
+            -exec shasum -a 256 {} + | tee "$GITHUB_WORKSPACE/artifact-sha256-${{ matrix.target }}.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mindmap-${{ matrix.target }}
+          path: |
+            ${{ matrix.artifact-glob }}
+            artifact-sha256-${{ matrix.target }}.txt
+          if-no-files-found: error

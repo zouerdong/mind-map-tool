@@ -2,7 +2,7 @@
   "name": "@mindmap/headless",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Agent 无头导出：树状大纲 → core 命令层 → organize → export 渲染（ADR 0014）",
   "main": "src/index.ts",

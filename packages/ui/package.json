@@ -2,7 +2,7 @@
   "name": "@mindmap/ui",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "视觉组件、画布呈现与交互状态（React Flow 获选视图，MM-050 实现）",
   "main": "src/index.ts",

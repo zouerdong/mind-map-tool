@@ -10,11 +10,11 @@ G2 已由项目负责人 ErDong Zou 于 2026-09-08 批准（原始 `[from-user]`
 | 产品显示名 | `Mind Map` | 菜单栏、窗口标题、安装包命名完全一致 |
 | Bundle Identifier | `com.mindmap.desktop` | 统一反向域名标识 |
 | 版本与构建号 | `0.1.0` (build 1) | package.json / Cargo.toml / tauri.conf.json 一致 |
-| 目标系统与架构 | macOS 11.0+ (Apple Silicon: aarch64-apple-darwin) | Windows 顺延至后续专门版本（非 v1 blocker） |
-| 文件关联 | `.mindmap` | JSON 结构；MIME: `application/x-mindmap+json`；UTI: `com.mindmap.document` |
-| 应用图标 | `apps/desktop/src-tauri/icons/icon.png` | 512x512 PNG，随 Tauri bundle 生成 icns |
-| 软件许可 | 专有软件 / All Rights Reserved（ADR 0007 Accepted 方案 4） | 根 `LICENSE`（© 2026 ErDong Zou）；正式公开发布前仍建议法律复核最终措辞 |
-| 候选格式 | Unsigned `.app` 与 `.dmg` | 严格禁止签名与公证 |
+| 目标系统与架构 | macOS 11.0+ (Apple Silicon: aarch64-apple-darwin) + Windows x64 (x86_64-pc-windows-msvc) | Windows 于 2026-09-17 进入首发（ADR 0017，含降级阀门）；Intel Mac / ARM Windows 不承诺 |
+| 文件关联 | `.mindmap` | JSON 结构；MIME: `application/x-mindmap+json`；UTI: `com.mindmap.document`（macOS）；Windows 由 NSIS 安装器写注册表 |
+| 应用图标 | `apps/desktop/src-tauri/icons/icon.png` | 512x512 PNG，随 Tauri bundle 生成 icns/ico |
+| 软件许可 | **MIT License**（ADR 0016，2026-09-17；取代 ADR 0007 专有许可） | 根 `LICENSE`（© 2026 ErDong Zou）；完全开源免费发布 |
+| 候选格式 | Unsigned `.app` / `.dmg`（macOS）与 unsigned NSIS `.exe`（Windows） | 严格禁止签名与公证；SmartScreen/Gatekeeper 绕过说明入 release notes |
 
 ## 随应用分发的字体
 

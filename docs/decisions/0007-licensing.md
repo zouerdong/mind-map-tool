@@ -1,6 +1,6 @@
 # ADR 0007: 许可与商业化边界
 
-- Status: Accepted
+- Status: **Superseded by ADR 0016**（2026-09-17 负责人决定开源 MIT 发布；本卡保留为审计历史）
 - ADR-Version: 1.0.0
 - Date: 2026-08-26（Proposed）→ 2026-09-08（Accepted）
 - Owners: ErDong Zou（项目负责人；最终文本以法律审阅为准）

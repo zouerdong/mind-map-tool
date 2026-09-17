@@ -2,7 +2,7 @@
 name = "mindmap-desktop"
 version = "0.1.0"
 description = "极简自由脑图工具桌面 host（Tauri 2）"
-license = "LicenseRef-Proprietary"
+license = "MIT"
 edition = "2021"
 
 [lib]
