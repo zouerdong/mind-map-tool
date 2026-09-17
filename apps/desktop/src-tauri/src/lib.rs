@@ -291,6 +291,9 @@ pub fn run() {
             move |app, event| match event {
                 // macOS：文件打开事件（Finder 双击 / 拖拽到图标 / 打开方式）。
                 // 诊断日志（C1 startup barrier 事实来源）+ 唯一 ingest。
+                // 平台门禁（ADR 0017）：Opened/Reopen 变体仅 macOS 存在；
+                // Windows 文件关联打开走 cold argv / single-instance 路径。
+                #[cfg(target_os = "macos")]
                 RunEvent::Opened { urls } => {
                     let sink = TauriHostEffectSink::new(app.clone());
                     eprintln!("[lifecycle] RunEvent::Opened: {} 个 URL", urls.len());
@@ -306,6 +309,7 @@ pub fn run() {
                 // macOS：Dock 点击 / Reopen。warm 每次恰好一个新空白
                 // activation；cold main 未确认时忽略（startup barrier 承担，
                 // 不多出空窗；N4）。
+                #[cfg(target_os = "macos")]
                 RunEvent::Reopen {
                     has_visible_windows,
                     ..
