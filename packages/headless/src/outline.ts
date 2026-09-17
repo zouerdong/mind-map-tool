@@ -15,7 +15,7 @@ import {
   type StateNode,
 } from "@mindmap/core";
 import type { ExportRenderer } from "@mindmap/export";
-import { balanceHorizontalLayout } from "./balance-layout.js";
+import { wideColumnarLayout } from "./wide-layout.js";
 
 /** 树状大纲节点。text 必填非空；children 缺省为叶子。 */
 export interface OutlineNode {
@@ -30,9 +30,9 @@ export interface BuildOptions {
   direction?: OrganizeDirection;
   /** 根节点强调角色（橙色"出发点"卡）；缺省 true，对齐 GUI 空文档首节点行为。 */
   emphasisRoot?: boolean;
-  /** 平衡双侧布局（horizontal 时生效，宽而浅树的默认形态，ADR 0014 v1.1.0）；
-   *  缺省 true；非单根树自动回退单侧层叠。 */
-  balanced?: boolean;
+  /** 宽而浅自适应分栏布局（horizontal 时生效，根在左、分支按宽高比分栏并排，
+   *  ADR 0014 v1.2.0）；缺省 true；非单根树自动回退 organize 单侧层叠。 */
+  wide?: boolean;
 }
 
 export type OutlineError =
@@ -47,8 +47,10 @@ export type BuildResult =
       document: MindMapDocumentV1;
       nodeCount: number;
       edgeCount: number;
-      /** 实际落地的布局：balanced = 平衡双侧，layered = organize 单侧层叠（含回退）。 */
-      layout: "balanced" | "layered";
+      /** 实际落地的布局：wide = 宽而浅分栏，layered = organize 单侧层叠（含回退）。 */
+      layout: "wide" | "layered";
+      /** wide 时的实际栏数；layered 时 0。 */
+      columns: number;
     }
   | { ok: false; error: OutlineError };
 
@@ -171,12 +173,14 @@ export function buildDocumentFromOutline(
     };
   }
   let finalPositions = layout.positions;
-  let layoutKind: "balanced" | "layered" = "layered";
-  if ((options.direction ?? "horizontal") === "horizontal" && (options.balanced ?? true)) {
-    const balancedResult = balanceHorizontalLayout(state.document);
-    if (balancedResult.balanced) {
-      finalPositions = balancedResult.positions;
-      layoutKind = "balanced";
+  let layoutKind: "wide" | "layered" = "layered";
+  let columns = 0;
+  if ((options.direction ?? "horizontal") === "horizontal" && (options.wide ?? true)) {
+    const wideResult = wideColumnarLayout(state.document);
+    if (wideResult.wide) {
+      finalPositions = wideResult.positions;
+      layoutKind = "wide";
+      columns = wideResult.columns;
     }
   }
   const moves = [...finalPositions.entries()].map(([id, position]) => ({ id, position }));
@@ -191,5 +195,6 @@ export function buildDocumentFromOutline(
     nodeCount: entries.length,
     edgeCount: entries.length - 1,
     layout: layoutKind,
+    columns,
   };
 }

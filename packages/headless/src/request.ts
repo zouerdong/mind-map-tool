@@ -18,8 +18,8 @@ export interface RenderRequest {
   saveSource?: boolean;
   /** 默认 true：根节点强调角色。 */
   emphasisRoot?: boolean;
-  /** 默认 true：horizontal 时使用平衡双侧布局（宽而浅形态）；非单根树自动回退。 */
-  balanced?: boolean;
+  /** 默认 true：horizontal 时使用宽而浅自适应分栏布局；非单根树自动回退。 */
+  wide?: boolean;
 }
 
 export type RenderFileResult =
@@ -31,7 +31,8 @@ export type RenderFileResult =
       bytes: number;
       nodes: number;
       edges: number;
-      layout: "balanced" | "layered";
+      layout: "wide" | "layered";
+      columns: number;
     }
   | { ok: false; error: { code: string; message: string } };
 
@@ -64,7 +65,7 @@ export async function renderOutlineToFile(
     ...(request.font !== undefined ? { font: request.font } : {}),
     ...(request.direction !== undefined ? { direction: request.direction } : {}),
     ...(request.emphasisRoot !== undefined ? { emphasisRoot: request.emphasisRoot } : {}),
-    ...(request.balanced !== undefined ? { balanced: request.balanced } : {}),
+    ...(request.wide !== undefined ? { wide: request.wide } : {}),
   });
   if (!built.ok) return fail(built.error.code, JSON.stringify(built.error));
 
@@ -89,5 +90,6 @@ export async function renderOutlineToFile(
     nodes: built.nodeCount,
     edges: built.edgeCount,
     layout: built.layout,
+    columns: built.columns,
   };
 }

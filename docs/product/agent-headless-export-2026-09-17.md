@@ -9,7 +9,7 @@
 ## 范围（v0）
 
 - Agent 宿主（pi / kimi / Claude Code / Codex 等任何 MCP 宿主）经 **MCP stdio** 调用本仓库提供的 `mcp-bridge`。
-- 输入为 **LLM 友好的树状大纲**（`{text, children[]}`），bridge 转成 core 命令建图并自动整理布局（horizontal 默认**平衡双侧**：根居中、分支均分两侧，宽而浅形态；ADR 0014 v1.1.0）。
+- 输入为 **LLM 友好的树状大纲**（`{text, children[]}`），bridge 转成 core 命令建图并自动整理布局（horizontal 默认**宽而浅分栏**：根在顶左、分支按宽高比自适应分栏并排；ADR 0014 v1.2.0）。
 - 输出格式：默认 **PNG 2x**；可指定 `svg` / `pdf` / `json`（Graph JSON）/ `mindmap`（源文件）。
 - **每次调用同时写出 `.mindmap` 源文件**（可关闭），用户想继续编辑时在 GUI 打开即可。
 - 本机分发：直接把仓库内 bridge 路径注册进 Agent 宿主的 MCP 配置。

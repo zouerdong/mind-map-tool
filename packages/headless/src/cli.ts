@@ -28,7 +28,7 @@ const { values } = parseArgs({
     // parseArgs 不支持 --no- 前缀否定式，用显式否定旗标
     "no-source": { type: "boolean", default: false },
     "no-emphasis-root": { type: "boolean", default: false },
-    "no-balanced": { type: "boolean", default: false },
+    "no-wide": { type: "boolean", default: false },
   },
   strict: true,
 });
@@ -68,7 +68,7 @@ const result = await renderOutlineToFile(renderer, {
   ...(values.direction !== undefined ? { direction: values.direction as OrganizeDirection } : {}),
   saveSource: !values["no-source"],
   emphasisRoot: !values["no-emphasis-root"],
-  balanced: !values["no-balanced"],
+  wide: !values["no-wide"],
 });
 if (!result.ok) fail(result.error.code, result.error.message);
 

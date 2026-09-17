@@ -86,7 +86,7 @@ describe("buildDocumentFromOutline", () => {
   });
 });
 
-describe("平衡双侧布局（ADR 0014 v1.1.0）", () => {
+describe("宽而浅自适应分栏布局（ADR 0014 v1.2.0）", () => {
   const wide = {
     text: "根",
     children: [1, 2, 3, 4, 5].map((i) => ({
@@ -108,35 +108,38 @@ describe("平衡双侧布局（ADR 0014 v1.1.0）", () => {
     return { width: maxX - minX, height: maxY - minY };
   };
 
-  it("默认落地 balanced：分支均分两侧（根两侧均有节点）", () => {
+  it("默认落地 wide：小树选单栏，根在左、非根节点全部在右侧", () => {
     const r = buildDocumentFromOutline(renderer, sample);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.layout).toBe("balanced");
+    expect(r.layout).toBe("wide");
+    expect(r.columns).toBe(1);
     const root = r.document.document.nodes[0]!;
-    const xs = r.document.document.nodes.slice(1).map((n) => n.position.x);
-    expect(xs.some((x) => x < root.position.x)).toBe(true);
-    expect(xs.some((x) => x > root.position.x)).toBe(true);
+    for (const n of r.document.document.nodes.slice(1))
+      expect(n.position.x).toBeGreaterThan(root.position.x);
   });
 
-  it("宽而浅树：balanced 显著降低总高、增大总宽（对比 balanced:false）", () => {
-    const b = buildDocumentFromOutline(renderer, wide);
-    const l = buildDocumentFromOutline(renderer, wide, { balanced: false });
-    expect(b.ok && l.ok).toBe(true);
-    if (!b.ok || !l.ok) return;
-    expect(b.layout).toBe("balanced");
+  it("宽而浅树：自动分多栏，根在顶左，总高显著低于单栏层叠、总宽显著更大", () => {
+    const w = buildDocumentFromOutline(renderer, wide);
+    const l = buildDocumentFromOutline(renderer, wide, { wide: false });
+    expect(w.ok && l.ok).toBe(true);
+    if (!w.ok || !l.ok) return;
+    expect(w.layout).toBe("wide");
+    expect(w.columns).toBeGreaterThanOrEqual(2);
     expect(l.layout).toBe("layered");
-    const be = extent(b.document);
+    const we = extent(w.document);
     const le = extent(l.document);
-    expect(be.height).toBeLessThan(le.height * 0.75);
-    expect(be.width).toBeGreaterThan(le.width * 1.5);
-    // 单侧层叠时全部非根节点都在根右侧
-    const rootL = l.document.document.nodes[0]!;
-    for (const n of l.document.document.nodes.slice(1))
-      expect(n.position.x).toBeGreaterThan(rootL.position.x);
+    expect(we.height).toBeLessThan(le.height * 0.75);
+    expect(we.width).toBeGreaterThan(le.width * 1.5);
+    // 根在顶左：x/y 均为全图最小
+    const root = w.document.document.nodes[0]!;
+    for (const n of w.document.document.nodes.slice(1)) {
+      expect(n.position.x).toBeGreaterThan(root.position.x);
+      expect(n.position.y).toBeGreaterThan(root.position.y);
+    }
   });
 
-  it("回退守卫：单分支树不做双侧，layout=layered", () => {
+  it("回退守卫：单分支树不做分栏，layout=layered", () => {
     const r = buildDocumentFromOutline(renderer, {
       text: "根",
       children: [{ text: "独支", children: [{ text: "叶" }] }],
@@ -144,12 +147,10 @@ describe("平衡双侧布局（ADR 0014 v1.1.0）", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.layout).toBe("layered");
-    const root = r.document.document.nodes[0]!;
-    for (const n of r.document.document.nodes.slice(1))
-      expect(n.position.x).toBeGreaterThan(root.position.x);
+    expect(r.columns).toBe(0);
   });
 
-  it("vertical 方向不应用双侧变换", () => {
+  it("vertical 方向不应用分栏变换", () => {
     const r = buildDocumentFromOutline(renderer, wide, { direction: "vertical" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
