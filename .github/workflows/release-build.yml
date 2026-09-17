@@ -56,7 +56,7 @@ jobs:
         run: pnpm build
 
       - name: Build Tauri bundle (unsigned)
-        run: pnpm --filter @mindmap/desktop exec tauri build -- --target ${{ matrix.target }} --ci
+        run: pnpm --filter @mindmap/desktop exec tauri build --target ${{ matrix.target }}
 
       - name: Package .app as tar.gz (macOS only)
         if: matrix.os == 'macos-latest'
