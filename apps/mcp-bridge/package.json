@@ -23,6 +23,7 @@
   "devDependencies": {
     "vitest": "^2.1.8",
     "@types/node": "^24.0.0",
+    "@resvg/resvg-wasm": "^2.6.2",
     "tsx": "^4.19.0"
   }
 }

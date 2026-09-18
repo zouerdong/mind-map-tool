@@ -41,3 +41,6 @@ packages/ui/perf/canvas-perf-app/dist/
 packages/ui/perf/canvas-perf-app/src/fixture.json
 packages/ui/node_modules/.vite-temp/
 .playwright-cli/
+
+# ADR 0018：安装包内 MCP 运行时（构建期由 scripts/stage-mcp-runtime.mjs 生成）
+apps/desktop/src-tauri/resources/

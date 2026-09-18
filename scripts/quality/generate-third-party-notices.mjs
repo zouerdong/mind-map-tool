@@ -301,6 +301,23 @@ lines.push("");
 lines.push(`- JavaScript packages（direct + transitive）：${jsEntries.length}`);
 lines.push(`- Cargo packages：${cargoEntries.length}`);
 lines.push(`- Fonts / license texts：${fontEntries.length}`);
+lines.push("- Bundled runtimes：1（Node.js，ADR 0018，安装包内嵌 MCP 运行时）");
+lines.push("");
+lines.push("## Bundled runtimes（随安装包分发的运行时）");
+lines.push("");
+// 版本与 scripts/fetch-node-standalone.mjs 的 pinned 常量同源（解析防漂移）。
+const fetchScript = readFileSync(resolve(ROOT, "scripts/fetch-node-standalone.mjs"), "utf8");
+const nodeVersion = fetchScript.match(/const NODE_VERSION = "(v[\d.]+)"/)?.[1];
+if (!nodeVersion) throw new Error("无法从 fetch-node-standalone.mjs 解析 NODE_VERSION");
+lines.push("| 组件 | 版本 | 许可 | 来源 | 分发形态 |");
+lines.push("| --- | --- | --- | --- | --- |");
+lines.push(
+  `| Node.js runtime | ${nodeVersion} | MIT | https://nodejs.org/dist/${nodeVersion}/ | 重命名为 \`mcp/mindmap-mcp\`（macOS）/ \`mcp/mindmap-mcp.exe\`（Windows），用于执行内嵌的 mindmap-mcp.mjs（ADR 0018） |`,
+);
+lines.push("");
+lines.push(
+  "Node.js 许可证全文见 https://raw.githubusercontent.com/nodejs/node/main/LICENSE（MIT；其附录所列依赖许可随官方二进制一并适用）。",
+);
 lines.push("");
 lines.push("## Fonts（随应用分发的字体）");
 lines.push("");

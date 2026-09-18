@@ -18,11 +18,13 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            node-platform: darwin-arm64
             artifact-glob: |
               apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
               apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            node-platform: win-x64
             artifact-glob: |
               apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
     runs-on: ${{ matrix.os }}
@@ -54,6 +56,12 @@ jobs:
 
       - name: Build frontend
         run: pnpm build
+
+      # ADR 0018：安装包内嵌 MCP 独立运行时（esbuild 单文件 + pinned Node 二进制）。
+      # staging 内含真实 MCP 握手冒烟（initialize/tools/list/render 落盘），失败即阻断打包。
+      - name: Stage standalone MCP runtime
+        shell: bash
+        run: node scripts/stage-mcp-runtime.mjs --platform ${{ matrix.node-platform }}
 
       - name: Build Tauri bundle (unsigned)
         run: pnpm --filter @mindmap/desktop exec tauri build --target ${{ matrix.target }}

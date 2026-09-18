@@ -1,6 +1,6 @@
 # Mind Map Tool 工程规则
 
-2026-09-17 当前派发更新：`OPEN_SOURCE_RELEASE_PREP / DUAL_PLATFORM_V1 / G-FINAL_NOT_REQUESTED`。负责人决定：放弃 Apple 渠道发行（无凭据且不愿投入），软件以 **MIT 完全开源免费**发布到本人 GitHub（ADR 0016，取代 ADR 0007 专有许可）；**Windows 进入首发**（ADR 0017，macOS aarch64 + Windows x64 双平台同批，含"冒烟暴露文件层深坑则 Windows 降为 Beta"的降级阀门）；公开发布推迟到 Agent 无头导出就绪后（ADR 0014 已落地：MCP stdio + 宽而浅分栏布局 v1.2.0 + endpointGap 0 贴卡缘 ADR 0015，dogfood 三轮通过）。下一步：建公开仓库跑 CI 双平台构建 → Windows 冒烟/dogfood → 双平台候选冻结 + 窄门重验 → GitHub Release（签名/公证/上传/push/公开发布仍为逐项授权红线）。
+2026-09-18 当前派发更新：`BETA_MCP_IN_INSTALLER / DUAL_PLATFORM_V1 / G-FINAL_NOT_REQUESTED`。负责人决定：放弃 Apple 渠道发行（无凭据且不愿投入），软件以 **MIT 完全开源免费**发布到本人 GitHub（ADR 0016）；**Windows 进入首发**（ADR 0017，双平台同批，含降级阀门）；公开发布推迟到 Agent 无头导出就绪后（ADR 0014 已落地 + ADR 0015）。2026-09-18 新增：同事内测要求「装安装包 → Agent 读文档即可接入 MCP」，**ADR 0018 落地**——MCP 编译为 esbuild 单文件（字体/WASM 内嵌）+ pinned Node 24.21.0 独立运行时随安装包分发（`mcp/` 目录，staging 含真实握手冒烟，CI 双平台与本地 `bundle:tauri` 前强制执行）；Windows 快捷键显示已平台化（6d61d33，负责人 Windows dogfood 修复项）。下一步：CI 出新双平台包 → 验证安装包内 mcp/ 布局 → 负责人/同事内测 → 双平台候选冻结 + 窄门重验 → GitHub Release（签名/公证/上传/push/公开发布仍为逐项授权红线）。
 
 ## 项目阶段
 

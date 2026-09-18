@@ -29,3 +29,12 @@
 3. 大纲 → 文档转换经 core 统一命令层（CreateNode/CreateEdge/MoveNodes），不直接拼装文档对象。
 4. 全部既有质量门保持绿（typecheck/lint/test:unit/test:export/boundaries/net:scan/license:scan）；新增包纳入 boundaries 与 net:scan 扫描范围。
 5. 输出路径与输入体量有 fail-closed 校验（路径必须显式给出且为文件路径；节点数/文本长继承 core `LIMITS`）。
+
+## 分发形态增补（2026-09-18，ADR 0018）
+
+内测分发要求「同事只装安装包即可接入 MCP」。落地：MCP 编译为 esbuild 单文件
+（字体/WASM 内嵌），随安装包分发 pinned Node 24.21.0 独立运行时（`mcp/` 目录：
+Windows `%LOCALAPPDATA%\Mind Map\mcp\`，macOS `…/Contents/Resources/mcp/`）。
+stdio 唯一通道与工具契约不变；构建期冒烟（initialize/tools/list/render 落盘）
+在 CI 双平台与本地 `bundle:tauri` 前强制执行。Agent 接入指南：桌面
+`mindmap-mcp-agent-guide.md`（负责人分发给内测同事）。

@@ -9,6 +9,15 @@ Mind Map Tool（© 2026 ErDong Zou，MIT License，见根 LICENSE）
 - JavaScript packages（direct + transitive）：391
 - Cargo packages：487
 - Fonts / license texts：4
+- Bundled runtimes：1（Node.js，ADR 0018，安装包内嵌 MCP 运行时）
+
+## Bundled runtimes（随安装包分发的运行时）
+
+| 组件 | 版本 | 许可 | 来源 | 分发形态 |
+| --- | --- | --- | --- | --- |
+| Node.js runtime | v24.21.0 | MIT | https://nodejs.org/dist/v24.21.0/ | 重命名为 `mcp/mindmap-mcp`（macOS）/ `mcp/mindmap-mcp.exe`（Windows），用于执行内嵌的 mindmap-mcp.mjs（ADR 0018） |
+
+Node.js 许可证全文见 https://raw.githubusercontent.com/nodejs/node/main/LICENSE（MIT；其附录所列依赖许可随官方二进制一并适用）。
 
 ## Fonts（随应用分发的字体）
 
@@ -203,9 +212,9 @@ WOFF2 为无损格式转换（名称表未改、无字形修改），Reserved Fo
 - `es-errors@1.3.0` — License: MIT — Source: https://github.com/ljharb/es-errors — Text: node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/es-errors/LICENSE
 - `es-module-lexer@1.7.0` — License: MIT — Source: https://github.com/guybedford/es-module-lexer — Text: node_modules/.pnpm/es-module-lexer@1.7.0/node_modules/es-module-lexer/LICENSE
 - `es-object-atoms@1.1.2` — License: MIT — Source: https://github.com/ljharb/es-object-atoms — Text: node_modules/.pnpm/es-object-atoms@1.1.2/node_modules/es-object-atoms/LICENSE
-- `esbuild@0.21.5` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/LICENSE.md
-- `esbuild@0.25.12` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/LICENSE.md
-- `esbuild@0.28.2` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/LICENSE.md
+★ - `esbuild@0.21.5` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/LICENSE.md
+★ - `esbuild@0.25.12` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/LICENSE.md
+★ - `esbuild@0.28.2` — License: MIT — Source: https://github.com/evanw/esbuild — Text: node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/LICENSE.md
 - `escalade@3.2.0` — License: MIT — Source: lukeed/escalade — Text: node_modules/.pnpm/escalade@3.2.0/node_modules/escalade/LICENSE
 - `escape-html@1.0.3` — License: MIT — Source: component/escape-html — Text: node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/LICENSE
 - `escape-string-regexp@4.0.0` — License: MIT — Source: sindresorhus/escape-string-regexp — Text: node_modules/.pnpm/escape-string-regexp@4.0.0/node_modules/escape-string-regexp/LICENSE
