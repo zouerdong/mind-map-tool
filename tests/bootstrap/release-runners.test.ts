@@ -256,7 +256,8 @@ function readImage(path) {
 }
 function writeImage(path, image) {
   const json = JSON.stringify(image);
-  writeFileSync(path, env.MOCK_BLOATED ? json + " ".repeat(Math.max(0, 25000001 - json.length)) : json);
+  // MOCK_BLOATED：填充至预算 +1B（预算与 release-budgets.mjs 同源，ADR 0006 v1.2.0 = 100MB）
+  writeFileSync(path, env.MOCK_BLOATED ? json + " ".repeat(Math.max(0, 100000001 - json.length)) : json);
 }
 function flagValue(name) { const i = args.indexOf(name); return i === -1 ? null : args[i + 1] ?? ""; }
 function last() { return args[args.length - 1]; }
@@ -2386,11 +2387,12 @@ describe("assemble-dmg (PRR-069C 无 Finder 确定性 DMG 装配)", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("体积超预算（>25,000,000B）时 fail-closed", () => {
+  it("体积超预算（>100,000,000B，ADR 0006 v1.2.0）时 fail-closed", () => {
     const { repoDir, regPath, toolDir } = setup("assemble-budget-repo");
     const res = runAssembler(repoDir, regPath, toolDir, [], { MOCK_BLOATED: "1" });
     expect(res.status).toBe(1);
-    expect(res.stderr).toContain("超过 installer 预算 25000000");
+    // 预算值与 scripts/quality/release-budgets.mjs 同源（ADR 0006 v1.2.0 = 100MB）
+    expect(res.stderr).toContain("超过 installer 预算 100000000");
   });
 
   it("合成 hanging tool 在约定超时内被终止，并输出可复算失败证据", () => {

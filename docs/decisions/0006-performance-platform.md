@@ -1,9 +1,10 @@
 # ADR 0006: 性能预算与平台覆盖矩阵
 
 - Status: Accepted
-- ADR-Version: 1.1.0
+- ADR-Version: 1.2.0
 - Date: 2026-08-26
 - Revised: 2026-09-09（cold 协议按 [from-user] G-PERF-PROTOCOL（PRR-067 v3）批准修订为双指标；见"G1 批准记录"末段与 decision-register）
+- Revised: 2026-09-18（v1.2.0 安装包预算 25MB → 100MB，负责人批准；见文末"修订记录"）
 - Owners: Project maintainers
 - Track: 性能/平台基线（G1 批准后才成为约束性预算）
 
@@ -34,7 +35,7 @@ Proposed 预算基线（P95，双平台各自达标）：
 | 高风险编辑命令（create/move/connect/undo） | ≤ 50 ms |
 | 原生文件保存（标准规模） | ≤ 200 ms |
 | 2x PNG 导出（标准规模） | ≤ 3 s |
-| 安装包/下载体积 | Tauri 每平台 ≤ 25 MB；Electron 对照实测，不混比格式 |
+| 安装包/下载体积 | Tauri 每平台 ≤ 100 MB（v1.2.0 修订；原 ≤25MB 因 ADR 0018 而废止，见文末）；Electron 对照实测，不混比格式 |
 
 Proposed 平台矩阵基线：macOS Apple Silicon 必测（Intel 是否覆盖待用户确认）；Windows x64 必测（ARM64 是否覆盖待用户确认）；系统缩放 100%/150%/200%；中文 IME；WebView2 已有/缺失/旧版本三种状态。
 
@@ -71,3 +72,14 @@ MM-010 Spike 建立基线 → G1 批准 → MM-050/MM-090 用 `run-performance.m
 - **批准决定**：cold 协议修订为双指标（`sessionFirstLaunchMs` 记录型 + `conditionedColdStartP95Ms` ≤1500ms，见上方测量协议）；warm p95 ≤800ms、各 20 样本、`renderer-ready` 完成点、estimator 与其余预算不变；授权修改 ADR/register/runner/verifier/schema/测试/文档。
 - **依据**：PRR-067 阶段 A 归因 `MEASUREMENT_BOUNDARY_CONFIRMED`（离群成本位于 exec→main 边界，应用分段稳定；新路径首启与系统重启后首启均可能出现；具体 macOS 子系统不可确定），经 PRR-067A-v3 决策包+独立审阅。
 - **绑定**：本版本（1.1.0）内容 hash 已登记于 `docs/decisions/decision-register.json` G1.performanceProtocol；批准后任何内容漂移使本记录失效并需重新审签。
+
+## 修订记录
+
+### v1.2.0（2026-09-18，负责人批准）
+
+**安装包预算 25MB → 100MB**。ADR 0018 批准的 MCP 独立运行时（pinned Node 24 +
+esbuild 单文件内嵌资产）随安装包分发，使 macOS ULMO DMG 实测达 75,268,912B
+（v0.3.0 候选 f611a1e），与原 25MB 预算直接冲突。ADR 0018 决策时已明示代价
+（"安装包体积增加约 50MB"），本修订是对该既定决策的预算对齐：新预算 100MB
+（实测基线 75.3MB + 约 25MB 余量）。其余全部预算指标不变；发布前如逼近新预算
+须重新评估 MCP 运行时瘦身（如 Node 精简构建）。

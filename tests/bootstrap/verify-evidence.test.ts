@@ -310,7 +310,7 @@ function attachPerformanceEvidence(manifest: any, canvasResult: Record<string, u
       editCommandP95Ms: 50,
       saveP95Ms: 200,
       pngExportP95Ms: 3000,
-      installerBytes: 25_000_000,
+      installerBytes: 100_000_000, // ADR 0006 v1.2.0（与 RELEASE_BUDGETS 同源）
     },
     results: {
       conditionedColdStartP95Ms: 20,

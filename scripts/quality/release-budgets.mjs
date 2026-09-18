@@ -12,5 +12,7 @@ export const RELEASE_BUDGETS = Object.freeze({
   warmStartP95Ms: 800,
   rssStableMb: 120,
   // ADR uses decimal MB for the distribution/download artifact.
-  installerBytes: 25_000_000,
+  // ADR 0006 v1.2.0（2026-09-18 负责人批准）：ADR 0018 MCP 独立运行时进安装包，
+  // 实测 ULMO DMG 75,268,912B（v0.3.0 候选 f611a1e）→ 预算 25MB 抬升至 100MB。
+  installerBytes: 100_000_000,
 });

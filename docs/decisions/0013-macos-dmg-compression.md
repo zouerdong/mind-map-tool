@@ -36,6 +36,7 @@ PRR-069 实现后，两次相互独立的 clean build 都在 Tauri 2.11.4 上游
 5. 最终 DMG 直接产出或转换为 ULMO。必须用 `hdiutil imageinfo` 证明 `Format=ULMO`，用 `hdiutil verify` 证明镜像有效，并通过无写入挂载复算 EULA、Applications 链接、`.app` 目录级 hash、bundle identity 与卷图标 hash。
 6. inventory 必须绑定 `.app`、最终 DMG、装配 runner、EULA 输入、卷图标、开始结束时间和实际系统命令；不得继承被替代 Tauri DMG 或旧 repack 报告的 hash。
 7. 不更改 SVG 母版、PNG/ICO/ICNS、ICNS 槽位、应用内容、最低系统版本或 25000000B 预算；不新增运行时依赖；不签名、不公证。
+  ※ 2026-09-18 注记：本条"预算"所指 25MB 已被 ADR 0006 v1.2.0 修订为 100MB（ADR 0018 MCP 运行时对齐）；本 ADR 的 ULMO 压缩决策不受影响。
 
 ## Consequences
 
