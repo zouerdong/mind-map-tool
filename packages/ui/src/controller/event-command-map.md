@@ -18,9 +18,16 @@
 | 主题切换（未来 MM-070 入口）                                                                  | `setTheme(theme)`                                          | `SetDocumentStyle`                                                 | 持久化、可 undo                                                          |
 | 节点形状覆盖（未来入口）                                                                      | `setNodeShape(id, shape)`                                  | `SetNodeShape`                                                     | null=清除覆盖                                                            |
 
+## 画布手势（2026-09-18 内测批次，负责人定稿 Q1=A）
+
+- **左键拖空白 = 框选**（Figma/Miro 白板惯例）；Shift+拖同效（RF `selectionKeyCode` 默认）；
+- **平移 = Space+左键拖 / 中键拖 / 右键拖**（`panOnDrag={[1,2]}` + `panActivationKeyCode="Space"`）；
+- 滚轮 = 缩放（`zoomOnScroll`，不变）；触控板双指捏合 = 缩放；
+- 多选后拖动任一选中节点 = 整体移动，`onNodeDragStop` 一次 `MoveNodes` 提交全部位移。
+
 ## session-only（绝不产生 Command、绝不入文件）
 
-- 画布 selection（框选 / Shift 点选）——仅作为 `DeleteSelection` 的参数来源
+- 画布 selection（左键框选 / Shift 点选 / ⌘A 全选）——仅作为 `DeleteSelection` 的参数来源
 - viewport（pan/zoom/fitView）
 - `editingId`（正在编辑的节点）
 - 拖动期间的乐观位移（drag stop 前的 view-model 状态）
