@@ -1,6 +1,6 @@
 # Mind Map Tool 工程规则
 
-2026-09-18 当前派发更新：`BETA_MCP_IN_INSTALLER / DUAL_PLATFORM_V1 / G-FINAL_NOT_REQUESTED`。负责人决定：放弃 Apple 渠道发行（无凭据且不愿投入），软件以 **MIT 完全开源免费**发布到本人 GitHub（ADR 0016）；**Windows 进入首发**（ADR 0017，双平台同批，含降级阀门）；公开发布推迟到 Agent 无头导出就绪后（ADR 0014 已落地 + ADR 0015）。2026-09-18 新增：同事内测要求「装安装包 → Agent 读文档即可接入 MCP」，**ADR 0018 落地**——MCP 编译为 esbuild 单文件（字体/WASM 内嵌）+ pinned Node 24.21.0 独立运行时随安装包分发（`mcp/` 目录，staging 含真实握手冒烟，CI 双平台与本地 `bundle:tauri` 前强制执行）；Windows 快捷键显示已平台化（6d61d33，负责人 Windows dogfood 修复项）。下一步：CI 出新双平台包 → 验证安装包内 mcp/ 布局 → 负责人/同事内测 → 双平台候选冻结 + 窄门重验 → GitHub Release（签名/公证/上传/push/公开发布仍为逐项授权红线）。
+2026-09-18 当前派发更新：`BETA_MCP_IN_INSTALLER / DUAL_PLATFORM_V1 / G-FINAL_NOT_REQUESTED`。负责人决定：放弃 Apple 渠道发行（无凭据且不愿投入），软件以 **MIT 完全开源免费**发布到本人 GitHub（ADR 0016）；**Windows 进入首发**（ADR 0017，双平台同批，含降级阀门）；公开发布推迟到 Agent 无头导出就绪后（ADR 0014 已落地 + ADR 0015）。2026-09-18 新增：同事内测要求「装安装包 → Agent 读文档即可接入 MCP」，**ADR 0018 落地**——MCP 编译为 esbuild 单文件（字体/WASM 内嵌）+ pinned Node 24.21.0 独立运行时随安装包分发（`mcp/` 目录，staging 含真实握手冒烟，CI 双平台与本地 `bundle:tauri` 前强制执行）；Windows 快捷键显示已平台化（6d61d33，负责人 Windows dogfood 修复项）。**2026-09-18 晚内测批次（已 tag `v0.3.0`）**：框选修复（左键拖空白=框选、滚轮=平移、⌘/Ctrl+滚轮=缩放；Windows 左键平移已评估否决，见 event-command-map 已否决项）+ 双侧连线与发散整理方向（ADR 0019）+ 层级深度调色板与四级镜像描边卡（ADR 0020，两轮原型定稿）+ 选中橙色高亮 + 来路能量脉冲；安装包预算 25MB→100MB（ADR 0006 v1.2.0，对齐 ADR 0018 MCP 运行时实测 75.3MB）。下一步：负责人/同事内测 v0.3.0 包 → 反馈收口 → 双平台候选冻结 + 窄门重验 → GitHub Release（签名/公证/上传/push/公开发布仍为逐项授权红线）。注意：`tauri.conf.json` version 字段未随 tag 递增（v0.3.0 包内仍显示 0.1.0），下次发版先把版本号 bump 纳入发布流程。
 
 ## 项目阶段
 
