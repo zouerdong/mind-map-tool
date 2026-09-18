@@ -16,8 +16,10 @@ import {
   EditorCanvas,
   GeometryBarrier,
   OnboardingFlow,
+  shortcutHints,
   type OnboardingObservation,
 } from "@mindmap/ui";
+import { detectShortcutPlatform } from "./shortcut-platform.js";
 import { AppNotice } from "./app-notice.js";
 import {
   createAppCommandListenerBridge,
@@ -58,6 +60,10 @@ type PendingConfirm = {
 
 /** pending-save gate（MRT-001A）的非致命提示：不弹 discard、不替换文档。 */
 const SAVE_BUSY_NOTICE = "保存尚未完成，请稍后再新建或打开。";
+
+// 键位徽记平台（ADR 0017，显示用；UA 不随会话变化，模块级一次探测）。
+const SHORTCUT_PLATFORM = detectShortcutPlatform();
+const HINTS = shortcutHints(SHORTCUT_PLATFORM);
 
 // 每 WebView 一个 bootstrap adapter（模块级单例：StrictMode 重挂载复用；
 // 窗口销毁随 WebView 进程终止）。null 仅出现在浏览器 dev。
@@ -592,11 +598,14 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       if (result.status === "moved") {
         bump();
         setOrganizedNow(true);
-        setNotice({ tone: "info", text: "已整理为分层布局（再点一次或 ⇧⌘L 还原整理前布局）" });
+        setNotice({
+          tone: "info",
+          text: `已整理为分层布局（再点一次或 ${HINTS.organize} 还原整理前布局）`,
+        });
       } else if (result.status === "restored") {
         bump();
         setOrganizedNow(false);
-        setNotice({ tone: "info", text: "已还原到整理前的布局（⌘Z 可撤销还原）" });
+        setNotice({ tone: "info", text: `已还原到整理前的布局（${HINTS.undo} 可撤销还原）` });
       } else if (result.status === "no-op") {
         setNotice({ tone: "info", text: "已经是整理好的布局" });
       } else {
@@ -1028,6 +1037,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         organizeSignal={organizeSignal}
         organizeDirection={organizeDirection}
         onOrganizeResult={handleOrganizeResult}
+        shortcutPlatform={SHORTCUT_PLATFORM}
       />
 
       <AppNotice notice={notice} theme={theme} onDismiss={() => setNotice(null)} />
@@ -1036,7 +1046,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         <button
           type="button"
           data-testid="organize-fab"
-          title={organizedNow ? "还原整理前的布局（⇧⌘L）" : "整理（⇧⌘L）"}
+          title={
+            organizedNow ? `还原整理前的布局（${HINTS.organize}）` : `整理（${HINTS.organize}）`
+          }
           onClick={() => dispatchCommand("view.organize")}
           style={{
             position: "absolute",
@@ -1054,7 +1066,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
             cursor: "pointer",
           }}
         >
-          {organizedNow ? "还原布局 ⇧⌘L" : "整理 ⇧⌘L"}
+          {organizedNow ? `还原布局 ${HINTS.organize}` : `整理 ${HINTS.organize}`}
         </button>
       ) : null}
 
@@ -1206,8 +1218,8 @@ export function MindMapApp({ ports }: MindMapAppProps) {
           >
             <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>全局唤起热键</h2>
             <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 8px" }}>
-              画布未在前台时按此热键唤起；画布已聚焦时同键直接新建 idea（默认 ⌥Space，2026-08-29
-              定稿）。
+              画布未在前台时按此热键唤起；画布已聚焦时同键直接新建 idea（默认 {HINTS.quickCreate}
+              ，2026-08-29 定稿）。
             </p>
             <input
               aria-label="热键组合（accelerator 格式，如 Alt+Space）"
@@ -1381,6 +1393,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         presentRestoredState={false}
         presentOnFirstRun
         onPreferenceWarning={onPreferenceWarning}
+        platform={SHORTCUT_PLATFORM}
       />
     </div>
   );

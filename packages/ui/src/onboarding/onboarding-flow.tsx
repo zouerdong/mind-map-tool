@@ -14,6 +14,7 @@ import {
 import { onboardingReducer } from "./onboarding-reducer.js";
 import type { OnboardingPreferencesPort } from "./onboarding-preferences.js";
 import { OnboardingOverlay } from "./onboarding-overlay.js";
+import type { ShortcutPlatform } from "../shortcut-hints.js";
 
 export interface OnboardingFlowProps {
   /** 命令/动作观察通道（返回取消订阅）。 */
@@ -32,6 +33,8 @@ export interface OnboardingFlowProps {
   presentOnFirstRun?: boolean;
   /** 偏好损坏/写入失败时的非致命提示；不阻塞画布与引导。 */
   onPreferenceWarning?: (message: string) => void;
+  /** 键位徽记平台（ADR 0017；默认 mac）。 */
+  platform?: ShortcutPlatform;
 }
 
 export function OnboardingFlow({
@@ -42,6 +45,7 @@ export function OnboardingFlow({
   presentRestoredState = true,
   presentOnFirstRun = false,
   onPreferenceWarning,
+  platform,
 }: OnboardingFlowProps) {
   const [state, dispatch] = useReducer(onboardingReducer, INITIAL_ONBOARDING_STATE);
   const explicitOpenRequested = useRef(false);
@@ -129,6 +133,7 @@ export function OnboardingFlow({
       onNext={handlers.onNext}
       onSkip={handlers.onSkip}
       onHide={handlers.onHide}
+      platform={platform ?? "mac"}
     />
   );
 }

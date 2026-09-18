@@ -6,7 +6,8 @@
 
 import { useEffect, useState } from "react";
 import type { ThemeTokens } from "../theme/theme-tokens.js";
-import { ONBOARDING_COPY } from "./onboarding-copy.js";
+import type { ShortcutPlatform } from "../shortcut-hints.js";
+import { ONBOARDING_COPY, onboardingCopy } from "./onboarding-copy.js";
 import { ONBOARDING_STEPS } from "./onboarding-types.js";
 import type { OnboardingState } from "./onboarding-types.js";
 
@@ -20,6 +21,8 @@ export interface OnboardingOverlayProps {
   onHide(): void;
   /** 锚点查找（默认 document.querySelector；测试可注入）。 */
   anchorLookup?(semanticId: string): HTMLElement | null;
+  /** 键位徽记平台（ADR 0017；默认 mac 保持历史行为）。 */
+  platform?: ShortcutPlatform;
 }
 
 function usePrefersReducedMotion(): boolean {
@@ -46,13 +49,14 @@ export function OnboardingOverlay({
   onSkip,
   onHide,
   anchorLookup,
+  platform = "mac",
 }: OnboardingOverlayProps) {
   const reducedMotion = usePrefersReducedMotion();
   if (!state.visible || state.currentStep === null) return null;
 
   const spec = ONBOARDING_STEPS.find((s) => s.id === state.currentStep);
   if (!spec) return null;
-  const copy = ONBOARDING_COPY[spec.id];
+  const copy = (platform === "mac" ? ONBOARDING_COPY : onboardingCopy(platform))[spec.id];
 
   // 锚点定位（真实控件贴近展示；无锚点居中）。
   const anchorEl = spec.anchor

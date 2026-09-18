@@ -107,7 +107,13 @@ export type {
   OnboardingPreferencesPort,
   PreferenceStore,
 } from "./onboarding/onboarding-preferences.js";
-export { ONBOARDING_COPY, ONBOARDING_REPLAY_LABEL } from "./onboarding/onboarding-copy.js";
+export {
+  ONBOARDING_COPY,
+  ONBOARDING_REPLAY_LABEL,
+  onboardingCopy,
+} from "./onboarding/onboarding-copy.js";
+export { shortcutHints } from "./shortcut-hints.js";
+export type { ShortcutHints, ShortcutPlatform } from "./shortcut-hints.js";
 export { OnboardingOverlay } from "./onboarding/onboarding-overlay.js";
 export type { OnboardingOverlayProps } from "./onboarding/onboarding-overlay.js";
 export { OnboardingFlow } from "./onboarding/onboarding-flow.js";

@@ -41,6 +41,7 @@ import {
 import type { FontResolver } from "@mindmap/export/src/layout.js";
 import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import { remapRunsForTextChange } from "../controller/runs-remap.js";
+import { shortcutHints, type ShortcutPlatform } from "../shortcut-hints.js";
 import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
 import {
   documentDefaults,
@@ -117,6 +118,8 @@ export interface EditorCanvasProps {
    */
   positionTransitionMs?: number;
   className?: string;
+  /** 键位徽记平台（ADR 0017：空画布「双击创建」提示按平台显示；默认 mac）。 */
+  shortcutPlatform?: ShortcutPlatform;
   /** 画布外覆层（工具条等；MM-070/MM-080 注入）。 */
   overlay?: ReactNode;
 }
@@ -179,6 +182,7 @@ export function EditorCanvas({
   onOrganizeComplete,
   positionTransitionMs: _positionTransitionMs = 0,
   className,
+  shortcutPlatform = "mac",
   overlay,
 }: EditorCanvasProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1175,7 +1179,7 @@ export function EditorCanvas({
               whiteSpace: "nowrap",
             }}
           >
-            双击创建 · ⌥Space
+            双击创建 · {shortcutHints(shortcutPlatform).quickCreate}
           </div>
         ) : null}
         {overlay}
