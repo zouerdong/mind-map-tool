@@ -163,7 +163,10 @@ function checkBootstrap() {
   if (!perf || typeof perf !== "object") {
     fail("G1.performanceProtocol missing (PRR-067 G-PERF-PROTOCOL)");
   } else {
-    if (perf.adrId !== "0006-performance-platform" || perf.adrVersion !== "1.1.0") {
+    // ADR 0006 版本钉：1.1.0 = G-PERF-PROTOCOL 双指标 cold 协议（2026-09-09）；
+    // 1.2.0 = 安装包预算 25MB→100MB（ADR 0018 MCP 运行时对齐，负责人 2026-09-18 批准）。
+    // 合法修订路径 = 负责人批准 → 更新 register 绑定（adrVersion+adrSha256）→ 更新本钉。
+    if (perf.adrId !== "0006-performance-platform" || perf.adrVersion !== "1.2.0") {
       fail("G1.performanceProtocol ADR id/version mismatch");
     }
     if (!/^[a-f0-9]{64}$/i.test(perf.adrSha256 ?? "")) {

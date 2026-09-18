@@ -43,7 +43,11 @@ export async function rfStubModule(): Promise<unknown> {
             key: n.id,
             className: "react-flow__node",
             "data-testid": `rf-node-${n.id}`,
-            onClick: () => props.onNodesChange?.([{ id: n.id, type: "select", selected: true }]),
+            // 单击=选中；Ctrl+单击=取消选中（2026-09-18 主选首落定测试需要）
+            onClick: (e: AnyProps) =>
+              props.onNodesChange?.([
+                { id: n.id, type: "select", selected: !(e as { ctrlKey?: boolean }).ctrlKey },
+              ]),
             onDoubleClick: (e: unknown) => props.onNodeDoubleClick?.(e, n),
           },
           props.nodeTypes?.[n.type]

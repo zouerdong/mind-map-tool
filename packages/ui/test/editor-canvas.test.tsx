@@ -119,6 +119,19 @@ describe("EditorCanvas", () => {
     });
   });
 
+  it("主选 = 第一个进入选择集的节点（2026-09-18 内测反馈）：追加不抢主选，取消主选后落最早剩余者", async () => {
+    renderCanvas();
+    // 观测量：来路脉冲高亮只在主选节点的路径上出现（makeDoc 无橙卡，
+    // 回退源 = n1；主选 n2 → 高亮 e1；主选 n1（源自身）→ 无脉冲）
+    const pulseOn = () => document.querySelector(".react-flow__edge-pulse-highlight") !== null;
+    fireEvent.click(screen.getByTestId("rf-node-n2")); // 第一个选中 n2 → 主选 n2
+    await waitFor(() => expect(pulseOn()).toBe(true));
+    fireEvent.click(screen.getByTestId("rf-node-n1")); // 追加 n1 → 主选仍 n2（旧行为会抢成 n1）
+    await waitFor(() => expect(pulseOn()).toBe(true));
+    fireEvent.click(screen.getByTestId("rf-node-n2"), { ctrlKey: true }); // 取消主选 n2
+    await waitFor(() => expect(pulseOn()).toBe(false)); // 主选落最早剩余者 n1（= 来路源，无脉冲）
+  });
+
   it("连接 → CreateEdge（反向 n2→n1 合法；同向重复会被预检拒绝）", async () => {
     const { session } = renderCanvas();
     fireEvent.click(screen.getByTestId("rf-connect-b-a"));

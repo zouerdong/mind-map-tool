@@ -364,10 +364,15 @@ export function EditorCanvas({
         const id = (c as { id: string }).id;
         if (selected) {
           selectionRef.current[source].add(id);
-          if (source === "nodes") primaryRef.current = id;
+          // 2026-09-18 内测反馈：主选 = 本次选择会话中第一个进入选择集的节点
+          // （框选时 = 最先被框到的框）；追加选中不抢主选，清空后才重新落定
+          if (source === "nodes" && primaryRef.current === null) primaryRef.current = id;
           touched = true;
         } else if (selectionRef.current[source].delete(id)) {
-          if (source === "nodes" && primaryRef.current === id) primaryRef.current = null;
+          // 主选被取消：落到剩余集合中最早进入者（Set 插入序），不跳到最新
+          if (source === "nodes" && primaryRef.current === id) {
+            primaryRef.current = [...selectionRef.current.nodes][0] ?? null;
+          }
           touched = true;
         }
       }
@@ -413,7 +418,8 @@ export function EditorCanvas({
         }
       }
       if (primaryRef.current === null && sel.nodes.size > 0) {
-        primaryRef.current = [...sel.nodes][sel.nodes.size - 1]!;
+        // 重投影修复主选：同样取最早进入者（与 trackSelection 首落定语义一致）
+        primaryRef.current = [...sel.nodes][0]!;
         pruned = true;
       }
       if (pruned) {
@@ -1146,7 +1152,11 @@ export function EditorCanvas({
           }}
           nodesConnectable
           // 2026-09-18 内测批次（负责人定稿 Q1=A）：左键拖空白=框选（Figma/Miro
-          // 白板惯例）；平移=Space+拖/中键/右键拖；滚轮缩放不变。
+          // 白板惯例）；平移=Space+拖/中键/右键拖 + 触控板双指滚动（panOnScroll，
+          // 内测反馈②）；缩放=捏合 / ⌘(Ctrl)+滚轮 / ⌘±0（zoomOnScroll 关闭，
+          // 滚轮让位给平移）。
+          // 三指拖移注记：系统辅助功能「三指拖移」合成的是左键拖拽事件，
+          // 事件层与鼠标左键不可区分 → 三指拖移等同框选；平移请用双指滚动。
           // RF 契约（@xyflow/react 12.11 源码）：panOnDrag===true 时
           // _selectionOnDrag 被整体禁用（selectionOnDrag && panOnDrag !== true）——
           // 此前两 prop 同 true 导致框选从未生效（仅剩 Shift+拖，不可发现）。
@@ -1156,7 +1166,9 @@ export function EditorCanvas({
           selectionOnDrag
           panOnDrag={[1, 2]}
           panActivationKeyCode="Space"
-          zoomOnScroll
+          zoomOnScroll={false}
+          zoomActivationKeyCode="Meta"
+          panOnScroll
           // 双击=建点（键位定稿 2026-08-29），不是缩放（缩放走 ⌘+/⌘-/⌘0）。
           // 且 d3-zoom 的 dblclick.zoom 会 stopImmediatePropagation（noevent），
           // 不关它 wrapper 的 onDoubleClick 永远收不到——双击建点从未生效的根因。
