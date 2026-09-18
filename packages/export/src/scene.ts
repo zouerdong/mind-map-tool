@@ -5,6 +5,7 @@
 // framesVisible=false 时不产 frame 项，文字落到画布墨色（§1.1/§1.2 墨纸互换）。
 
 import type { MindMapDocumentV1, NodeShape } from "@mindmap/core";
+import { deriveNodeDepths } from "@mindmap/core";
 import { LAYOUT, type FontResolver } from "./layout.js";
 import {
   EDGE_VISUAL,
@@ -148,6 +149,8 @@ export function buildScene(
   const direction = options.direction ?? "horizontal";
 
   const byId = new Map(d.nodes.map((n) => [n.id, n]));
+  // ADR 0020：层级深度派生（不落 schema）——普通角色卡色按深度阶梯取色
+  const depths = deriveNodeDepths(doc);
   const boxById = new Map(
     d.nodes.map((n) => [
       n.id,
@@ -172,7 +175,12 @@ export function buildScene(
     });
     edgeIds.push(e.id);
   }
-  const geoms = planEdgeGeometry(inputs, direction, lineMorph, { obstacles: boxes });
+  // ADR 0019：dualSide 恒定开启——锚点侧由端点相对几何确定性派生（左邻边镜像布线），
+  // 自由态左拉边与 balanced 发散布局的导出与 GUI 同一几何契约。
+  const geoms = planEdgeGeometry(inputs, direction, lineMorph, {
+    obstacles: boxes,
+    dualSide: true,
+  });
 
   // ---- bounds：卡片 + 边极值（控制点/外弧/箭头）+ 描边留白；负坐标不裁切 ----
   let minX = Infinity,
@@ -231,7 +239,7 @@ export function buildScene(
     const y = n.position.y + offY;
     const shape = resolvedShapeOf(n, d.shape);
     const role: NodeRole = nodeRoleOf(n);
-    const colors = nodeColorsOf(palette, role, framesVisible);
+    const colors = nodeColorsOf(palette, role, framesVisible, depths.get(n.id));
     const visual = layoutNodeVisual(n, shape, d.font, fonts);
 
     if (framesVisible && colors.fill) {
@@ -243,7 +251,7 @@ export function buildScene(
           rx: n.size.width / 2,
           ry: n.size.height / 2,
           fill: colors.fill,
-          stroke: null,
+          stroke: colors.stroke, // ADR 0020 第二轮：depth≥4 镜像描边卡
         });
       } else {
         items.push({
@@ -254,7 +262,7 @@ export function buildScene(
           h: n.size.height,
           rx: VISUAL_TYPOGRAPHY.cardRadius,
           fill: colors.fill,
-          stroke: null,
+          stroke: colors.stroke,
         });
       }
     }

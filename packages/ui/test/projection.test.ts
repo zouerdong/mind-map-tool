@@ -3,8 +3,15 @@
 // 画布内部状态（selection/viewport/measurement）绝不进入投影产物。
 
 import { describe, expect, it } from "vitest";
-import { applyCommand, makeStateNode, type Command, type MindMapDocumentV1 } from "@mindmap/core";
 import {
+  applyCommand,
+  deriveNodeDepths,
+  makeStateNode,
+  type Command,
+  type MindMapDocumentV1,
+} from "@mindmap/core";
+import {
+  deriveHandleSides,
   documentDefaults,
   projectDocument,
   projectEdge,
@@ -136,8 +143,18 @@ describe("命令后重投影一致性（无双状态漂移）", () => {
   it("单节点/单边投影与整体投影等价", () => {
     const doc = makeDoc();
     const defaults = documentDefaults(doc);
+    const depths = deriveNodeDepths(doc); // ADR 0020：depth 由整体投影派生
     const whole = projectDocument(doc);
-    expect(projectNode(doc.document.nodes[1]!, defaults)).toEqual(whole.nodes[1]);
-    expect(projectEdge(doc.document.edges[0]!, defaults.theme)).toEqual(whole.edges[0]);
+    expect(projectNode(doc.document.nodes[1]!, defaults, depths.get("n2"))).toEqual(whole.nodes[1]);
+    // ADR 0019：锚点侧由整体投影按几何派生（此处用同一规则重建期望值）
+    const e0 = doc.document.edges[0]!;
+    const byId = new Map(doc.document.nodes.map((n) => [n.id, n]));
+    const s0 = byId.get(e0.sourceNodeId)!;
+    const t0 = byId.get(e0.targetNodeId)!;
+    const anchors = deriveHandleSides(
+      s0.position.x + s0.size.width / 2,
+      t0.position.x + t0.size.width / 2,
+    );
+    expect(projectEdge(e0, defaults.theme, anchors)).toEqual(whole.edges[0]);
   });
 });

@@ -17,6 +17,7 @@ export type AppCommandId =
   | "view.organize"
   | "view.layout-horizontal"
   | "view.layout-vertical"
+  | "view.layout-balanced"
   | "view.theme-warm"
   | "view.theme-dark"
   | "app.shortcuts"
@@ -34,6 +35,7 @@ export interface AppCommandHandlers {
   "view.organize": () => void;
   "view.layout-horizontal": () => void;
   "view.layout-vertical": () => void;
+  "view.layout-balanced": () => void;
   "view.theme-warm": () => void;
   "view.theme-dark": () => void;
   "app.shortcuts": () => void;
@@ -60,6 +62,7 @@ const APP_COMMAND_ID_TABLE = {
   "view.organize": true,
   "view.layout-horizontal": true,
   "view.layout-vertical": true,
+  "view.layout-balanced": true,
   "view.theme-warm": true,
   "view.theme-dark": true,
   "app.shortcuts": true,

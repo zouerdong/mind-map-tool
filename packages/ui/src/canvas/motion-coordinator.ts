@@ -52,7 +52,8 @@ export interface MotionFrame {
 }
 
 export interface MotionOptions {
-  direction?: LayoutDirection;
+  /** 整理方向；balanced（ADR 0019 发散）内部归一到 horizontal + 双侧锚点。 */
+  direction?: LayoutDirection | "balanced";
   reducedMotion?: boolean;
   /** 手动时钟模式（用于单元测试精确步进，不启动后台 rAF 循环） */
   manualTick?: boolean;
@@ -217,6 +218,8 @@ export class MotionCoordinator {
   private currentPositions = new Map<string, Point>();
   private frozenRoutes?: Map<string, RoutedEdge> | undefined;
   private direction: LayoutDirection = "horizontal";
+  /** ADR 0019：锚点侧几何派生恒定开启（双侧连线与发散布局共用同一几何契约）。 */
+  private dualSide = true;
   private rafId: number | null = null;
   private manualTick = false;
   private activeDoc: MindMapDocumentV1 | null = null;
@@ -251,7 +254,8 @@ export class MotionCoordinator {
     this.cancel();
 
     this.activeDoc = doc;
-    this.direction = options.direction ?? "horizontal";
+    this.direction =
+      options.direction === "balanced" ? "horizontal" : (options.direction ?? "horizontal");
     this.fromPositions = new Map(from);
     this.toPositions = new Map(to);
     this.interruptedNodes.clear();
@@ -301,7 +305,8 @@ export class MotionCoordinator {
     this.cancel();
 
     this.activeDoc = doc;
-    this.direction = options.direction ?? "horizontal";
+    this.direction =
+      options.direction === "balanced" ? "horizontal" : (options.direction ?? "horizontal");
     this.fromPositions = from;
     this.toPositions = new Map(targetPositions);
     this.interruptedNodes.clear();
@@ -392,7 +397,10 @@ export class MotionCoordinator {
         },
       });
     }
-    this.frozenRoutes = planEdgeRoutes(targetInputs, this.direction, { obstacles: targetBoxes });
+    this.frozenRoutes = planEdgeRoutes(targetInputs, this.direction, {
+      obstacles: targetBoxes,
+      dualSide: this.dualSide,
+    });
   }
 
   /** 当前线形态参数（0 = 散乱曲线，1 = 规整正交；整理/undo 动画终态驻留）。 */
@@ -553,6 +561,7 @@ export class MotionCoordinator {
     const geoms = planEdgeGeometry(inputs, this.direction, lineMorph, {
       obstacles: boxes,
       routes: this.frozenRoutes,
+      dualSide: this.dualSide,
     });
 
     const edgePaths = new Map<string, { pathD: string; arrowD: string }>();

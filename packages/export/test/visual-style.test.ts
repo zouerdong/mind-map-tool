@@ -121,6 +121,30 @@ describe("节点角色与配色（ADR 0010 / D2）", () => {
     expect(nodeColorsOf(LIGHT_PALETTE, "normal", false).text).toBe("#141412");
     expect(nodeColorsOf(DARK_PALETTE, "normal", false).text).toBe("#EFEAE0");
   });
+
+  it("深度阶梯（ADR 0020 两轮定稿）：depth3 深暖灰浅字；depth≥4 镜像描边卡（暖白白卡黑边 / 黑板黑卡白边）", () => {
+    // depth 缺省/1/2 → 普通卡无描边
+    for (const d of [undefined, 1, 2]) {
+      const c = nodeColorsOf(LIGHT_PALETTE, "normal", true, d);
+      expect(c.fill).toBe("#141412");
+      expect(c.stroke).toBeNull();
+    }
+    const l3 = nodeColorsOf(LIGHT_PALETTE, "normal", true, 3);
+    expect(l3.fill).toBe("#57524B");
+    expect(l3.stroke).toBeNull();
+    const l4 = nodeColorsOf(LIGHT_PALETTE, "normal", true, 4);
+    expect(l4.fill).toBe("#FFFFFF");
+    expect(l4.text).toBe("#141412");
+    expect(l4.stroke).toBe("#141412"); // 白卡黑边
+    const d4 = nodeColorsOf(DARK_PALETTE, "normal", true, 4);
+    expect(d4.fill).toBe("#141412");
+    expect(d4.text).toBe("#F5F2EA");
+    expect(d4.stroke).toBe("#EFEAE0"); // 黑卡白边
+    // depth 5+ 与 4 同档
+    expect(nodeColorsOf(LIGHT_PALETTE, "normal", true, 7)).toEqual(l4);
+    // accent 恒橙、无描边（强调语义优先于阶梯）
+    expect(nodeColorsOf(LIGHT_PALETTE, "accent", true, 4).stroke).toBeNull();
+  });
 });
 
 describe("节点测量（kicker + runs 正文，UI/导出同源）", () => {

@@ -21,8 +21,10 @@ import {
 } from "react";
 import {
   ReactFlow,
+  getBezierPath,
   useEdgesState,
   useNodesState,
+  Position,
   type Connection,
   type EdgeChange,
   type NodeChange,
@@ -42,7 +44,7 @@ import type { FontResolver } from "@mindmap/export/src/layout.js";
 import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import { remapRunsForTextChange } from "../controller/runs-remap.js";
 import { shortcutHints, type ShortcutPlatform } from "../shortcut-hints.js";
-import type { LayoutDirection } from "@mindmap/export/src/edge-geometry.js";
+import type { OrganizeDirection } from "@mindmap/core";
 import {
   documentDefaults,
   projectDocument,
@@ -68,6 +70,8 @@ import {
   type LinkingState,
   type NavDirection,
 } from "./keyboard-navigation.js";
+import { pulsePathTo } from "./pulse-path.js";
+import { pulseCycleTiming } from "./pulse-timing.js";
 
 export interface EditorCanvasProps {
   session: DocumentSession;
@@ -104,7 +108,8 @@ export interface EditorCanvasProps {
   /**
    * 整理布局方向（默认 horizontal；G-VIS D7）。
    */
-  organizeDirection?: LayoutDirection;
+  /** 整理方向（ADR 0019：horizontal/vertical/balanced 三向；balanced 内部走横向双侧几何）。 */
+  organizeDirection?: OrganizeDirection;
   /**
    * 整理结果回调（通知上层成功/no-op/超限错误）。
    */
@@ -220,6 +225,7 @@ export function EditorCanvas({
               theme: session.current.document.document.theme,
               font: documentDefaults(session.current.document).font,
               framesVisible: session.current.document.document.framesVisible,
+              depth: undefined, // pending 新节点尚无连线，无层级（ADR 0020）
             },
             width: 60,
             height: 37,
@@ -1009,6 +1015,89 @@ export function EditorCanvas({
     [editingId, focusNodeId, fonts, linking, onCancelEdit, onCommitEdit],
   );
 
+  // ---- 能量脉冲（2026-09-18 内测批次④；规格 §5.1「选中动效」） ----
+  // 主选节点的来路：出发点橙卡（或回退源）沿边方向 BFS 最短路径（pulsePathTo）。
+  // 时序按各边实测长度匀速分配（pulseCycleTiming）；reduced-motion 只留静态高亮。
+  // 整理动画期间时序按动画前几何计算（路径本体随动画实时渲染，仅窗口份额滞后，
+  // 下一选择动作即收敛——已知小取舍）。
+  const pulseTargetId = uiSelection.primary;
+  const pulsePath = useMemo(
+    () => (pulseTargetId ? pulsePathTo(session.current.document, pulseTargetId) : null),
+    // docVersion 变化 = 文档快照更新信号（session 本体为稳定可变容器）
+    [pulseTargetId, docVersion, session],
+  );
+  const pulsePathKey = pulsePath ? pulsePath.edgeIds.join("\0") : "";
+  const [pulseTimings, setPulseTimings] = useState<Map<
+    string,
+    { beginFrac: number; endFrac: number; durMs: number }
+  > | null>(null);
+
+  useEffect(() => {
+    if (!pulsePath) {
+      setPulseTimings(null);
+      return;
+    }
+    const edgeById = new Map(rfEdges.map((e) => [e.id, e]));
+    const nodeById = new Map(rfNodes.map((n) => [n.id, n]));
+    const lengths: number[] = [];
+    for (const eid of pulsePath.edgeIds) {
+      const e = edgeById.get(eid);
+      const s = e ? nodeById.get(e.source) : undefined;
+      const t = e ? nodeById.get(e.target) : undefined;
+      if (!e || !s || !t) {
+        lengths.push(1);
+        continue;
+      }
+      // 规整态用同源 pathD；自由态回退贝塞尔。ADR 0019：锚点侧按相对几何派生
+      // （与 projection deriveHandleSides 同一规则：目标中心偏左 → 左出右入）
+      const mirrored = t.position.x + (t.width ?? 0) / 2 < s.position.x + (s.width ?? 0) / 2;
+      const d =
+        e.data?.pathD ??
+        getBezierPath({
+          sourceX: mirrored ? s.position.x : s.position.x + (s.width ?? 0),
+          sourceY: s.position.y + (s.height ?? 0) / 2,
+          sourcePosition: mirrored ? Position.Left : Position.Right,
+          targetX: mirrored ? t.position.x + (t.width ?? 0) : t.position.x,
+          targetY: t.position.y + (t.height ?? 0) / 2,
+          targetPosition: mirrored ? Position.Right : Position.Left,
+        })[0];
+      lengths.push(measurePathLength(d) ?? estimateEdgeLength(s, t));
+    }
+    const timing = pulseCycleTiming(lengths);
+    const next = new Map(
+      pulsePath.edgeIds.map((id, i) => [
+        id,
+        {
+          beginFrac: timing.windows[i]!.beginFrac,
+          endFrac: timing.windows[i]!.endFrac,
+          durMs: timing.durMs,
+        },
+      ]),
+    );
+    setPulseTimings((prev) => (pulseTimingsEqual(prev, next) ? prev : next));
+    // rfNodes/rfEdges 拖动期间逐帧变化 → 时序跟随最新几何；等值守卫防抖
+  }, [pulsePathKey, pulsePath, rfEdges, rfNodes]);
+
+  // 注入脉冲/高亮到边 view-model（不动 rfEdges 本体，避免回流进受控 state）
+  const displayEdges = useMemo(() => {
+    if (!pulsePath) return rfEdges;
+    const onPath = new Set(pulsePath.edgeIds);
+    return rfEdges.map((e) => {
+      if (!onPath.has(e.id)) return e;
+      const data = e.data;
+      if (!data) return e;
+      const timing = pulseTimings?.get(e.id);
+      return {
+        ...e,
+        data: {
+          ...data,
+          pulseHighlight: true,
+          ...(timing && !reducedMotion ? { pulse: timing } : {}),
+        },
+      };
+    });
+  }, [rfEdges, pulsePath, pulseTimings, reducedMotion]);
+
   return (
     <EditingContext.Provider value={editingValue}>
       <div
@@ -1033,7 +1122,7 @@ export function EditorCanvas({
       >
         <ReactFlow
           nodes={rfNodes}
-          edges={rfEdges}
+          edges={displayEdges}
           // MM-090-D9：背景设在 RF 本体——wrapper 上的背景会被 RF 内层默认
           // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
           style={{
@@ -1056,8 +1145,17 @@ export function EditorCanvas({
             }
           }}
           nodesConnectable
+          // 2026-09-18 内测批次（负责人定稿 Q1=A）：左键拖空白=框选（Figma/Miro
+          // 白板惯例）；平移=Space+拖/中键/右键拖；滚轮缩放不变。
+          // RF 契约（@xyflow/react 12.11 源码）：panOnDrag===true 时
+          // _selectionOnDrag 被整体禁用（selectionOnDrag && panOnDrag !== true）——
+          // 此前两 prop 同 true 导致框选从未生效（仅剩 Shift+拖，不可发现）。
+          // panOnDrag=[1,2] 仅中/右键平移；panActivationKeyPressed 期间
+          // panOnDrag 提升为 true → Space 按住时左键拖自动让位给平移。
+          // Shift+拖框选（selectionKeyCode 默认 Shift）与 ⌘A 全选保留。
           selectionOnDrag
-          panOnDrag
+          panOnDrag={[1, 2]}
+          panActivationKeyCode="Space"
           zoomOnScroll
           // 双击=建点（键位定稿 2026-08-29），不是缩放（缩放走 ⌘+/⌘-/⌘0）。
           // 且 d3-zoom 的 dblclick.zoom 会 stopImmediatePropagation（noevent），
@@ -1218,6 +1316,58 @@ function useReducedMotionFlag(): boolean {
     return () => mq.removeEventListener("change", onChange);
   }, []);
   return reduced;
+}
+
+// ---- 能量脉冲辅助（模块级，不进组件重渲染闭包） ----
+
+/** 离屏 path 长度实测（浏览器 getTotalLength；jsdom 等无实现环境返回 null 走估算）。 */
+const measurePathLength = (() => {
+  let pathEl: SVGPathElement | null | undefined;
+  return (d: string): number | null => {
+    if (typeof document === "undefined") return null;
+    if (pathEl === undefined) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      pathEl = typeof (el as SVGPathElement).getTotalLength === "function" ? el : null;
+    }
+    if (pathEl === null) return null;
+    try {
+      pathEl.setAttribute("d", d);
+      const len = pathEl.getTotalLength();
+      return Number.isFinite(len) && len > 0 ? len : null;
+    } catch {
+      return null;
+    }
+  };
+})();
+
+/** 长度估算回退（无 getTotalLength）：源锚 → 目标锚的曼哈顿距离（ADR 0019 双侧锚点）。 */
+function estimateEdgeLength(s: MindFlowNode, t: MindFlowNode): number {
+  const mirrored = t.position.x + (t.width ?? 0) / 2 < s.position.x + (s.width ?? 0) / 2;
+  const sx = mirrored ? s.position.x : s.position.x + (s.width ?? 0);
+  const sy = s.position.y + (s.height ?? 0) / 2;
+  const tx = mirrored ? t.position.x + (t.width ?? 0) : t.position.x;
+  const ty = t.position.y + (t.height ?? 0) / 2;
+  return Math.max(Math.abs(tx - sx) + Math.abs(ty - sy), 1);
+}
+
+/** 脉冲时序等值比较（拖动逐帧重算防抖：份额漂移 < 0.1% 不触发 setState）。 */
+function pulseTimingsEqual(
+  a: Map<string, { beginFrac: number; endFrac: number; durMs: number }> | null,
+  b: Map<string, { beginFrac: number; endFrac: number; durMs: number }>,
+): boolean {
+  if (a === null || a.size !== b.size) return false;
+  for (const [id, tb] of b) {
+    const ta = a.get(id);
+    if (!ta) return false;
+    if (
+      Math.abs(ta.beginFrac - tb.beginFrac) > 0.001 ||
+      Math.abs(ta.endFrac - tb.endFrac) > 0.001 ||
+      Math.abs(ta.durMs - tb.durMs) > 1
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** 画布事件 → 画布坐标（viewport 逆变换）。仅命中空白 pane 才有效：

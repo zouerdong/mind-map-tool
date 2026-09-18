@@ -634,6 +634,7 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       "view.organize": () => onOrganize(),
       "view.layout-horizontal": () => setOrganizeDirection("horizontal"),
       "view.layout-vertical": () => setOrganizeDirection("vertical"),
+      "view.layout-balanced": () => setOrganizeDirection("balanced"),
       "view.theme-warm": () => {
         if (session.current.document.document.theme === "light") return;
         session.commit({ kind: "SetDocumentStyle", theme: "light" });

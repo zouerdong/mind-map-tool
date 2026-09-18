@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 2,
+  "document": {
+    "theme": "light",
+    "font": "noto-sans-sc",
+    "shape": "card",
+    "framesVisible": true,
+    "nodes": [
+      {
+        "id": "b-root",
+        "text": "初始想法",
+        "position": {
+          "x": 606,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        },
+        "emphasis": true
+      },
+      {
+        "id": "b-c1",
+        "text": "发散方向 1",
+        "position": {
+          "x": 404,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c2",
+        "text": "发散方向 2",
+        "position": {
+          "x": 808,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c3",
+        "text": "发散方向 3",
+        "position": {
+          "x": 404,
+          "y": 84.4
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c4",
+        "text": "发散方向 4",
+        "position": {
+          "x": 808,
+          "y": 84.4
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c5",
+        "text": "发散方向 5",
+        "position": {
+          "x": 404,
+          "y": 168.8
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c6",
+        "text": "发散方向 6",
+        "position": {
+          "x": 808,
+          "y": 168.8
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c7",
+        "text": "发散方向 7",
+        "position": {
+          "x": 404,
+          "y": 253.2
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c8",
+        "text": "发散方向 8",
+        "position": {
+          "x": 808,
+          "y": 253.2
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-c9",
+        "text": "发散方向 9",
+        "position": {
+          "x": 404,
+          "y": 337.6
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-b-c1-g1",
+        "text": "b-c1 子项 1",
+        "position": {
+          "x": 202,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-b-c1-g2",
+        "text": "b-c1 子项 2",
+        "position": {
+          "x": 202,
+          "y": 84.4
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-b-c2-g1",
+        "text": "b-c2 子项 1",
+        "position": {
+          "x": 1010,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-b-c2-g2",
+        "text": "b-c2 子项 2",
+        "position": {
+          "x": 1010,
+          "y": 84.4
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-b-c2-g3",
+        "text": "b-c2 子项 3",
+        "position": {
+          "x": 1010,
+          "y": 168.8
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      },
+      {
+        "id": "b-leaf",
+        "text": "深层末梢",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 120,
+          "height": 46.4
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "b-e-c1",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c1"
+      },
+      {
+        "id": "b-e-c2",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c2"
+      },
+      {
+        "id": "b-e-c3",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c3"
+      },
+      {
+        "id": "b-e-c4",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c4"
+      },
+      {
+        "id": "b-e-c5",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c5"
+      },
+      {
+        "id": "b-e-c6",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c6"
+      },
+      {
+        "id": "b-e-c7",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c7"
+      },
+      {
+        "id": "b-e-c8",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c8"
+      },
+      {
+        "id": "b-e-c9",
+        "sourceNodeId": "b-root",
+        "targetNodeId": "b-c9"
+      },
+      {
+        "id": "b-e-b-c1-g1",
+        "sourceNodeId": "b-c1",
+        "targetNodeId": "b-b-c1-g1"
+      },
+      {
+        "id": "b-e-b-c1-g2",
+        "sourceNodeId": "b-c1",
+        "targetNodeId": "b-b-c1-g2"
+      },
+      {
+        "id": "b-e-b-c2-g1",
+        "sourceNodeId": "b-c2",
+        "targetNodeId": "b-b-c2-g1"
+      },
+      {
+        "id": "b-e-b-c2-g2",
+        "sourceNodeId": "b-c2",
+        "targetNodeId": "b-b-c2-g2"
+      },
+      {
+        "id": "b-e-b-c2-g3",
+        "sourceNodeId": "b-c2",
+        "targetNodeId": "b-b-c2-g3"
+      },
+      {
+        "id": "b-e-leaf",
+        "sourceNodeId": "b-b-c1-g1",
+        "targetNodeId": "b-leaf"
+      }
+    ]
+  }
+}

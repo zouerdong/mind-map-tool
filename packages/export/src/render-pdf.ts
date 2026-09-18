@@ -102,11 +102,13 @@ export async function renderPdf(
           break;
         }
         case "frame-rect":
-          // 圆角矩形从共同 primitives 绘制（rx 与 SVG 同值）；实心卡无描边
+          // 圆角矩形从共同 primitives 绘制（rx 与 SVG 同值）；
+          // ADR 0020 第二轮：depth≥4 卡有镜像描边（SVG 侧 stroke-width 1 同源）
           page.drawSvgPath(roundedRectPath(item.w, item.h, item.rx), {
             x: item.x,
             y: pageH - item.y,
             color: hexToRgb(item.fill),
+            ...(item.stroke !== null ? { borderColor: hexToRgb(item.stroke), borderWidth: 1 } : {}),
           });
           break;
         case "frame-ellipse":
@@ -116,6 +118,7 @@ export async function renderPdf(
             xScale: item.rx,
             yScale: item.ry,
             color: hexToRgb(item.fill),
+            ...(item.stroke !== null ? { borderColor: hexToRgb(item.stroke), borderWidth: 1 } : {}),
           });
           break;
         case "text":

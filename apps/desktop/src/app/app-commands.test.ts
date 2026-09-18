@@ -24,6 +24,7 @@ function recordingHandlers(calls: string[]): AppCommandHandlers {
     "view.organize",
     "view.layout-horizontal",
     "view.layout-vertical",
+    "view.layout-balanced",
     "view.theme-warm",
     "view.theme-dark",
     "app.shortcuts",

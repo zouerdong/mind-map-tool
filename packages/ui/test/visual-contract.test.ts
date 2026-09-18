@@ -22,10 +22,25 @@ describe("ui ↔ export 视觉同源", () => {
     expect(ui.cardAccentFill).toBe(ex.cardAccentFill);
     expect(ui.cardAccentText).toBe(ex.cardAccentText);
     expect(ui.cardAccentKicker).toBe(ex.cardAccentKicker);
+    // ADR 0020 深度阶梯
+    expect(ui.cardDepth3Fill).toBe(ex.cardDepth3Fill);
+    expect(ui.cardDepth3Text).toBe(ex.cardDepth3Text);
+    expect(ui.cardDepth3Kicker).toBe(ex.cardDepth3Kicker);
+    expect(ui.cardDepth4Fill).toBe(ex.cardDepth4Fill);
+    expect(ui.cardDepth4Text).toBe(ex.cardDepth4Text);
+    expect(ui.cardDepth4Kicker).toBe(ex.cardDepth4Kicker);
+    expect(ui.cardDepth4Stroke).toBe(ex.cardDepth4Stroke); // ADR 0020 第二轮：镜像描边
     expect(ui.edgePrimary).toBe(ex.edgePrimary);
     expect(ui.edgeSecondary).toBe(ex.edgeSecondary);
     expect(ui.canvasInk).toBe(ex.canvasInk);
     expect(ui.canvasKicker).toBe(ex.canvasKicker);
+  });
+
+  it("选中高亮 = 出发点橙卡同 hue（2026-09-18 [from-user]：选中框橙色高亮、与初始框呼应）", () => {
+    for (const t of [LIGHT_TOKENS, DARK_TOKENS]) {
+      expect(t.selectionAccent).toBe(t.cardAccentFill); // #D97757 同 hue 呼应
+      expect(t.selectionAccentHalo).toContain("217, 119, 87"); // 发光环 = 半透明橙
+    }
   });
 
   it("状态色（选中/焦点/端口）= 加深强调变体（#D06B47，暖白底 3.36:1 / 黑板 5.15:1）；卡填充 = 产品强调 #D97757", () => {

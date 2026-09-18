@@ -12,6 +12,7 @@ import {
   findCollinearOverlaps,
   formatNum,
   planEdgeGeometry,
+  planEdgeRoutes,
   polylineD,
   type EdgePlanInput,
   type NodeBox,
@@ -286,6 +287,118 @@ describe("确定性", () => {
     ];
     const a = planEdgeGeometry(edges, "horizontal", 1);
     const b = planEdgeGeometry(edges, "horizontal", 1);
+    expect([...a.values()]).toEqual([...b.values()]);
+  });
+});
+
+describe("双侧锚点（ADR 0019 dualSide：目标偏左 → 左出右入镜像布线）", () => {
+  it("默认（dualSide 缺省）保持旧契约：一律右出左入", () => {
+    // target 在 source 左侧：旧契约仍右出左入
+    const e = edge("e1", 400, 0, 0, 0);
+    const g = planEdgeGeometry([e], "horizontal", 1).get("e1")!;
+    expect(g.anchorSource.x).toBe(400 + 188); // 右缘出
+    expect(g.anchorTarget.x).toBe(0); // 左缘入
+  });
+
+  it("dualSide：目标偏左的边左出右入，箭头仍指向目标", () => {
+    const e = edge("e1", 400, 0, 0, 0);
+    const g = planEdgeGeometry([e], "horizontal", 1, { dualSide: true }).get("e1")!;
+    expect(g.anchorSource.x).toBe(400); // 左缘出
+    expect(g.anchorTarget.x).toBe(0 + 188); // 右缘入
+    expect(g.tip.x).toBeLessThan(g.start.x); // 流向朝左（朝目标）
+  });
+
+  it("dualSide：目标偏右/平局仍右出左入（与旧契约一致）", () => {
+    const e = edge("e1", 0, 0, 400, 0);
+    const g = planEdgeGeometry([e], "horizontal", 1, { dualSide: true }).get("e1")!;
+    expect(g.anchorSource.x).toBe(188);
+    expect(g.anchorTarget.x).toBe(400);
+  });
+
+  it("发散混合组：一左一右两条边互不穿越节点、零共线重叠", () => {
+    // root 居中，left/right 两个一级子节点（发散布局典型终态）
+    const obstacles = [box(500, 200), box(100, 200), box(900, 200)];
+    const edges: EdgePlanInput[] = [
+      {
+        id: "el",
+        sourceId: "root",
+        targetId: "left",
+        source: box(500, 200),
+        target: box(100, 200),
+      },
+      {
+        id: "er",
+        sourceId: "root",
+        targetId: "right",
+        source: box(500, 200),
+        target: box(900, 200),
+      },
+    ];
+    const geoms = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true, obstacles });
+    const gl = geoms.get("el")!;
+    const gr = geoms.get("er")!;
+    // 左支左出右入；右支右出左入
+    expect(gl.anchorSource.x).toBe(500);
+    expect(gl.anchorTarget.x).toBe(100 + 188);
+    expect(gr.anchorSource.x).toBe(500 + 188);
+    expect(gr.anchorTarget.x).toBe(900);
+    // 合并输出零共线重叠（§1.4 硬规则跨分帧仍成立）
+    const overlaps = findCollinearOverlaps(geoms.values());
+    expect(overlaps.filter((o) => o.axis === "v")).toEqual([]);
+  });
+
+  it("镜像一致性：左右对称布局产出镜像几何", () => {
+    // A(0,0)→B(600,0) 与 B'(600,0)→A'(0,0) 的几何应关于 x 镜像（同尺寸盒）
+    const fwd = planEdgeGeometry([edge("e", 0, 0, 600, 0)], "horizontal", 1, {
+      dualSide: true,
+    }).get("e")!;
+    const bwd = planEdgeGeometry([edge("e", 600, 0, 0, 0)], "horizontal", 1, {
+      dualSide: true,
+    }).get("e")!;
+    // bwd 的 chain 每个点 = fwd 对应点 x 取反 + 盒宽平移（镜像轴 x=694 中心）
+    // 简化断言：bwd chain 的 x 序列严格递减，fwd 严格递增（或单段相等跨度）
+    const xs = (g: typeof fwd) => g.chain.map((p) => p.x);
+    const fwdXs = xs(fwd);
+    const bwdXs = xs(bwd);
+    expect(fwdXs.length).toBe(bwdXs.length);
+    for (let i = 1; i < fwdXs.length; i++) {
+      expect(Math.sign(fwdXs[i]! - fwdXs[i - 1]!)).toBeGreaterThanOrEqual(0);
+      expect(Math.sign(bwdXs[i]! - bwdXs[i - 1]!)).toBeLessThanOrEqual(0);
+    }
+  });
+
+  it("冻结路由复用：dualSide 下传入 routes 与不传入结果一致", () => {
+    const obstacles = [box(500, 200), box(100, 200), box(100, 400), box(900, 200)];
+    const edges: EdgePlanInput[] = [
+      { id: "e1", sourceId: "root", targetId: "l1", source: box(500, 200), target: box(100, 200) },
+      { id: "e2", sourceId: "root", targetId: "l2", source: box(500, 200), target: box(100, 400) },
+      { id: "e3", sourceId: "root", targetId: "r1", source: box(500, 200), target: box(900, 200) },
+    ];
+    const fresh = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true, obstacles });
+    const routes = planEdgeRoutes(edges, "horizontal", { dualSide: true, obstacles });
+    const frozen = planEdgeGeometry(edges, "horizontal", 1, {
+      dualSide: true,
+      obstacles,
+      routes,
+    });
+    expect([...frozen.values()]).toEqual([...fresh.values()]);
+  });
+
+  it("vertical + dualSide：忽略双侧（仅 horizontal 生效），不崩溃", () => {
+    const e = edge("e1", 0, 0, 0, 400);
+    const a = planEdgeGeometry([e], "vertical", 1, { dualSide: true }).get("e1")!;
+    const b = planEdgeGeometry([e], "vertical", 1).get("e1")!;
+    expect(a).toEqual(b);
+  });
+
+  it("确定性：dualSide 同输入同输出", () => {
+    const obstacles = [box(500, 0), box(0, 0), box(1000, 0)];
+    const edges: EdgePlanInput[] = [
+      { id: "e1", sourceId: "r", targetId: "l", source: box(500, 0), target: box(0, 0) },
+      { id: "e2", sourceId: "r", targetId: "r2", source: box(500, 0), target: box(1000, 0) },
+    ];
+    const a = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true, obstacles });
+    const b = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true, obstacles });
     expect([...a.values()]).toEqual([...b.values()]);
   });
 });

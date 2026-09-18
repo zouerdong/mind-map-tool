@@ -20,6 +20,15 @@ export interface ThemeTokens {
   cardNormalFill: string;
   cardNormalText: string;
   cardNormalKicker: string;
+  /** 深度阶梯（ADR 0020）：depth=3 深灰 / depth≥4 浅灰；深色主题镜像。depth 1–2 复用 cardNormal*。 */
+  cardDepth3Fill: string;
+  cardDepth3Text: string;
+  cardDepth3Kicker: string;
+  cardDepth4Fill: string;
+  cardDepth4Text: string;
+  cardDepth4Kicker: string;
+  /** depth≥4 卡描边（ADR 0020 第二轮：镜像描边——暖白白卡黑边 / 黑板黑卡白边）。 */
+  cardDepth4Stroke: string;
   /** 强调卡（用户手动角色，橙卡不随主题反转，§1.2）。 */
   cardAccentFill: string;
   cardAccentText: string;
@@ -31,6 +40,11 @@ export interface ThemeTokens {
   edgeSecondary: string;
   /** 状态：选中描边 / 键盘焦点环 / 拖动反馈 / hover 连接端口（同一橙 token，§1.1 原则）。 */
   selectionOutline: string;
+  /** 选中高亮（2026-09-18 [from-user]）：与出发点橙卡同 hue 的选中描边 + 外发光环。
+   *  描边用产品橙 #D97757（呼应语义优先，2.94:1 略低于 3:1 图形基线——可见性由
+   *  发光环通道承担）；发光环为半透明橙。 */
+  selectionAccent: string;
+  selectionAccentHalo: string;
   focusRing: string;
   draggingOutline: string;
   hoverPort: string;
@@ -55,6 +69,15 @@ export const LIGHT_TOKENS: ThemeTokens = {
   cardNormalFill: "#141412",
   cardNormalText: "#F5F2EA",
   cardNormalKicker: "#A8A296",
+  // ADR 0020 色值定稿（2026-09-18 负责人原型过目）：阶梯间距拉大——
+  // depth3 = 高级暖灰（浅字），depth4+ = 白卡墨字（与暖白画布仍可辨）。
+  cardDepth3Fill: "#57524B",
+  cardDepth3Text: "#F5F2EA",
+  cardDepth3Kicker: "#C9C4B8",
+  cardDepth4Fill: "#FFFFFF",
+  cardDepth4Text: "#141412",
+  cardDepth4Kicker: "#8A8478",
+  cardDepth4Stroke: "#141412",
   cardAccentFill: "#D97757",
   cardAccentText: "#331708",
   cardAccentKicker: "#5C2F1A",
@@ -62,6 +85,8 @@ export const LIGHT_TOKENS: ThemeTokens = {
   edgePrimary: "#4A4640",
   edgeSecondary: "#8A8478",
   selectionOutline: "#D06B47",
+  selectionAccent: "#D97757",
+  selectionAccentHalo: "rgba(217, 119, 87, 0.25)",
   focusRing: "#D06B47",
   draggingOutline: "#D06B47",
   hoverPort: "#D06B47",
@@ -82,6 +107,13 @@ export const DARK_TOKENS: ThemeTokens = {
   cardNormalFill: "#EFEAE0",
   cardNormalText: "#141412",
   cardNormalKicker: "#7A7264",
+  cardDepth3Fill: "#B4AEA0",
+  cardDepth3Text: "#141412",
+  cardDepth3Kicker: "#575146",
+  cardDepth4Fill: "#141412",
+  cardDepth4Text: "#F5F2EA",
+  cardDepth4Kicker: "#A39C8E",
+  cardDepth4Stroke: "#EFEAE0",
   cardAccentFill: "#D97757",
   cardAccentText: "#331708",
   cardAccentKicker: "#5C2F1A", // §1.2 未单列 → 沿用 light（与 export DARK_PALETTE 一致）
@@ -89,6 +121,8 @@ export const DARK_TOKENS: ThemeTokens = {
   edgePrimary: "#A39C8E",
   edgeSecondary: "#6B655A",
   selectionOutline: "#D06B47",
+  selectionAccent: "#D97757",
+  selectionAccentHalo: "rgba(217, 119, 87, 0.32)",
   focusRing: "#D06B47",
   draggingOutline: "#D06B47",
   hoverPort: "#D06B47",

@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { emptyDocument, type MindMapDocumentV1, type TextRun } from "@mindmap/core";
+import { emptyDocument, organize, type MindMapDocumentV1, type TextRun } from "@mindmap/core";
 import { createExportRenderer } from "@mindmap/export";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -350,6 +350,75 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
     );
     return doc;
   })();
+
+  // balanced-fanout（ADR 0019/0020）：发散整理终态 + 深度阶梯色 + 双侧镜像布线回归。
+  // 根橙卡（emphasis）+ 9 个一级子节点（含左右两支）+ 若干孙节点，位置由
+  // core organize(direction:"balanced") 权威产出——夹具即「整理后导出」契约快照。
+  {
+    const doc = emptyDocument();
+    doc.document.font = "noto-sans-sc"; // 显式锁定
+    const root = {
+      id: "b-root",
+      text: "初始想法",
+      position: { x: 0, y: 0 },
+      size: renderer.measureNodeVisual({ text: "初始想法" }, doc.document.font),
+      emphasis: true,
+    };
+    doc.document.nodes.push(root);
+    const CHILDREN = 9;
+    for (let i = 1; i <= CHILDREN; i++) {
+      const text = `发散方向 ${i}`;
+      doc.document.nodes.push({
+        id: `b-c${i}`,
+        text,
+        position: { x: 0, y: 0 },
+        size: renderer.measureNodeVisual({ text }, doc.document.font),
+      });
+      doc.document.edges.push({ id: `b-e-c${i}`, sourceNodeId: "b-root", targetNodeId: `b-c${i}` });
+    }
+    // 左右两支各带孙节点（深度 3 → 深灰阶梯），c1 再带曾孙（深度 4 → 浅灰阶梯）
+    for (const [parent, count] of [
+      ["b-c1", 2],
+      ["b-c2", 3],
+    ] as const) {
+      for (let i = 1; i <= count; i++) {
+        const text = `${parent} 子项 ${i}`;
+        const id = `b-${parent}-g${i}`;
+        doc.document.nodes.push({
+          id,
+          text,
+          position: { x: 0, y: 0 },
+          size: renderer.measureNodeVisual({ text }, doc.document.font),
+        });
+        doc.document.edges.push({
+          id: `b-e-${parent}-g${i}`,
+          sourceNodeId: parent,
+          targetNodeId: id,
+        });
+      }
+    }
+    {
+      const text = "深层末梢";
+      doc.document.nodes.push({
+        id: "b-leaf",
+        text,
+        position: { x: 0, y: 0 },
+        size: renderer.measureNodeVisual({ text }, doc.document.font),
+      });
+      doc.document.edges.push({
+        id: "b-e-leaf",
+        sourceNodeId: "b-b-c1-g1",
+        targetNodeId: "b-leaf",
+      });
+    }
+    const laid = organize(doc, { direction: "balanced" });
+    if (!laid.ok) throw new Error("balanced fixture layout failed");
+    for (const n of doc.document.nodes) {
+      const p = laid.positions.get(n.id);
+      if (p) n.position = p;
+    }
+    fixtures["balanced-fanout"] = doc;
+  }
 
   return fixtures;
 }

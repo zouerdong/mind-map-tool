@@ -21,6 +21,17 @@ export interface VisualPalette {
   cardNormalText: string;
   /** 普通卡眉题（§1.1 card.normal.kicker / §1.2 亮卡深眉题） */
   cardNormalKicker: string;
+  /** 深度阶梯（ADR 0020）：depth=3 深灰 / depth≥4 浅灰；深色主题镜像（越深越暗）。
+   *  depth 1–2 复用 cardNormal*。色值为原型初值，负责人确认后可在 token 层微调。 */
+  cardDepth3Fill: string;
+  cardDepth3Text: string;
+  cardDepth3Kicker: string;
+  cardDepth4Fill: string;
+  cardDepth4Text: string;
+  cardDepth4Kicker: string;
+  /** depth≥4 卡描边（ADR 0020 第二轮定稿 2026-09-18：四级起为「描边镜像」卡——
+   *  暖白 = 白卡黑边、黑板 = 黑卡白边；其余层级无描边）。 */
+  cardDepth4Stroke: string;
   /** 强调节点实心填充（橙，两主题不随主题反转，§1.2） */
   cardAccentFill: string;
   /** 强调卡正文（深字，两主题同值） */
@@ -43,6 +54,15 @@ export const LIGHT_PALETTE: VisualPalette = {
   cardNormalFill: "#141412",
   cardNormalText: "#F5F2EA",
   cardNormalKicker: "#A8A296",
+  // ADR 0020 色值定稿（2026-09-18 负责人原型过目）：阶梯间距拉大——
+  // depth3 = 高级暖灰（浅字），depth4+ = 白卡墨字（与暖白画布仍可辨）。
+  cardDepth3Fill: "#57524B",
+  cardDepth3Text: "#F5F2EA",
+  cardDepth3Kicker: "#C9C4B8",
+  cardDepth4Fill: "#FFFFFF",
+  cardDepth4Text: "#141412",
+  cardDepth4Kicker: "#8A8478",
+  cardDepth4Stroke: "#141412",
   cardAccentFill: "#D97757",
   cardAccentText: "#331708",
   cardAccentKicker: "#5C2F1A",
@@ -58,6 +78,13 @@ export const DARK_PALETTE: VisualPalette = {
   cardNormalFill: "#EFEAE0",
   cardNormalText: "#141412",
   cardNormalKicker: "#7A7264",
+  cardDepth3Fill: "#B4AEA0",
+  cardDepth3Text: "#141412",
+  cardDepth3Kicker: "#575146",
+  cardDepth4Fill: "#141412",
+  cardDepth4Text: "#F5F2EA",
+  cardDepth4Kicker: "#A39C8E",
+  cardDepth4Stroke: "#EFEAE0",
   cardAccentFill: "#D97757",
   cardAccentText: "#331708",
   cardAccentKicker: "#5C2F1A",
@@ -162,23 +189,53 @@ export function nodeRoleOf(node: Pick<MindNode, "emphasis">): NodeRole {
   return node.emphasis === true ? "accent" : "normal";
 }
 
-/** 角色与 frame visibility 共同决定卡底/正文/眉题三色（§1.1、§1.2；D3 眉题可选）。 */
+/** 深度阶梯档（ADR 0020）：depth 1–2 → normal；3 → depth3；≥4 → depth4；
+ *  undefined（孤立节点无层级语义）→ normal。UI 与 scene 共用本映射，不各自判断。 */
+export type DepthTier = "normal" | "depth3" | "depth4";
+
+export function depthTierOf(depth: number | undefined): DepthTier {
+  if (depth === undefined || depth <= 2) return "normal";
+  if (depth === 3) return "depth3";
+  return "depth4";
+}
+
+/** 角色与 frame visibility 共同决定卡底/正文/眉题三色（§1.1、§1.2；D3 眉题可选）。
+ *  ADR 0020：普通角色按深度阶梯取色（depth 缺省 = 孤立/深度 1–2 = 现状黑卡）。 */
 export function nodeColorsOf(
   palette: VisualPalette,
   role: NodeRole,
   framesVisible: boolean,
-): { fill: string | null; text: string; kicker: string } {
-  if (!framesVisible) return { fill: null, text: palette.canvasInk, kicker: palette.canvasKicker };
+  depth?: number,
+): { fill: string | null; text: string; kicker: string; stroke: string | null } {
+  if (!framesVisible)
+    return { fill: null, text: palette.canvasInk, kicker: palette.canvasKicker, stroke: null };
   if (role === "accent")
     return {
       fill: palette.cardAccentFill,
       text: palette.cardAccentText,
       kicker: palette.cardAccentKicker,
+      stroke: null,
+    };
+  const tier = depthTierOf(depth);
+  if (tier === "depth3")
+    return {
+      fill: palette.cardDepth3Fill,
+      text: palette.cardDepth3Text,
+      kicker: palette.cardDepth3Kicker,
+      stroke: null,
+    };
+  if (tier === "depth4")
+    return {
+      fill: palette.cardDepth4Fill,
+      text: palette.cardDepth4Text,
+      kicker: palette.cardDepth4Kicker,
+      stroke: palette.cardDepth4Stroke,
     };
   return {
     fill: palette.cardNormalFill,
     text: palette.cardNormalText,
     kicker: palette.cardNormalKicker,
+    stroke: null,
   };
 }
 

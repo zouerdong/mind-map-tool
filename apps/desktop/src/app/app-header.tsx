@@ -369,7 +369,11 @@ export function AppHeader({
             >
               <span>布局方向</span>
               <span style={kbdStyle}>
-                {organizeDirection === "horizontal" ? "横向 (默认)" : "纵向"}
+                {organizeDirection === "horizontal"
+                  ? "横向 (默认)"
+                  : organizeDirection === "vertical"
+                    ? "纵向"
+                    : "发散"}
               </span>
             </button>
             <hr style={hrStyle} />

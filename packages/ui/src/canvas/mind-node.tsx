@@ -9,7 +9,7 @@ import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { FontToken } from "@mindmap/core";
 import { layoutNodeVisual, VISUAL_TYPOGRAPHY } from "@mindmap/export/src/visual-style.js";
-import { measureNodeVisual } from "@mindmap/export/src/visual-style.js";
+import { depthTierOf, measureNodeVisual } from "@mindmap/export/src/visual-style.js";
 import { LAYOUT, type FontResolver } from "@mindmap/export/src/layout.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 import type { MindFlowNode } from "../projection/projection.js";
@@ -56,9 +56,36 @@ function MindNodeViewImpl({
   // DFR-020：隐藏框线（framesVisible=false）必须实际隐藏填充并切换到画布
   // 墨色/眉题色（与 export nodeColorsOf 同语义），此前 UI 忽略该字段。
   const frameless = data.framesVisible === false;
-  const fill = frameless ? "transparent" : accent ? t.cardAccentFill : t.cardNormalFill;
-  const text = frameless ? t.canvasInk : accent ? t.cardAccentText : t.cardNormalText;
-  const kicker = frameless ? t.canvasKicker : accent ? t.cardAccentKicker : t.cardNormalKicker;
+  // ADR 0020：普通卡按深度阶梯取色（depth3 深灰 / depth4+ 浅灰；孤立与 depth 1–2 保持
+  // 现状普通色）；强调橙卡优先级最高、frameless 纯文字态不受阶梯影响。
+  const tier = depthTierOf(data.depth);
+  const fill = frameless
+    ? "transparent"
+    : accent
+      ? t.cardAccentFill
+      : tier === "depth4"
+        ? t.cardDepth4Fill
+        : tier === "depth3"
+          ? t.cardDepth3Fill
+          : t.cardNormalFill;
+  const text = frameless
+    ? t.canvasInk
+    : accent
+      ? t.cardAccentText
+      : tier === "depth4"
+        ? t.cardDepth4Text
+        : tier === "depth3"
+          ? t.cardDepth3Text
+          : t.cardNormalText;
+  const kicker = frameless
+    ? t.canvasKicker
+    : accent
+      ? t.cardAccentKicker
+      : tier === "depth4"
+        ? t.cardDepth4Kicker
+        : tier === "depth3"
+          ? t.cardDepth3Kicker
+          : t.cardNormalKicker;
   const isEllipse = data.shape === "ellipse";
   const primary = selected || focused; // 主选/焦点：角标记
   // OFR-2026-09-14 #6：无真粗体字体（文楷 bold()=null）的语义粗体段不能用
@@ -96,26 +123,51 @@ function MindNodeViewImpl({
         outline: linkCandidate
           ? `3px solid ${t.hoverPort}`
           : selected
-            ? `2px solid ${t.selectionOutline}`
+            ? `2px solid ${t.selectionAccent}`
             : focused
               ? `2px solid ${t.focusRing}`
               : dragging
                 ? `1.5px dashed ${t.draggingOutline}`
                 : "none",
         outlineOffset: 3,
+        // boxShadow 复合（互不干扰）：depth≥4 镜像描边卡（ADR 0020 第二轮，内侧 1px）
+        // + 选中橙色发光环（2026-09-18 [from-user]，外侧 6px）。
+        boxShadow: (() => {
+          const shadows: string[] = [];
+          if (!frameless && !accent && tier === "depth4")
+            shadows.push(`inset 0 0 0 1px ${t.cardDepth4Stroke}`);
+          if (selected && !linkCandidate) shadows.push(`0 0 0 6px ${t.selectionAccentHalo}`);
+          return shadows.length > 0 ? shadows.join(", ") : "none";
+        })(),
       }}
       role="button"
       aria-label={`${data.kicker ? data.kicker + "·" : ""}节点：${data.text || "空"}${accent ? "（强调）" : ""}`}
       tabIndex={-1}
     >
-      {/* G-VIS D7：整理默认横向（右出左入）；纵向可选时由 VRA-060 协调切换 */}
+      {/* ADR 0019（2026-09-18 内测批次，负责人定稿 Q2=B）：左右两侧均可进线/出线，
+          箭头表达流向；锚点侧由投影按相对几何派生（projection deriveHandleSides）。
+          同侧 target/source 手柄重叠渲染，source 居顶层——从任一侧拖出均为正向连线。 */}
       <Handle
         type="target"
+        id="t-left"
+        position={Position.Left}
+        style={{ opacity: selected || focused ? 0.9 : 0.35 }}
+      />
+      <Handle
+        type="target"
+        id="t-right"
+        position={Position.Right}
+        style={{ opacity: selected || focused ? 0.9 : 0.35 }}
+      />
+      <Handle
+        type="source"
+        id="s-left"
         position={Position.Left}
         style={{ opacity: selected || focused ? 0.9 : 0.35 }}
       />
       <Handle
         type="source"
+        id="s-right"
         position={Position.Right}
         style={{ opacity: selected || focused ? 0.9 : 0.35 }}
       />

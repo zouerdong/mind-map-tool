@@ -43,6 +43,7 @@ pub const MENU_VIEW_FIT: &str = "view.fit";
 pub const MENU_VIEW_ORGANIZE: &str = "view.organize";
 pub const MENU_VIEW_LAYOUT_HORIZONTAL: &str = "view.layout-horizontal";
 pub const MENU_VIEW_LAYOUT_VERTICAL: &str = "view.layout-vertical";
+pub const MENU_VIEW_LAYOUT_BALANCED: &str = "view.layout-balanced";
 pub const MENU_VIEW_THEME_WARM: &str = "view.theme-warm";
 pub const MENU_VIEW_THEME_DARK: &str = "view.theme-dark";
 pub const MENU_APP_SHORTCUTS: &str = "app.shortcuts";
@@ -66,6 +67,7 @@ pub const RENDERER_COMMAND_IDS: &[&str] = &[
     MENU_VIEW_ORGANIZE,
     MENU_VIEW_LAYOUT_HORIZONTAL,
     MENU_VIEW_LAYOUT_VERTICAL,
+    MENU_VIEW_LAYOUT_BALANCED,
     MENU_VIEW_THEME_WARM,
     MENU_VIEW_THEME_DARK,
     MENU_APP_SHORTCUTS,
@@ -80,6 +82,7 @@ pub const RENDERER_COMMAND_IDS: &[&str] = &[
 pub const CHECK_COMMAND_IDS: &[&str] = &[
     MENU_VIEW_LAYOUT_HORIZONTAL,
     MENU_VIEW_LAYOUT_VERTICAL,
+    MENU_VIEW_LAYOUT_BALANCED,
     MENU_VIEW_THEME_WARM,
     MENU_VIEW_THEME_DARK,
 ];
@@ -105,7 +108,7 @@ pub fn is_check_command(id: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MenuWindowSync {
     pub theme: &'static str,              // "light" | "dark"（暖白 / 黑板）
-    pub organize_direction: &'static str, // "horizontal" | "vertical"
+    pub organize_direction: &'static str, // "horizontal" | "vertical" | "balanced"（ADR 0019 发散）
 }
 
 impl MenuWindowSync {
@@ -118,6 +121,7 @@ impl MenuWindowSync {
         let organize_direction = match organize_direction {
             "horizontal" => "horizontal",
             "vertical" => "vertical",
+            "balanced" => "balanced",
             _ => return None,
         };
         Some(Self {
@@ -126,13 +130,14 @@ impl MenuWindowSync {
         })
     }
 
-    /// 四个 check 项的目标勾选态：(theme_warm, theme_dark, layout_h, layout_v)。
-    pub fn check_state(&self) -> (bool, bool, bool, bool) {
+    /// 五个 check 项的目标勾选态：(theme_warm, theme_dark, layout_h, layout_v, layout_b)。
+    pub fn check_state(&self) -> (bool, bool, bool, bool, bool) {
         (
             self.theme == "light",
             self.theme == "dark",
             self.organize_direction == "horizontal",
             self.organize_direction == "vertical",
+            self.organize_direction == "balanced",
         )
     }
 }
@@ -144,6 +149,7 @@ pub struct MenuState {
     theme_dark: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
     layout_horizontal: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
     layout_vertical: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+    layout_balanced: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
     per_window: Mutex<HashMap<String, MenuWindowSync>>,
 }
 
@@ -160,6 +166,7 @@ impl MenuState {
             theme_dark: Mutex::new(None),
             layout_horizontal: Mutex::new(None),
             layout_vertical: Mutex::new(None),
+            layout_balanced: Mutex::new(None),
             per_window: Mutex::new(HashMap::new()),
         }
     }
@@ -170,11 +177,13 @@ impl MenuState {
         theme_dark: CheckMenuItem<tauri::Wry>,
         layout_horizontal: CheckMenuItem<tauri::Wry>,
         layout_vertical: CheckMenuItem<tauri::Wry>,
+        layout_balanced: CheckMenuItem<tauri::Wry>,
     ) {
         *self.theme_warm.lock().unwrap() = Some(theme_warm);
         *self.theme_dark.lock().unwrap() = Some(theme_dark);
         *self.layout_horizontal.lock().unwrap() = Some(layout_horizontal);
         *self.layout_vertical.lock().unwrap() = Some(layout_vertical);
+        *self.layout_balanced.lock().unwrap() = Some(layout_balanced);
     }
 
     /// renderer 上报（仅当该窗口为最近聚焦窗口时应用到 app-wide 菜单；
@@ -212,7 +221,7 @@ impl MenuState {
     }
 
     fn apply_sync(&self, sync: &MenuWindowSync) {
-        let (warm, dark, horiz, vert) = sync.check_state();
+        let (warm, dark, horiz, vert, bal) = sync.check_state();
         if let Some(item) = self.theme_warm.lock().unwrap().as_ref() {
             let _ = item.set_checked(warm);
         }
@@ -224,6 +233,9 @@ impl MenuState {
         }
         if let Some(item) = self.layout_vertical.lock().unwrap().as_ref() {
             let _ = item.set_checked(vert);
+        }
+        if let Some(item) = self.layout_balanced.lock().unwrap().as_ref() {
+            let _ = item.set_checked(bal);
         }
     }
 }
@@ -315,6 +327,15 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
+    // ADR 0019：发散布局（根居中、两侧发散）
+    let layout_balanced = CheckMenuItem::with_id(
+        app,
+        MENU_VIEW_LAYOUT_BALANCED,
+        "发散布局",
+        true,
+        false,
+        None::<&str>,
+    )?;
     let theme_warm = CheckMenuItem::with_id(
         app,
         MENU_VIEW_THEME_WARM,
@@ -369,6 +390,7 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         .item(&view_organize)
         .item(&layout_horizontal)
         .item(&layout_vertical)
+        .item(&layout_balanced)
         .separator()
         .item(&theme_warm)
         .item(&theme_dark)
@@ -384,7 +406,13 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
 
     // check 项句柄注册（运行时 set_checked；菜单随最近聚焦窗口刷新）
     if let Some(state) = app.try_state::<Arc<MenuState>>() {
-        state.register_check_items(theme_warm, theme_dark, layout_horizontal, layout_vertical);
+        state.register_check_items(
+            theme_warm,
+            theme_dark,
+            layout_horizontal,
+            layout_vertical,
+            layout_balanced,
+        );
     }
     Ok(())
 }
@@ -461,6 +489,7 @@ mod tests {
             "view.organize",
             "view.layout-horizontal",
             "view.layout-vertical",
+            "view.layout-balanced",
             "view.theme-warm",
             "view.theme-dark",
         ] {
@@ -491,12 +520,14 @@ mod tests {
     #[test]
     fn menu_window_sync_parse_and_check_state() {
         let warm_h = MenuWindowSync::parse("light", "horizontal").unwrap();
-        assert_eq!(warm_h.check_state(), (true, false, true, false));
+        assert_eq!(warm_h.check_state(), (true, false, true, false, false));
         let dark_v = MenuWindowSync::parse("dark", "vertical").unwrap();
-        assert_eq!(dark_v.check_state(), (false, true, false, true));
+        assert_eq!(dark_v.check_state(), (false, true, false, true, false));
         // 非法输入 fail-closed
         assert!(MenuWindowSync::parse("blue", "horizontal").is_none());
         assert!(MenuWindowSync::parse("light", "diagonal").is_none());
+        let bal = MenuWindowSync::parse("dark", "balanced").unwrap();
+        assert_eq!(bal.check_state(), (false, true, false, false, true));
         assert!(MenuWindowSync::parse("", "").is_none());
     }
 

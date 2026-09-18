@@ -15,6 +15,8 @@ const TEXT_PAIRS = (t: ThemeTokens) =>
   [
     ["普通卡正文/卡底", t.cardNormalText, t.cardNormalFill],
     ["强调卡正文/卡底", t.cardAccentText, t.cardAccentFill],
+    ["深度3卡正文/卡底（ADR 0020）", t.cardDepth3Text, t.cardDepth3Fill],
+    ["深度4+卡正文/卡底（ADR 0020）", t.cardDepth4Text, t.cardDepth4Fill],
     ["编辑光标/普通卡底", t.editingCaret, t.cardNormalFill],
     ["shell 文字/画布底", t.shellText, t.canvasBackground],
     ["提示卡正文/卡底", t.onboardingCardText, t.onboardingCardBackground],
@@ -24,6 +26,8 @@ const KICKER_PAIRS = (t: ThemeTokens) =>
   [
     ["普通卡眉题/卡底", t.cardNormalKicker, t.cardNormalFill],
     ["强调卡眉题/卡底", t.cardAccentKicker, t.cardAccentFill],
+    ["深度3卡眉题/卡底（ADR 0020）", t.cardDepth3Kicker, t.cardDepth3Fill],
+    ["深度4+卡眉题/卡底（ADR 0020）", t.cardDepth4Kicker, t.cardDepth4Fill],
   ] as const;
 
 const GRAPHIC_PAIRS = (t: ThemeTokens) =>
@@ -34,6 +38,7 @@ const GRAPHIC_PAIRS = (t: ThemeTokens) =>
     ["焦点环/画布底", t.focusRing, t.canvasBackground],
     ["拖动框/画布底", t.draggingOutline, t.canvasBackground],
     ["端口/画布底", t.hoverPort, t.canvasBackground],
+    ["四级卡描边/画布底（ADR 0020 第二轮镜像描边）", t.cardDepth4Stroke, t.canvasBackground],
     ["提示卡描边/卡底", t.onboardingCardBorder, t.onboardingCardBackground],
   ] as const;
 

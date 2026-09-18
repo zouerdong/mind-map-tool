@@ -68,6 +68,42 @@ export interface EdgePlanInput {
   outerArc?: ChannelSide;
 }
 
+/** 双侧路由（ADR 0019）：按端点中心 x 分帧，镜像组 x 取反后走标准横向规划。
+ *  镜像组的锚点与路由数值保留在镜像帧（mirrored=true），几何出口处统一镜像回真实坐标。 */
+function planEdgeRoutesDualSide(
+  edges: readonly EdgePlanInput[],
+  context: PlanContext,
+): Map<string, RoutedEdge> {
+  const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
+  const normal: EdgePlanInput[] = [];
+  const mirrored: EdgePlanInput[] = [];
+  for (const e of edges) (edgeIsMirrored(e) ? mirrored : normal).push(e);
+  const result = new Map<string, RoutedEdge>();
+  if (normal.length > 0) {
+    const r = planEdgeRoutes(normal, "horizontal", { ...context, dualSide: false, obstacles });
+    for (const [id, re] of r) result.set(id, { ...re, mirrored: false });
+  }
+  if (mirrored.length > 0) {
+    const mEdges = mirrored.map((e) => ({
+      ...e,
+      source: mirrorBoxX(e.source),
+      target: mirrorBoxX(e.target),
+    }));
+    const mObstacles = obstacles.map(mirrorBoxX);
+    const r = planEdgeRoutes(mEdges, "horizontal", {
+      ...context,
+      dualSide: false,
+      obstacles: mObstacles,
+      bounds: undefined, // 镜像帧 bounds 由镜像 obstacles 重推
+    });
+    for (const [id, re] of r) {
+      const orig = mirrored.find((e) => e.id === id)!;
+      result.set(id, { ...re, input: orig, mirrored: true });
+    }
+  }
+  return result;
+}
+
 /** 端口分配（同卡多出边/多入边沿卡边均分，边文档序即槽位序 —— 算法可重复）。 */
 export interface PortAllocation {
   sourceSlot: number;
@@ -80,6 +116,9 @@ export interface RoutedEdge {
   id: string;
   input: EdgePlanInput;
   ports: PortAllocation;
+  /** dualSide 镜像组的锚点/路由处于镜像坐标系（x 取反）；正常组为真实坐标。
+   *  冻结路由复用时由 planEdgeGeometry 按当前端点框重新分帧，保持同帧消费。 */
+  mirrored?: boolean;
   /** 卡边界锚点（端点 gap 之前） */
   anchorSource: Pt;
   anchorTarget: Pt;
@@ -154,6 +193,9 @@ export interface PlanContext {
   seamWidth?: number | undefined;
   /** 冻结的路由拓扑（动效期间保持通道与拓扑不变，防止离散跳形；缺省由 planEdgeRoutes 计算） */
   routes?: Map<string, RoutedEdge> | undefined;
+  /** 双侧锚点（ADR 0019）：仅 horizontal 生效。目标中心在源中心左侧的边走镜像规划
+   * （左出右入），其余右出左入；缺省 false = 全部右出左入（旧契约）。 */
+  dualSide?: boolean | undefined;
 }
 
 export function formatNum(v: number): string {
@@ -172,6 +214,41 @@ export function translatePt(p: Pt, dx: number, dy: number): Pt {
 
 export function translatePts(pts: readonly Pt[], dx: number, dy: number): Pt[] {
   return pts.map((p) => translatePt(p, dx, dy));
+}
+
+// ---------- 双侧锚点（ADR 0019）：镜像坐标系工具 ----------
+// 镜像 = x 轴取反（box.x' = -(x+width)，点 x' = -x）。镜像后「左出右入」的边
+// 变成标准横向「右出左入」，整体规划完成后再镜像回真实坐标。
+
+/** 双侧分帧判定：目标中心严格在源中心左侧 → 镜像组（左出右入）。平局归正常组。 */
+export function edgeIsMirrored(e: Pick<EdgePlanInput, "source" | "target">): boolean {
+  return e.target.x + e.target.width / 2 < e.source.x + e.source.width / 2;
+}
+
+function mirrorBoxX(b: NodeBox): NodeBox {
+  return { x: -(b.x + b.width), y: b.y, width: b.width, height: b.height };
+}
+
+function mirrorPtX(p: Pt): Pt {
+  return { x: -p.x, y: p.y };
+}
+
+/** 几何整体镜像回真实坐标（点/向量/折线/箭头一致变换；route 数值字段保留在规划帧，
+ *  下游消费者（冻结路由）按 mirrored 标记同帧复用，不直接读坐标字段）。 */
+function mirrorGeometryX(g: EdgeGeometry): EdgeGeometry {
+  return {
+    ...g,
+    anchorSource: mirrorPtX(g.anchorSource),
+    anchorTarget: mirrorPtX(g.anchorTarget),
+    start: mirrorPtX(g.start),
+    tip: mirrorPtX(g.tip),
+    lineEnd: mirrorPtX(g.lineEnd),
+    enterDir: { x: -g.enterDir.x, y: g.enterDir.y },
+    arrowBase: [mirrorPtX(g.arrowBase[0]), mirrorPtX(g.arrowBase[1])],
+    controls: [mirrorPtX(g.controls[0]), mirrorPtX(g.controls[1])],
+    chain: g.chain.map(mirrorPtX),
+    extremes: g.extremes.map(mirrorPtX),
+  };
 }
 
 function len(dx: number, dy: number): number {
@@ -254,6 +331,9 @@ export function planEdgeRoutes(
   direction: LayoutDirection,
   context: PlanContext = {},
 ): Map<string, RoutedEdge> {
+  if (direction === "horizontal" && context.dualSide === true) {
+    return planEdgeRoutesDualSide(edges, context);
+  }
   const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
   const gb = context.bounds ?? graphBoundsOf(obstacles);
   const seam = Math.max(40, context.seamWidth ?? EDGE_GEOMETRY.seamWidth);
@@ -595,6 +675,9 @@ export function planEdgeGeometry(
   lineMorph: number,
   context: PlanContext = {},
 ): Map<string, EdgeGeometry> {
+  if (direction === "horizontal" && context.dualSide === true) {
+    return planEdgeGeometryDualSide(edges, lineMorph, context);
+  }
   const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
   const gb = context.bounds ?? graphBoundsOf(obstacles);
   const seam = Math.max(40, context.seamWidth ?? EDGE_GEOMETRY.seamWidth);
@@ -669,6 +752,53 @@ export function planEdgeGeometry(
   }
   // 让行 pass：消除引出走廊与其它走廊的共线重叠（§1.4 硬规则的收尾保障）
   if (lineMorph >= 0.999) resolveExitCorridors(result, 3);
+  return result;
+}
+
+/** 双侧几何（ADR 0019）：镜像组在镜像帧完成全部几何构建后镜像回真实坐标。
+ *  冻结路由契约：镜像组的 routes 由 planEdgeRoutes dualSide 存于镜像帧，此处同帧复用。 */
+function planEdgeGeometryDualSide(
+  edges: readonly EdgePlanInput[],
+  lineMorph: number,
+  context: PlanContext,
+): Map<string, EdgeGeometry> {
+  const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
+  const normal: EdgePlanInput[] = [];
+  const mirrored: EdgePlanInput[] = [];
+  for (const e of edges) (edgeIsMirrored(e) ? mirrored : normal).push(e);
+  const result = new Map<string, EdgeGeometry>();
+  if (normal.length > 0) {
+    const g = planEdgeGeometry(normal, "horizontal", lineMorph, {
+      ...context,
+      dualSide: false,
+      obstacles,
+    });
+    for (const [id, geo] of g) result.set(id, geo);
+  }
+  if (mirrored.length > 0) {
+    const mEdges = mirrored.map((e) => ({
+      ...e,
+      source: mirrorBoxX(e.source),
+      target: mirrorBoxX(e.target),
+    }));
+    const mObstacles = obstacles.map(mirrorBoxX);
+    let mRoutes: Map<string, RoutedEdge> | undefined;
+    if (context.routes) {
+      mRoutes = new Map<string, RoutedEdge>();
+      for (const e of mirrored) {
+        const r = context.routes.get(e.id);
+        if (r) mRoutes.set(e.id, r);
+      }
+    }
+    const g = planEdgeGeometry(mEdges, "horizontal", lineMorph, {
+      ...context,
+      dualSide: false,
+      obstacles: mObstacles,
+      bounds: undefined,
+      routes: mRoutes,
+    });
+    for (const [id, geo] of g) result.set(id, mirrorGeometryX(geo));
+  }
   return result;
 }
 
