@@ -49,6 +49,9 @@ export interface MindEdgeData extends Record<string, unknown> {
   pulse?: { beginFrac: number; endFrac: number; durMs: number };
   /** 脉冲来路的静态高亮（pulse 播放时同亮；reduced-motion 退化为仅此）。 */
   pulseHighlight?: boolean;
+  /** 指针悬停（会话态，EditorCanvas 经 onEdgeMouseEnter/Leave 注入）：
+   *  hover 时显示中点删除按钮，不进文件与导出。 */
+  hover?: boolean;
 }
 
 export type MindFlowEdge = Edge<MindEdgeData, "mind">;

@@ -13,10 +13,22 @@
 | 节点拖动结束（`onNodeDragStop`）                                                              | `moveNodes(deltas, doc)`                                   | `MoveNodes`（批量原子）                                            | 拖动期间只本地位移；**只提交一次**；位移为零 → `null`                    |
 | 连接（`onConnect` source→target）                                                             | `connect(source, target, doc)`                             | `CreateEdge`                                                       | 预检自环/同向重复/悬空 → `null`（core 亦会拒绝，预检避免注定失败的提交） |
 | Delete / Backspace（画布 focus，非编辑态）                                                    | `deleteSelection(nodeIds, edgeIds)`                        | `DeleteSelection`                                                  | 选中节点 + 选中边；incident 边由 core 原子删除                           |
+| 边中点 × 按钮点击（hover/选中边时浮出，2026-09-22 内测反馈）                                  | `deleteSelection([], [edgeId])`                            | `DeleteSelection`（仅 edgeIds）                                    | 仅删该边、不动两端节点；可 undo；经 `EdgeActionsContext.deleteEdge` 注入   |
 | ⌘/Ctrl+Z（非编辑态、非 IME 组合；生产经编辑菜单 accelerator → dispatcher，OFR-2026-09-14 #5） | `session.undo()`（不产生新命令）                           | —                                                                  | history hook                                                             |
 | ⌘/Ctrl+Shift+Z / ⌘/Ctrl+Y                                                                     | `session.redo()`                                           | —                                                                  |                                                                          |
 | 主题切换（未来 MM-070 入口）                                                                  | `setTheme(theme)`                                          | `SetDocumentStyle`                                                 | 持久化、可 undo                                                          |
 | 节点形状覆盖（未来入口）                                                                      | `setNodeShape(id, shape)`                                  | `SetNodeShape`                                                     | null=清除覆盖                                                            |
+
+## 边选中与删除（2026-09-22 内测反馈批次）
+
+- **点击边 = 选中**：描边换 `selectionAccent` 橙 + 光晕底衬（组件内消费 `selected` prop——
+  RF base.css 的 `.selected` 描边被投影 inline `style.stroke` 压死，选中零反馈的根因修复）；
+- **hover / 选中边 → 线中点浮出 × 删除按钮**（foreignObject 挂在边平面内，随视口变换）；
+- 仅选中边时上下文工具条锚点回退为该边两端节点中点（此前 anchor=null 掉回屏幕顶部中央，
+  边工具与线无空间关联）；工具条「删除」按钮门槛从 nodeSel > 0 修为任一选中（此前
+  仅选中边时工具条删除从不渲染）；
+- 已知取舍：自由态 RF marker 箭头颜色在建边时定死，选中时箭头不随描边变橙
+  （规整态 customArrow 用 fill=stroke 会跟随）。
 
 ## 画布手势（2026-09-18 内测批次，负责人定稿 Q1=A + 内测反馈②③）
 

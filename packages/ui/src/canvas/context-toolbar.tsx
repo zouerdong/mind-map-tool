@@ -134,7 +134,9 @@ export function ContextToolbar({
           render={{ btn, t }}
         />
       ) : null}
-      {nodeSel.length > 0
+      {/* 2026-09-22 内测反馈修复：此前以 nodeSel.length > 0 为门槛，
+          仅选中边时删除按钮从不渲染（文件头注释承诺的「边→删除」从未兑现）。 */}
+      {!nothing
         ? btn(
             "删除",
             () =>

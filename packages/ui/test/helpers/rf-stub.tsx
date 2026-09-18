@@ -78,6 +78,9 @@ export async function rfStubModule(): Promise<unknown> {
               className: "react-flow__edge",
               "data-testid": `rf-edge-${e.id}`,
               "data-path": e.data?.pathD,
+              // 单击=选中边（与节点 testid 同法：代理 RF EdgeWrapper 的 select change）
+              onClick: () =>
+                props.onEdgesChange?.([{ id: e.id, type: "select", selected: true }]),
             },
             props.edgeTypes?.[e.type]
               ? createElement(props.edgeTypes[e.type], {
@@ -87,6 +90,13 @@ export async function rfStubModule(): Promise<unknown> {
                   data: e.data,
                   style: e.style,
                   markerEnd: e.markerEnd,
+                  selected: Boolean(e.selected),
+                  sourceX: 0,
+                  sourceY: 0,
+                  targetX: 100,
+                  targetY: 0,
+                  sourcePosition: "right",
+                  targetPosition: "left",
                 })
               : null,
           ),

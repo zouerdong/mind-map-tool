@@ -55,7 +55,7 @@ import { createInteractionController } from "../controller/interaction-controlle
 import { isCompositionEvent } from "./node-text-editor.js";
 import { useCanvasSession } from "./use-canvas-session.js";
 import { MindNodeView } from "./mind-node.js";
-import { MindEdgeView } from "./mind-edge.js";
+import { EdgeActionsContext, MindEdgeView } from "./mind-edge.js";
 import { ContextToolbar } from "./context-toolbar.js";
 import { themeTokens } from "../theme/theme-tokens.js";
 import type { GeometryBarrier } from "./geometry-barrier.js";
@@ -354,6 +354,9 @@ export function EditorCanvas({
     primary: null,
   });
   const primaryRef = useRef<string | null>(null);
+  // 指针悬停的边（2026-09-22 内测反馈：连线删除入口）——hover 时显示中点删除按钮。
+  // session-only，经 displayEdges 注入 data.hover，不回流受控 state。
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const trackSelection = useCallback(
     (source: "nodes" | "edges", changes: Array<NodeChange<MindFlowNode> | EdgeChange>) => {
       let touched = false;
@@ -997,17 +1000,31 @@ export function EditorCanvas({
 
   // DFR-030 / ADR 0012 v1.1.0：上下文工具条锚点——主选节点的屏幕坐标
   //（卡上方中心），供 ContextToolbar 定位到节点附近并夹紧视口。
+  // 2026-09-22：仅选中边时锚点回退为该边两端节点的中点（此前 anchor=null
+  // 掉到屏幕顶部中央，与线无空间关联，边工具不可发现的根因之一）。
   const toolbarAnchor = useMemo(() => {
     const pid = uiSelection.primary;
-    if (!pid) return null;
-    const node = rfNodes.find((n) => n.id === pid);
-    if (!node) return null;
-    const w = node.width ?? 0;
-    return {
-      x: viewport.x + (node.position.x + w / 2) * viewport.zoom,
-      y: viewport.y + node.position.y * viewport.zoom,
-    };
-  }, [uiSelection.primary, rfNodes, viewport]);
+    if (pid) {
+      const node = rfNodes.find((n) => n.id === pid);
+      if (!node) return null;
+      const w = node.width ?? 0;
+      return {
+        x: viewport.x + (node.position.x + w / 2) * viewport.zoom,
+        y: viewport.y + node.position.y * viewport.zoom,
+      };
+    }
+    const eid = uiSelection.edges[uiSelection.edges.length - 1];
+    if (!eid) return null;
+    const edge = rfEdges.find((e) => e.id === eid);
+    const src = edge ? rfNodes.find((n) => n.id === edge.source) : undefined;
+    const tgt = edge ? rfNodes.find((n) => n.id === edge.target) : undefined;
+    if (!src || !tgt) return null;
+    const mx =
+      (src.position.x + (src.width ?? 0) / 2 + tgt.position.x + (tgt.width ?? 0) / 2) / 2;
+    const my =
+      (src.position.y + (src.height ?? 0) / 2 + tgt.position.y + (tgt.height ?? 0) / 2) / 2;
+    return { x: viewport.x + mx * viewport.zoom, y: viewport.y + my * viewport.zoom };
+  }, [uiSelection.primary, uiSelection.edges, rfNodes, rfEdges, viewport]);
 
   const editingValue = useMemo<EditingContextValue>(
     () => ({
@@ -1084,28 +1101,46 @@ export function EditorCanvas({
     // rfNodes/rfEdges 拖动期间逐帧变化 → 时序跟随最新几何；等值守卫防抖
   }, [pulsePathKey, pulsePath, rfEdges, rfNodes]);
 
-  // 注入脉冲/高亮到边 view-model（不动 rfEdges 本体，避免回流进受控 state）
+  // 注入脉冲/高亮/hover 到边 view-model（不动 rfEdges 本体，避免回流进受控 state）
   const displayEdges = useMemo(() => {
-    if (!pulsePath) return rfEdges;
-    const onPath = new Set(pulsePath.edgeIds);
+    const onPath = pulsePath ? new Set(pulsePath.edgeIds) : null;
     return rfEdges.map((e) => {
-      if (!onPath.has(e.id)) return e;
+      const hover = hoveredEdgeId === e.id;
+      const pulseActive = onPath?.has(e.id) === true;
+      if (!hover && !pulseActive) return e;
       const data = e.data;
       if (!data) return e;
-      const timing = pulseTimings?.get(e.id);
+      const timing = pulseActive ? pulseTimings?.get(e.id) : undefined;
       return {
         ...e,
         data: {
           ...data,
-          pulseHighlight: true,
-          ...(timing && !reducedMotion ? { pulse: timing } : {}),
+          ...(hover ? { hover: true } : {}),
+          ...(pulseActive
+            ? {
+                pulseHighlight: true,
+                ...(timing && !reducedMotion ? { pulse: timing } : {}),
+              }
+            : {}),
         },
       };
     });
-  }, [rfEdges, pulsePath, pulseTimings, reducedMotion]);
+  }, [rfEdges, hoveredEdgeId, pulsePath, pulseTimings, reducedMotion]);
+
+  // 边中点删除按钮（2026-09-22 内测反馈）→ 仅删该边（不动两端节点）；可 undo。
+  const deleteEdge = useCallback(
+    (edgeId: string) => {
+      setHoveredEdgeId((cur) => (cur === edgeId ? null : cur));
+      const cmd = controller.deleteSelection([], [edgeId]);
+      if (cmd) api.commit(cmd);
+    },
+    [api, controller],
+  );
+  const edgeActions = useMemo(() => ({ deleteEdge }), [deleteEdge]);
 
   return (
     <EditingContext.Provider value={editingValue}>
+      <EdgeActionsContext.Provider value={edgeActions}>
       <div
         className={className}
         // MM-090-D9：黑板主题的纯黑画布此前从未接线（tokens 定义了但无消费者，
@@ -1140,6 +1175,10 @@ export function EditorCanvas({
           onEdgesChange={onEdgesChange}
           onNodeDragStop={onNodeDragStop}
           onConnect={onConnect}
+          onEdgeMouseEnter={(_e, edge) => setHoveredEdgeId(edge.id)}
+          onEdgeMouseLeave={(_e, edge) =>
+            setHoveredEdgeId((cur) => (cur === edge.id ? null : cur))
+          }
           onNodeDoubleClick={(_e, node) => beginEdit(node.id)}
           onMove={(_, vp) => setViewport(vp)} // session-only
           onInit={(instance) => {
@@ -1294,6 +1333,7 @@ export function EditorCanvas({
         ) : null}
         {overlay}
       </div>
+      </EdgeActionsContext.Provider>
     </EditingContext.Provider>
   );
 }
