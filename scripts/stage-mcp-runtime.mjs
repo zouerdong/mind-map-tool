@@ -7,6 +7,7 @@
 //       （缺省按当前主机平台；Windows 构建只走 CI，见 release-build.yml）
 
 import { execFileSync } from "node:child_process";
+import { copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -39,11 +40,14 @@ const run = (script, args) =>
   });
 
 run("scripts/build-mcp-standalone.mjs", []);
+// mjs 必须进入安装包资源目录（与运行时同目录），冒烟也打 staging 后的那份。
+const STAGED_MJS = resolve(RESOURCES_DIR, "mindmap-mcp.mjs");
+copyFileSync(resolve(REPO_ROOT, "apps/mcp-bridge/dist/mindmap-mcp.mjs"), STAGED_MJS);
 run("scripts/fetch-node-standalone.mjs", ["--platform", platform, "--out", RESOURCES_DIR]);
 run("scripts/smoke-mcp-standalone.mjs", [
   "--node",
   resolve(RESOURCES_DIR, platform === "win-x64" ? "mindmap-mcp.exe" : "mindmap-mcp"),
   "--bundle",
-  resolve(REPO_ROOT, "apps/mcp-bridge/dist/mindmap-mcp.mjs"),
+  STAGED_MJS,
 ]);
 console.log(`stage-mcp-runtime: READY（${platform}）→ ${RESOURCES_DIR}`);
