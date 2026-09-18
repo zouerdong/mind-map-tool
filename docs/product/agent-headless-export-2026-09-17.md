@@ -36,5 +36,5 @@
 （字体/WASM 内嵌），随安装包分发 pinned Node 24.21.0 独立运行时（`mcp/` 目录：
 Windows `%LOCALAPPDATA%\Mind Map\mcp\`，macOS `…/Contents/Resources/mcp/`）。
 stdio 唯一通道与工具契约不变；构建期冒烟（initialize/tools/list/render 落盘）
-在 CI 双平台与本地 `bundle:tauri` 前强制执行。Agent 接入指南：桌面
-`mindmap-mcp-agent-guide.md`（负责人分发给内测同事）。
+在 CI 双平台与本地 `bundle:tauri` 前强制执行。Agent 接入指南已收入版本库
+`docs/guides/agent-mcp-integration.md`（随发布分发；内测包副本随安装包一起发出）。
