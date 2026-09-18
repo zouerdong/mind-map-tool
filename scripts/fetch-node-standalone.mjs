@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { inflateRawSync } from "node:zlib";
 import {
   chmodSync,
   copyFileSync,
@@ -68,15 +69,55 @@ if (actual !== expected) {
   throw new Error(`sha256 不匹配：期望 ${expected}，实际 ${actual}`);
 }
 
-// 解包（tar 在 macOS / Windows runner 上均为 bsdtar，可同时处理 .tar.gz 与 .zip）。
+// 纯 Node 解压 zip 单条目（解析中央目录，不依赖外部 tar/unzip——Windows
+// runner 的 Git Bash tar 不能解 zip，2026-09-18 CI 失败教训）。
+function unzipEntry(buf, wantedName) {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0 && i > buf.length - 22 - 65536; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error("zip EOCD 未找到");
+  const count = buf.readUInt16LE(eocd + 10);
+  let off = buf.readUInt32LE(eocd + 16);
+  for (let n = 0; n < count; n++) {
+    if (buf.readUInt32LE(off) !== 0x02014b50) throw new Error("zip 中央目录损坏");
+    const method = buf.readUInt16LE(off + 10);
+    const compSize = buf.readUInt32LE(off + 20);
+    const nameLen = buf.readUInt16LE(off + 28);
+    const extraLen = buf.readUInt16LE(off + 30);
+    const commentLen = buf.readUInt16LE(off + 32);
+    const localOff = buf.readUInt32LE(off + 42);
+    const name = buf.subarray(off + 46, off + 46 + nameLen).toString("utf8");
+    if (name === wantedName) {
+      const lhNameLen = buf.readUInt16LE(localOff + 26);
+      const lhExtraLen = buf.readUInt16LE(localOff + 28);
+      const dataStart = localOff + 30 + lhNameLen + lhExtraLen;
+      const comp = buf.subarray(dataStart, dataStart + compSize);
+      if (method === 0) return comp;
+      if (method === 8) return inflateRawSync(comp);
+      throw new Error(`不支持的 zip 压缩方式 ${method}`);
+    }
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+  throw new Error(`zip 中未找到 ${wantedName}`);
+}
+
+// 解包（.tar.gz 走 bsdtar；.zip 走上面的纯 Node 解压）。
 const work = mkdtempSync(join(tmpdir(), "node-standalone-"));
 try {
-  const archivePath = join(work, spec.archive);
-  writeFileSync(archivePath, archiveBuf);
-  execFileSync("tar", ["-xf", archivePath, "-C", work], { stdio: "inherit" });
   mkdirSync(outDir, { recursive: true });
   const outPath = join(outDir, spec.outName);
-  copyFileSync(join(work, spec.inner), outPath);
+  if (spec.archive.endsWith(".zip")) {
+    writeFileSync(outPath, unzipEntry(archiveBuf, spec.inner));
+  } else {
+    const archivePath = join(work, spec.archive);
+    writeFileSync(archivePath, archiveBuf);
+    execFileSync("tar", ["-xf", archivePath, "-C", work], { stdio: "inherit" });
+    copyFileSync(join(work, spec.inner), outPath);
+  }
   if (platform !== "win-x64") chmodSync(outPath, 0o755);
   console.log(`fetch-node-standalone: OK ${NODE_VERSION} ${platform} → ${outPath}`);
 } finally {
