@@ -1191,6 +1191,12 @@ export function EditorCanvas({
               }
             }}
             nodesConnectable
+            // OFR-2026-09-20 [from-user]：连线拖拽预览走主题主墨色（默认 RF 连接线是
+            // 冷灰蓝 #b1b1b7，在暖色画布上观感为「蓝闪」）；形态默认贝塞尔，与散乱态一致。
+            connectionLineStyle={{
+              stroke: themeTokens(session.current.document.document.theme).edgePrimary,
+              strokeWidth: 2,
+            }}
             // 2026-09-18 内测批次（负责人定稿 Q1=A）：左键拖空白=框选（Figma/Miro
             // 白板惯例）；平移=Space+拖/中键/右键拖 + 触控板双指滚动（panOnScroll，
             // 内测反馈②）；缩放=捏合 / ⌘(Ctrl)+滚轮 / ⌘±0（zoomOnScroll 关闭，

@@ -105,7 +105,7 @@ function planEdgeRoutesDualSide(
   return result;
 }
 
-/** 端口分配（同卡多出边/多入边沿卡边均分，边文档序即槽位序 —— 算法可重复）。 */
+/** 端口分配（同卡多出边/多入边沿卡边均分；槽位序 = 对端锚沿轴坐标升序，ADR 0019 v1.2.0 —— 与输入顺序解耦、几何可重复）。 */
 export interface PortAllocation {
   sourceSlot: number;
   sourceOf: number;
@@ -261,28 +261,50 @@ function unit(dx: number, dy: number): Pt {
   return l === 0 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
 }
 
-/** 端口分配：出边/入边分别计数，槽位按边文档序（确定性；与原型 frozenAnchors 同规则）。 */
-export function assignEdgePorts(edges: readonly EdgePlanInput[]): Map<string, PortAllocation> {
+/**
+ * 端口分配：出边/入边分别计数；槽位序 = 对端锚沿轴坐标升序（tie：边 id）。
+ * [ADR 0019 v1.2.0 续，2026-09-20 dogfood] 旧规则按边文档序分配槽位——文档序与目标高度序
+ * 不一致时，中间槽位被低目标边占用，与转折 rank 序错位导致扇出“麻花”交叉。
+ * 新规则：出边槽位按目标卡沿轴坐标升序、入边槽位按源卡沿轴坐标升序——
+ * 越高的目标越靠上出线（从卡边中线向两翼排开），与转折 rank（垂直行程升序）同向，
+ * 单侧扇出零交叉；排序后分配与输入数组顺序无关（几何仅由布局决定）。
+ */
+export function assignEdgePorts(
+  edges: readonly EdgePlanInput[],
+  direction: LayoutDirection = "horizontal",
+): Map<string, PortAllocation> {
+  // 对端锚沿轴坐标：出边看目标卡、入边看源卡（用卡中心，与具体槽位无关，避免自引用）
+  const otherAlong = (e: EdgePlanInput, kind: "source" | "target"): number => {
+    const box = kind === "source" ? e.target : e.source;
+    return direction === "horizontal" ? box.y + box.height / 2 : box.x + box.width / 2;
+  };
+  const byOtherAlong =
+    (kind: "source" | "target") =>
+    (p: EdgePlanInput, q: EdgePlanInput): number =>
+      otherAlong(p, kind) - otherAlong(q, kind) || (p.id < q.id ? -1 : p.id > q.id ? 1 : 0);
   const outCnt = new Map<string, number>();
   const inCnt = new Map<string, number>();
-  const outIdx = new Map<string, number>();
-  const inIdx = new Map<string, number>();
   const result = new Map<string, PortAllocation>();
   for (const e of edges) {
     outCnt.set(e.sourceId, (outCnt.get(e.sourceId) ?? 0) + 1);
     inCnt.set(e.targetId, (inCnt.get(e.targetId) ?? 0) + 1);
   }
-  for (const e of edges) {
-    const sourceSlot = outIdx.get(e.sourceId) ?? 0;
-    outIdx.set(e.sourceId, sourceSlot + 1);
-    const targetSlot = inIdx.get(e.targetId) ?? 0;
-    inIdx.set(e.targetId, targetSlot + 1);
-    result.set(e.id, {
-      sourceSlot,
-      sourceOf: outCnt.get(e.sourceId)!,
-      targetSlot,
-      targetOf: inCnt.get(e.targetId)!,
-    });
+  // 每节点分组排序后分配槽位（分配序与输入顺序解耦）
+  const outSorted = [...edges].sort(byOtherAlong("source"));
+  const inSorted = [...edges].sort(byOtherAlong("target"));
+  const outIdx = new Map<string, number>();
+  const inIdx = new Map<string, number>();
+  for (const e of outSorted) {
+    const slot = outIdx.get(e.sourceId) ?? 0;
+    outIdx.set(e.sourceId, slot + 1);
+    const prev = result.get(e.id) ?? { sourceSlot: 0, sourceOf: 0, targetSlot: 0, targetOf: 0 };
+    result.set(e.id, { ...prev, sourceSlot: slot, sourceOf: outCnt.get(e.sourceId)! });
+  }
+  for (const e of inSorted) {
+    const slot = inIdx.get(e.targetId) ?? 0;
+    inIdx.set(e.targetId, slot + 1);
+    const prev = result.get(e.id) ?? { sourceSlot: 0, sourceOf: 0, targetSlot: 0, targetOf: 0 };
+    result.set(e.id, { ...prev, targetSlot: slot, targetOf: inCnt.get(e.targetId)! });
   }
   return result;
 }
@@ -338,7 +360,7 @@ export function planEdgeRoutes(
   const obstacles = context.obstacles ?? edges.flatMap((e) => [e.source, e.target]);
   const gb = context.bounds ?? graphBoundsOf(obstacles);
   const seam = Math.max(40, context.seamWidth ?? EDGE_GEOMETRY.seamWidth);
-  const ports = assignEdgePorts(edges);
+  const ports = assignEdgePorts(edges, direction);
   const routed = new Map<string, RoutedEdge>();
 
   interface Member {

@@ -62,10 +62,14 @@ describe("端口方向（§1.4：横向右出左入；纵向底出顶入）", ()
     expect(ys[2]).toBe(51);
   });
 
-  it("assignEdgePorts：槽位按边文档序，计数与序号一致", () => {
-    const ports = assignEdgePorts([edge("a", 0, 0, 100, 0), edge("b", 0, 0, 100, 50)]);
-    expect(ports.get("a")).toEqual({ sourceSlot: 0, sourceOf: 2, targetSlot: 0, targetOf: 1 });
-    expect(ports.get("b")).toEqual({ sourceSlot: 1, sourceOf: 2, targetSlot: 0, targetOf: 1 });
+  it("assignEdgePorts：槽位按对端锚沿轴坐标升序（ADR 0019 v1.2.0 续），与输入顺序无关", () => {
+    // b 的目标在上方（y=50）、a 的目标在下方（y=200）：即使 a 先出现，b 也拿更靠上的槽位 0
+    const fwd = assignEdgePorts([edge("a", 0, 0, 100, 200), edge("b", 0, 0, 100, 50)]);
+    expect(fwd.get("b")!.sourceSlot).toBe(0);
+    expect(fwd.get("a")!.sourceSlot).toBe(1);
+    // 输入顺序颠倒 → 分配结果完全一致（几何仅由布局决定）
+    const rev = assignEdgePorts([edge("b", 0, 0, 100, 50), edge("a", 0, 0, 100, 200)]);
+    expect([...rev.entries()].sort()).toEqual([...fwd.entries()].sort());
   });
 
   it("edgeAnchor 单边居中、多边均分", () => {
@@ -463,6 +467,13 @@ describe("发散扇出零交叉（ADR 0019 v1.2.0：同缝 rank 按垂直行程�
     const geoms = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true });
     expect(fanCrossings([...geoms.values()])).toEqual([]);
     expect(findCollinearOverlaps(geoms.values())).toEqual([]);
+    // v1.2.0 续：打乱输入顺序（模拟用户真实创建序）→ 几何完全一致
+    // （端口槽位按对端高度排序 + 转折 rank 按行程排序，均与输入顺序解耦）
+    const shuffled = [...edges].reverse();
+    const geoms2 = planEdgeGeometry(shuffled, "horizontal", 1, { dualSide: true });
+    for (const e of edges) {
+      expect(geoms2.get(e.id)).toEqual(geoms.get(e.id));
+    }
   });
 
   it("纯横向层列（全部目标在源下方）：行程序与目标锚序一致，转折序不变", () => {

@@ -77,22 +77,22 @@
       "pdfSha256": "4bd0bf3e2d753d555fd482997b439896a50a9d71990bcf13a03610c40431bf4c"
     },
     "dense-300-450": {
-      "svgSha256": "0c1ec59f5115f90e1e23bd9569484077c7c491af13a1fdce9b9e8fe40ed0e097",
+      "svgSha256": "211ca8f4dd8d6df0c98700abbf7e6c2e059cc18aada1403704ea3fcf09c76c6c",
       "width": 4430,
-      "height": 3354,
-      "pngSha256": "871841446ad8205ec7c39b4c576492033a65f7fc02c788d584030c78454b4a70",
+      "height": 3326,
+      "pngSha256": "57977295d9c75947d7d04150c6f3ff38cbfaa63fa20516baaccef1007352985c",
       "pngWidth": 8860,
-      "pngHeight": 6708,
-      "pdfSha256": "4cbe420c43bf4473c7679ab21cef72ee93cc0fb26eeeb98591e7513175924827"
+      "pngHeight": 6652,
+      "pdfSha256": "a9a9e78ba81f759fd5a9964234f1b14a6994a6a7860e450c589036dcbd531d1d"
     },
     "visual-style-v2": {
-      "svgSha256": "e6df038480c7f810d289ce5427e70853cf3cfe23a97c56ab310ee7b1377b8139",
+      "svgSha256": "d718034ec6616f35958c11812533fee691742ead9f2024792c4fed8d2d3cd81c",
       "width": 1473,
       "height": 858,
-      "pngSha256": "06ecdd4aa081ca5cee07a6998ff31c7c3160cbafcea8fc73cfbb5808235e7d34",
+      "pngSha256": "3692e3e499323d0447c39d1ffa1dae91874ee4569528f38d2cf9f0dca90cf9b1",
       "pngWidth": 2946,
       "pngHeight": 1716,
-      "pdfSha256": "45980474ec14a567d32ac0c9f8e317c495964f7a0b7b8445b2de4566dfd525e8"
+      "pdfSha256": "ab39310decb9353e4efdb7d42da818356ba1424bd8ce325f61f7b171bb89cb43"
     },
     "large-bounds": {
       "svgSha256": "110e500a67ea747a01d94bab41ac2382290dfd39b0661757c822e7ebe93a7258",
