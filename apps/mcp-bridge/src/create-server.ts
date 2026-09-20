@@ -41,9 +41,11 @@ export function createMindmapMcpServer(renderer: ExportRenderer): McpServer {
           .optional()
           .describe("字体：lxgw-wenkai（手写，默认）/ noto-sans-sc（黑体）"),
         direction: z
-          .enum(["horizontal", "vertical"])
+          .enum(["balanced", "horizontal", "vertical"])
           .optional()
-          .describe("整理布局方向，默认 horizontal"),
+          .describe(
+            "整理布局方向，默认 balanced（发散：主根居中、子节点左右两支展开，ADR 0019 v1.1.0 起跟随应用默认）；horizontal / vertical 为单侧层列",
+          ),
         wide: z
           .boolean()
           .optional()

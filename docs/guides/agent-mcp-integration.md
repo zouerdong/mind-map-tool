@@ -2,7 +2,7 @@
 
 > 本文档面向 AI Agent（Claude Code / Cursor / 其他 MCP 客户端）。读完本文档，你应能独立完成：找到并注册 mindmap MCP server → 调用工具生成脑图文件 → 正确处理返回结果。无需再查其他资料。
 >
-> 版本：2026-09-18 v2（ADR 0018：MCP 运行时随安装包分发）· 仓库 https://github.com/zouerdong/mind-map-tool（public）
+> 版本：2026-09-20 v3（v0.3.2：direction 新增 `balanced` 且为省略时默认；ADR 0018/0019）· 仓库 https://github.com/zouerdong/mind-map-tool（public）
 
 ---
 
@@ -129,7 +129,7 @@ MCP 是通用协议，**TUI / GUI 客户端都能接入**。区别只在配置�
 | `outPath` | string | ✅ | — | 输出文件**绝对路径**，扩展名必须与 format 一致（如 `/tmp/plan.png`）。父目录必须已存在 |
 | `format` | enum | 否 | `"png"` | `png` / `svg` / `pdf` / `json` / `mindmap` |
 | `font` | enum | 否 | `"lxgw-wenkai"` | `lxgw-wenkai`（手写体）/ `noto-sans-sc`（黑体） |
-| `direction` | enum | 否 | `"horizontal"` | 整理布局方向：`horizontal` / `vertical` |
+| `direction` | enum | 否 | `"balanced"` | 整理布局方向：`balanced`（发散：主根居中、子节点左右两支展开，v0.3.2 起跟随应用默认）/ `horizontal` / `vertical` |
 | `wide` | boolean | 否 | `true` | horizontal 时启用宽而浅自适应分栏（根在最左、分支按宽高比分栏并排）。非单根树自动回退普通分层 |
 | `saveSource` | boolean | 否 | `true` | 同时写出同名 `.mindmap` 源文件（可在 Mind Map 桌面应用中打开继续编辑） |
 | `emphasisRoot` | boolean | 否 | `true` | 根节点使用强调样式（橙色卡片） |
@@ -238,4 +238,4 @@ MCP 是通用协议，**TUI / GUI 客户端都能接入**。区别只在配置�
 
 ---
 
-*文档版本 2026-09-18 v2；接口以仓库 `apps/mcp-bridge/src/create-server.ts` 与 `packages/headless/src/request.ts` 为准（分发形态 ADR 0018）。反馈渠道：内测群或直接提给 Erdong。*
+*文档版本 2026-09-20 v3；接口以仓库 `apps/mcp-bridge/src/create-server.ts` 与 `packages/headless/src/request.ts` 为准（分发形态 ADR 0018）。反馈渠道：内测群或直接提给 Erdong。*
