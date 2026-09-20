@@ -568,6 +568,10 @@ export function EditorCanvas({
           reducedMotion,
           onFrame,
           onComplete: () => {
+            // OFR-2026-09-20 [from-user]：整理完成后自适应取景——
+            // 内容从左上角聚拢变为整窗框架化（根居中、缩放匹配窗口）。
+            // reduced-motion 时 start 同步终态回调，fitView 同样立即落定。
+            void rfInstanceRef.current?.fitView({ padding: 0.2, duration: 400 });
             onOrganizeComplete?.();
           },
         });

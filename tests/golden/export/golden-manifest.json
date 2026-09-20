@@ -77,22 +77,22 @@
       "pdfSha256": "4bd0bf3e2d753d555fd482997b439896a50a9d71990bcf13a03610c40431bf4c"
     },
     "dense-300-450": {
-      "svgSha256": "2fb01dc4d236e3f140499fedbabf16945e1cef4d38484c7b7c3760f4aa047dc5",
+      "svgSha256": "0c1ec59f5115f90e1e23bd9569484077c7c491af13a1fdce9b9e8fe40ed0e097",
       "width": 4430,
       "height": 3354,
-      "pngSha256": "e4cf9045a84019adb9b276c00b34b8b0f167da4b79a069496402f346c6fa9a7d",
+      "pngSha256": "871841446ad8205ec7c39b4c576492033a65f7fc02c788d584030c78454b4a70",
       "pngWidth": 8860,
       "pngHeight": 6708,
-      "pdfSha256": "e12560ce5e24ddb72127a1282363050e9cd02141ba85094656d420bcd8241395"
+      "pdfSha256": "4cbe420c43bf4473c7679ab21cef72ee93cc0fb26eeeb98591e7513175924827"
     },
     "visual-style-v2": {
-      "svgSha256": "1207134b085995c53c9b166620b7782adcc285f265a244b7019b63dafb81dbed",
+      "svgSha256": "e6df038480c7f810d289ce5427e70853cf3cfe23a97c56ab310ee7b1377b8139",
       "width": 1473,
       "height": 858,
-      "pngSha256": "7c13ab2d34bb8c4a71a5c31fce9e5a846e0f8d18e8fccdda578a2805e1adf759",
+      "pngSha256": "06ecdd4aa081ca5cee07a6998ff31c7c3160cbafcea8fc73cfbb5808235e7d34",
       "pngWidth": 2946,
       "pngHeight": 1716,
-      "pdfSha256": "821f9add189dd4115a15b6bedcbe12277359cccdc903798997de559303ecff8c"
+      "pdfSha256": "45980474ec14a567d32ac0c9f8e317c495964f7a0b7b8445b2de4566dfd525e8"
     },
     "large-bounds": {
       "svgSha256": "110e500a67ea747a01d94bab41ac2382290dfd39b0661757c822e7ebe93a7258",
@@ -102,13 +102,13 @@
       "pdfSha256": "bb70a312378fea62619aed93f38614e7ee43b85c98e69db96250ac265e64d212"
     },
     "balanced-fanout": {
-      "svgSha256": "161463c1a9f1128cdb6a1cc93ccf95237ec504f9dc2790d175282745c3934852",
+      "svgSha256": "0c03ca154322e2a6ba609f91411324dfce4b1528f5951151121459a6eb3e39b6",
       "width": 1210,
       "height": 464,
-      "pngSha256": "6e81fd34b7e299f3ef3eea83d553e6214c5ef9de1024598b5b5b7bcdd39e94d3",
+      "pngSha256": "2eefe8eed309b3498deeefc64a085e3706ebd4d5243ff31613b60fed02a4520b",
       "pngWidth": 2420,
       "pngHeight": 928,
-      "pdfSha256": "82516819c302b9420744d511fdd9e67ad0a5f00d81c1a13bd4a2c4bb269a49f3"
+      "pdfSha256": "85e6f68f34c240dc8d44c524a76a48f66842b85052b9a13f9593c5a7cfee628d"
     }
   }
 }

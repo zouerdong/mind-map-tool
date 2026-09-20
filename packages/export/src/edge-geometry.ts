@@ -37,7 +37,8 @@ export type ChannelSide = "up" | "down" | "left" | "right";
 /** 路由拓扑（VRA-060 冻结后插值的单位）。
  *  形状（§1.4 规整态线型）：水平出一小段 → 圆角垂直折 → 水平跨越 → 圆角垂直折 → 水平进入。
  *  exitTurn：引出垂直段位置（源列包络外 6px + 同列出边序×14，跨源也错开）；
- *  turn/entryTurn：进入缝的垂直转折（rank = 同缝进入序，通道边与梳状边共用同一序）→ 全缝唯一。 */
+ *  turn/entryTurn：进入缝的垂直转折（rank = 同缝进入序：垂直行程短者转折近目标列、
+ *  长者靠外——扇出边默认零交叉；通道边与梳状边共用同一序）→ 全缝唯一。 */
 export type EdgeRoute =
   | {
       kind: "comb";
@@ -343,6 +344,7 @@ export function planEdgeRoutes(
   interface Member {
     id: string;
     key: number; // 目标锚 y（横向）/ x（纵向）：缝内排序键
+    src: number; // 源锚 y（横向）/ x（纵向）：垂直行程 = |key - src|
     tie: string;
   }
   const seamGroups = new Map<number, Member[]>(); // 目标列入口（横向 = b.x；纵向 = b.y）
@@ -414,7 +416,12 @@ export function planEdgeRoutes(
         exitTurn: exitBase,
       };
     }
-    const member: Member = { id: e.id, key: alongTarget, tie: e.id };
+    const member: Member = {
+      id: e.id,
+      key: alongTarget,
+      src: direction === "horizontal" ? a.y : a.x,
+      tie: e.id,
+    };
     const members = seamGroups.get(lane) ?? [];
     members.push(member);
     seamGroups.set(lane, members);
@@ -422,6 +429,7 @@ export function planEdgeRoutes(
     const exitMember: Member = {
       id: e.id,
       key: direction === "horizontal" ? a.y : a.x,
+      src: 0, // 引出段排序只用 key（源锚坐标），src 不参与
       tie: e.id,
     };
     const exitKey = sourceKey;
@@ -431,11 +439,18 @@ export function planEdgeRoutes(
     routed.set(e.id, { id: e.id, input: e, ports: p, anchorSource: a, anchorTarget: b, route });
   }
 
-  // ③ 同缝进入序（comb + channel 共用同一序）：目标更高的边转折更近目标列 → 转折全缝唯一
+  // ③ 同缝进入序（comb + channel 共用同一序）：垂直行程短者 rank 小（转折近目标列）、
+  // 行程长者 rank 大（转折靠外）——长行程垂直段不穿短行程边的进入横段，单侧扇出默认零交叉
+  // （ADR 0019 v1.2.0；旧规则按目标锚 y 升序，根居中后上方组会出现"麻花"交叉）。
+  // 纯横向/纵向布局中同缝各边行程序与目标锚序一致，行为不变；同距按目标锚升序、再按 id。
+  const byTravel = (p: Member, q: Member) =>
+    Math.abs(p.key - p.src) - Math.abs(q.key - q.src) ||
+    p.key - q.key ||
+    (p.tie < q.tie ? -1 : p.tie > q.tie ? 1 : 0);
   const byKey = (p: Member, q: Member) =>
     p.key - q.key || (p.tie < q.tie ? -1 : p.tie > q.tie ? 1 : 0);
   for (const [lane, list] of seamGroups) {
-    const ordered = [...list].sort(byKey);
+    const ordered = [...list].sort(byTravel);
     const spacing = seamSpacing(ordered.length, seam);
     ordered.forEach((member, rank) => {
       const r = routed.get(member.id)!.route;

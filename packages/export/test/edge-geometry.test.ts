@@ -402,3 +402,86 @@ describe("双侧锚点（ADR 0019 dualSide：目标偏左 → 左出右入镜像
     expect([...a.values()]).toEqual([...b.values()]);
   });
 });
+
+describe("发散扇出零交叉（ADR 0019 v1.2.0：同缝 rank 按垂直行程升序）", () => {
+  // 段严格相交（排除共享端点/共线并行——共线由 findCollinearOverlaps 负责检测）
+  const segCross = (
+    a1: { x: number; y: number },
+    a2: { x: number; y: number },
+    b1: { x: number; y: number },
+    b2: { x: number; y: number },
+  ): boolean => {
+    const d = (
+      o: { x: number; y: number },
+      p: { x: number; y: number },
+      q: { x: number; y: number },
+    ) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+    const d1 = d(b1, b2, a1);
+    const d2 = d(b1, b2, a2);
+    const d3 = d(a1, a2, b1);
+    const d4 = d(a1, a2, b2);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  };
+  const fanCrossings = (gs: { id: string; chain: { x: number; y: number }[] }[]): string[] => {
+    const out: string[] = [];
+    for (let i = 0; i < gs.length; i++)
+      for (let j = i + 1; j < gs.length; j++)
+        for (let s = 0; s < gs[i]!.chain.length - 1; s++)
+          for (let t = 0; t < gs[j]!.chain.length - 1; t++)
+            if (
+              segCross(
+                gs[i]!.chain[s]!,
+                gs[i]!.chain[s + 1]!,
+                gs[j]!.chain[t]!,
+                gs[j]!.chain[t + 1]!,
+              )
+            )
+              out.push(`${gs[i]!.id}#${s} x ${gs[j]!.id}#${t}`);
+    return out;
+  };
+
+  it("根垂直居中 + 9 个一级子节点（上/下方组并存）：双侧扇出零交叉、零共线重叠", () => {
+    // 复刻发散整理终态（160x48 卡）：根在中央，右列 5 卡、左列 4 卡，
+    // 根的上、下两侧均有目标——旧 rank 规则在此形态产生"麻花"交叉（2026-09-20 dogfood）
+    const root = { x: 242, y: 180, width: 160, height: 48 };
+    const edges: EdgePlanInput[] = [
+      ...[24, 110, 196, 282, 368].map((y, i) => ({
+        id: `r${i}`,
+        sourceId: "root",
+        targetId: `rc${i}`,
+        source: root,
+        target: { x: 475, y, width: 160, height: 48 },
+      })),
+      ...[67, 153, 239, 325].map((y, i) => ({
+        id: `l${i}`,
+        sourceId: "root",
+        targetId: `lc${i}`,
+        source: root,
+        target: { x: 9, y, width: 160, height: 48 },
+      })),
+    ];
+    const geoms = planEdgeGeometry(edges, "horizontal", 1, { dualSide: true });
+    expect(fanCrossings([...geoms.values()])).toEqual([]);
+    expect(findCollinearOverlaps(geoms.values())).toEqual([]);
+  });
+
+  it("纯横向层列（全部目标在源下方）：行程序与目标锚序一致，转折序不变", () => {
+    // 回归：根在顶部（旧行为）时新旧规则同序——横向既有 golden 不受 v1.2.0 影响
+    const root = { x: 0, y: 0, width: 160, height: 48 };
+    const edges: EdgePlanInput[] = [0, 86, 172, 258].map((y, i) => ({
+      id: `e${i}`,
+      sourceId: "root",
+      targetId: `c${i}`,
+      source: root,
+      target: { x: 242, y, width: 160, height: 48 },
+    }));
+    const geoms = planEdgeGeometry(edges, "horizontal", 1);
+    expect(fanCrossings([...geoms.values()])).toEqual([]);
+    const turns = edges.map((e) => {
+      const r = geoms.get(e.id)!.route;
+      return r.kind === "comb" ? r.turn : null;
+    });
+    // 全缝唯一（硬规则不变式）
+    expect(new Set(turns).size).toBe(turns.length);
+  });
+});
