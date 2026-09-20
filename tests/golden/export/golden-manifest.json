@@ -102,13 +102,13 @@
       "pdfSha256": "bb70a312378fea62619aed93f38614e7ee43b85c98e69db96250ac265e64d212"
     },
     "balanced-fanout": {
-      "svgSha256": "5697ed9b47d0033f243a3e027ff01f13cf3febef65c88ea0f40c7844fab6b8f6",
+      "svgSha256": "161463c1a9f1128cdb6a1cc93ccf95237ec504f9dc2790d175282745c3934852",
       "width": 1210,
       "height": 464,
-      "pngSha256": "1e881a800bf307eea0d4c9a0ce0d512665144bdc2f99c3c1dd4ec2352fc1faa6",
+      "pngSha256": "6e81fd34b7e299f3ef3eea83d553e6214c5ef9de1024598b5b5b7bcdd39e94d3",
       "pngWidth": 2420,
       "pngHeight": 928,
-      "pdfSha256": "69949a0114e5b66fa3938a3d13ee6919fd565036bfdb591b4de8e49f61854de6"
+      "pdfSha256": "82516819c302b9420744d511fdd9e67ad0a5f00d81c1a13bd4a2c4bb269a49f3"
     }
   }
 }

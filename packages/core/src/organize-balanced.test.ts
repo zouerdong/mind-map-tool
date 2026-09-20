@@ -1,8 +1,9 @@
 // ADR 0019：发散（balanced）整理方向测试。
 // 覆盖：主根居中、第一层贪心分侧、深层跟随前驱侧、不可达子图回退右侧、
 // 环降级、孤立组、确定性（边序置换）、坐标非负、无重叠、命令幂等。
+// v1.1.0（2026-09-20）：默认方向即发散；主根列与左右支块对总高度垂直居中。
 import { describe, expect, it } from "vitest";
-import { organize, organizeCommand } from "./organize.js";
+import { organize, organizeCommand, ORGANIZE_GAPS } from "./organize.js";
 import type { MindMapDocumentV1, MindMapDocumentData, MindNode } from "./schema.js";
 
 function node(id: string, w = 100, h = 40): MindNode {
@@ -41,6 +42,59 @@ function star(childCount: number): MindMapDocumentV1 {
 }
 
 describe("organize balanced（ADR 0019 发散）", () => {
+  it("v1.1.0：缺省方向即发散（与显式 balanced 完全一致）", () => {
+    const d = star(4);
+    const bare = ok(organize(d));
+    const explicit = ok(organize(d, { direction: "balanced" }));
+    for (const n of d.document.nodes) expect(P(bare, n.id)).toEqual(P(explicit, n.id));
+  });
+
+  it("v1.1.0 垂直居中：主根列与左右支块对总高度整块居中", () => {
+    // star(3)：等权交替 c1→右、c2→左、c3→右；右支 2 卡高 118，左支/主根各 40
+    const pos = ok(organize(star(3), { direction: "balanced" }));
+    const span = 40 + ORGANIZE_GAPS.intraGap + 40; // 118
+    const center = span / 2; // 59
+    expect(P(pos, "root").y + 20).toBe(center); // 主根垂直居中
+    expect(P(pos, "c2").y + 20).toBe(center); // 左支单卡同轴居中
+    // 右支为最高块，不偏移：块内堆叠几何不变
+    expect(P(pos, "c1").y).toBe(0);
+    expect(P(pos, "c3").y).toBe(40 + ORGANIZE_GAPS.intraGap);
+  });
+
+  it("v1.1.0 垂直居中：深层列跟随本侧块偏移，块内相对几何不变", () => {
+    // c1 带 2 孙（体量 3）→ 右；c2 → 左。右块高=孙列 118，左块/主根 40
+    const d = doc(
+      [node("root"), node("c1"), node("c2"), node("g1"), node("g2")],
+      [
+        ["root", "c1"],
+        ["root", "c2"],
+        ["c1", "g1"],
+        ["c1", "g2"],
+      ],
+    );
+    const pos = ok(organize(d, { direction: "balanced" }));
+    const shiftLow = (40 + ORGANIZE_GAPS.intraGap + 40 - 40) / 2; // 39
+    expect(P(pos, "root").y).toBe(shiftLow);
+    expect(P(pos, "c2").y).toBe(shiftLow);
+    // 右支为最高块不偏移：c1/孙列保持自 0 堆叠
+    expect(P(pos, "c1").y).toBe(0);
+    expect(P(pos, "g1").y).toBe(0);
+    expect(P(pos, "g2").y).toBe(40 + ORGANIZE_GAPS.intraGap);
+    // 居中后仍无矩形重叠
+    for (const [i, a] of d.document.nodes.entries()) {
+      for (const b of d.document.nodes.slice(i + 1)) {
+        const pa = P(pos, a.id);
+        const pb = P(pos, b.id);
+        const overlap =
+          pa.x < pb.x + b.size.width &&
+          pb.x < pa.x + a.size.width &&
+          pa.y < pb.y + b.size.height &&
+          pb.y < pa.y + a.size.height;
+        expect(overlap, `${a.id} vs ${b.id}`).toBe(false);
+      }
+    }
+  });
+
   it("星形 4 子：两右两左交替（等权贪心，右侧优先），主根居中", () => {
     const pos = ok(organize(star(4), { direction: "balanced" }));
     const root = P(pos, "root");

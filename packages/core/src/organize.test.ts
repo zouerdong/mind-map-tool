@@ -1,4 +1,4 @@
-// VRA-030：DAG 分层布局（横向默认/纵向可选）测试。
+// VRA-030：DAG 分层布局测试（横向/纵向算法用例显式给方向；ADR 0019 v1.1.0 起默认 balanced，见 organize-balanced.test.ts）。
 // 覆盖任务卡必测反例：边序置换稳定性、diamond、多根汇聚、参考 DAG、环/双向边/
 // 无边/单节点/负起始坐标、不同尺寸、300/450、10k 单链结构化失败、幂等、无重叠、层约束。
 
@@ -79,7 +79,7 @@ describe("organize：层级与汇聚", () => {
         ["b", "c"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expect(p.get("a")).toEqual({ x: 0, y: 0 });
     expect(p.get("b")).toEqual({ x: 100 + ORGANIZE_GAPS.layerGap, y: 0 }); // 层1
     expect(P(p, "c").x).toBe(100 * 2 + ORGANIZE_GAPS.layerGap * 2); // 层2：c 在 b 严格之后
@@ -95,7 +95,7 @@ describe("organize：层级与汇聚", () => {
         ["b", "c"],
       ],
     );
-    const expected = posKey(organize(base));
+    const expected = posKey(organize(base, { direction: "horizontal" }));
     const perms: Array<Array<[string, string]>> = [
       [
         ["a", "b"],
@@ -125,7 +125,7 @@ describe("organize：层级与汇聚", () => {
     ];
     for (const edges of perms) {
       const d = doc([node("a", 0, 0), node("b", 50, 200), node("c", 100, 400)], edges);
-      expect(posKey(organize(d))).toEqual(expected);
+      expect(posKey(organize(d, { direction: "horizontal" }))).toEqual(expected);
     }
   });
 
@@ -139,7 +139,7 @@ describe("organize：层级与汇聚", () => {
         ["c", "d"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expect(P(p, "b").x).toBe(P(p, "c").x); // 同层同列
     expect(P(p, "b").y).toBeLessThan(P(p, "c").y); // 层内堆叠有序
     expect(P(p, "d").x).toBeGreaterThan(P(p, "b").x);
@@ -154,7 +154,7 @@ describe("organize：层级与汇聚", () => {
         ["r2", "s"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expect(P(p, "r1").x).toBe(P(p, "r2").x);
     expect(P(p, "s").x).toBeGreaterThan(P(p, "r1").x);
     expect(p.size).toBe(3); // s 恰好一次
@@ -167,7 +167,9 @@ describe("organize：层级与汇聚", () => {
       ["a", "b"],
       ["b", "c"],
     ];
-    expect(posKey(organize(doc(nodesA, edges)))).toEqual(posKey(organize(doc(nodesB, edges))));
+    expect(posKey(organize(doc(nodesA, edges), { direction: "horizontal" }))).toEqual(
+      posKey(organize(doc(nodesB, edges), { direction: "horizontal" })),
+    );
   });
 });
 
@@ -181,7 +183,7 @@ describe("organize：环与孤立", () => {
         ["b", "c"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expect(P(p, "a").x).toBe(P(p, "b").x); // a↔b 同一分量 → 同层
     expect(P(p, "c").x).toBeGreaterThan(P(p, "a").x); // 分量 → c 严格靠后
     expectLayoutInvariants(d.document.nodes, p);
@@ -196,7 +198,7 @@ describe("organize：环与孤立", () => {
         ["c", "a"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expect(P(p, "a").x).toBe(P(p, "b").x);
     expect(P(p, "b").x).toBe(P(p, "c").x);
   });
@@ -220,14 +222,14 @@ describe("organize：环与孤立", () => {
 
   it("无边文档（全孤立）：全部成行/列，无重叠", () => {
     const d = doc([node("a", 0, 0), node("b", 0, 0)], []);
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expectLayoutInvariants(d.document.nodes, p);
   });
 
   it("单节点与空文档", () => {
-    expect(ok(organize(doc([], []))).size).toBe(0);
+    expect(ok(organize(doc([], []), { direction: "horizontal" })).size).toBe(0);
     const d = doc([node("only", 5, 5)], []);
-    expect(ok(organize(d)).get("only")).toEqual({ x: 0, y: 0 });
+    expect(ok(organize(d, { direction: "horizontal" })).get("only")).toEqual({ x: 0, y: 0 });
   });
 });
 
@@ -247,7 +249,7 @@ describe("organize：尺寸感知与参考 DAG", () => {
         ["b", "d"],
       ],
     );
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     // 层1（b、c 堆叠，b 先——文档序）：b=(层1x, 0)、c=(层1x, 80+38)
     expect(P(p, "b").y).toBe(0);
     expect(P(p, "c").y).toBe(80 + ORGANIZE_GAPS.intraGap);
@@ -288,7 +290,7 @@ describe("organize：尺寸感知与参考 DAG", () => {
       ["n-cicd", "n-close"],
     ];
     const d = doc(nodes, edges);
-    const p = ok(organize(d));
+    const p = ok(organize(d, { direction: "horizontal" }));
     expectLayoutInvariants(nodes, p);
     // 层级（最长路径）：capture0 notes0 review0 hooks0 → skills1 subtasks1 evals1 → design2 peer2 → cicd3 → close4
     const col = (id: string) => p.get(id)!.x;
@@ -324,7 +326,7 @@ describe("organize：规模与失败", () => {
       seen.add(key);
       edges.push([`n${s}`, `n${t}`]);
     }
-    const p = ok(organize(doc(nodes, edges)));
+    const p = ok(organize(doc(nodes, edges), { direction: "horizontal" }));
     expectLayoutInvariants(nodes, p);
   });
 
@@ -334,13 +336,13 @@ describe("organize：规模与失败", () => {
       { length: 9_999 },
       (_, i) => [`c${i}`, `c${i + 1}`] as [string, string],
     );
-    const result = organize(doc(nodes, edges));
+    const result = organize(doc(nodes, edges), { direction: "horizontal" });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("COORD_LIMIT");
       expect(result.error.span).toBeGreaterThan(result.error.max);
     }
-    const cmd = organizeCommand(doc(nodes, edges));
+    const cmd = organizeCommand(doc(nodes, edges), { direction: "horizontal" });
     expect(cmd.status).toBe("error");
   });
 });
@@ -348,7 +350,7 @@ describe("organize：规模与失败", () => {
 describe("organizeCommand：命令契约", () => {
   it("散乱 → moved：单条 MoveNodes 覆盖全部变化节点；再跑 → no-op", () => {
     const d = doc([node("a", 999, 999), node("b", -50, -50)], [["a", "b"]]);
-    const first = organizeCommand(d);
+    const first = organizeCommand(d, { direction: "horizontal" });
     expect(first.status).toBe("moved");
     if (first.status !== "moved") return;
     expect(first.command.kind).toBe("MoveNodes");
@@ -366,18 +368,18 @@ describe("organizeCommand：命令契约", () => {
         })),
       },
     };
-    expect(organizeCommand(applied).status).toBe("no-op");
+    expect(organizeCommand(applied, { direction: "horizontal" }).status).toBe("no-op");
   });
 
   it("已就位 → no-op（不产生命令）", () => {
-    // 默认横向：a 层0 (0,0)、b 层1 (100+layerGap, 0)
+    // 横向：a 层0 (0,0)、b 层1 (100+layerGap, 0)
     const d = doc([node("a", 0, 0), node("b", 100 + ORGANIZE_GAPS.layerGap, 0)], [["a", "b"]]);
-    expect(organizeCommand(d).status).toBe("no-op");
+    expect(organizeCommand(d, { direction: "horizontal" }).status).toBe("no-op");
   });
 
-  it("布局不改文本/样式/尺寸/边，不改未列节点；默认横向、可选纵向", () => {
+  it("布局不改文本/样式/尺寸/边，不改未列节点；横向↔纵向转置关系", () => {
     const d = doc([node("a", 7, 7, 120, 50), node("b", 9, 9)], [["a", "b"]]);
-    const h = ok(organize(d));
+    const h = ok(organize(d, { direction: "horizontal" }));
     const v = ok(organize(d, { direction: "vertical" }));
     // 转置关系（对称）
     expect(P(v, "a").x).toBe(P(h, "a").y);

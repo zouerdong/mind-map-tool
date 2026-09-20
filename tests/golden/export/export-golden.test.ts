@@ -82,6 +82,7 @@ describe("导出 golden", () => {
     "dense-300-450",
     "large-bounds",
     "visual-style-v2",
+    "balanced-fanout",
   ];
 
   it("夹具清单覆盖全部用例", () => {

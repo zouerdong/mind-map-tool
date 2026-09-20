@@ -79,8 +79,7 @@ export async function rfStubModule(): Promise<unknown> {
               "data-testid": `rf-edge-${e.id}`,
               "data-path": e.data?.pathD,
               // 单击=选中边（与节点 testid 同法：代理 RF EdgeWrapper 的 select change）
-              onClick: () =>
-                props.onEdgesChange?.([{ id: e.id, type: "select", selected: true }]),
+              onClick: () => props.onEdgesChange?.([{ id: e.id, type: "select", selected: true }]),
             },
             props.edgeTypes?.[e.type]
               ? createElement(props.edgeTypes[e.type], {

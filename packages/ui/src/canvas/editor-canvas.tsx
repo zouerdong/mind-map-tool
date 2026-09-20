@@ -105,10 +105,7 @@ export interface EditorCanvasProps {
    * 整理动画触发信号（VRA-060）：外部触发整理动作时自增此信号。
    */
   organizeSignal?: number;
-  /**
-   * 整理布局方向（默认 horizontal；G-VIS D7）。
-   */
-  /** 整理方向（ADR 0019：horizontal/vertical/balanced 三向；balanced 内部走横向双侧几何）。 */
+  /** 整理方向（ADR 0019 v1.1.0：horizontal/vertical/balanced 三向，默认 balanced；balanced 内部走横向双侧几何）。 */
   organizeDirection?: OrganizeDirection;
   /**
    * 整理结果回调（通知上层成功/no-op/超限错误）。
@@ -182,7 +179,7 @@ export function EditorCanvas({
   quickCreateSignal = 0,
   fitViewSignal = 0,
   organizeSignal = 0,
-  organizeDirection = "horizontal",
+  organizeDirection = "balanced",
   onOrganizeResult,
   onOrganizeComplete,
   positionTransitionMs: _positionTransitionMs = 0,
@@ -1019,8 +1016,7 @@ export function EditorCanvas({
     const src = edge ? rfNodes.find((n) => n.id === edge.source) : undefined;
     const tgt = edge ? rfNodes.find((n) => n.id === edge.target) : undefined;
     if (!src || !tgt) return null;
-    const mx =
-      (src.position.x + (src.width ?? 0) / 2 + tgt.position.x + (tgt.width ?? 0) / 2) / 2;
+    const mx = (src.position.x + (src.width ?? 0) / 2 + tgt.position.x + (tgt.width ?? 0) / 2) / 2;
     const my =
       (src.position.y + (src.height ?? 0) / 2 + tgt.position.y + (tgt.height ?? 0) / 2) / 2;
     return { x: viewport.x + mx * viewport.zoom, y: viewport.y + my * viewport.zoom };
@@ -1141,198 +1137,199 @@ export function EditorCanvas({
   return (
     <EditingContext.Provider value={editingValue}>
       <EdgeActionsContext.Provider value={edgeActions}>
-      <div
-        className={className}
-        // MM-090-D9：黑板主题的纯黑画布此前从未接线（tokens 定义了但无消费者，
-        // jsdom 测不到视觉——用户实测发现）。画布底色/点阵随文档主题。
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "relative",
-          background: themeTokens(session.current.document.document.theme).canvasBackground,
-          transition: "background 200ms ease",
-        }}
-        role="application"
-        aria-label="脑图画布"
-        tabIndex={0}
-        // MM-090-D5（open）：点击 pane 不聚焦 wrapper → 键盘流需先 Tab。
-        // 实测两版 mousedown 聚焦（preventDefault / setTimeout）都会破坏
-        // 双击建点的 dblclick 派发——缺陷卡记录候选：RF onPaneClick 聚焦。
-        onKeyDown={onKeyDown}
-        onDoubleClick={onWrapperDoubleClick}
-      >
-        <ReactFlow
-          nodes={rfNodes}
-          edges={displayEdges}
-          // MM-090-D9：背景设在 RF 本体——wrapper 上的背景会被 RF 内层默认
-          // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
+        <div
+          className={className}
+          // MM-090-D9：黑板主题的纯黑画布此前从未接线（tokens 定义了但无消费者，
+          // jsdom 测不到视觉——用户实测发现）。画布底色/点阵随文档主题。
           style={{
-            backgroundColor: themeTokens(session.current.document.document.theme).canvasBackground,
+            width: "100%",
+            height: "100%",
+            position: "relative",
+            background: themeTokens(session.current.document.document.theme).canvasBackground,
+            transition: "background 200ms ease",
           }}
-          nodeTypes={NODE_TYPES}
-          edgeTypes={EDGE_TYPES}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeDragStop={onNodeDragStop}
-          onConnect={onConnect}
-          onEdgeMouseEnter={(_e, edge) => setHoveredEdgeId(edge.id)}
-          onEdgeMouseLeave={(_e, edge) =>
-            setHoveredEdgeId((cur) => (cur === edge.id ? null : cur))
-          }
-          onNodeDoubleClick={(_e, node) => beginEdit(node.id)}
-          onMove={(_, vp) => setViewport(vp)} // session-only
-          onInit={(instance) => {
-            rfInstanceRef.current = instance;
-            // 冷启动即带内容（测试/恢复场景）才框架化；空文档不框架化，
-            // 避免首个节点出现时镜头跳到 maxZoom（见 fitViewSignal 注释）。
-            if (session.current.document.document.nodes.length > 0) {
-              void instance.fitView({ padding: 0.2 });
-            }
-          }}
-          nodesConnectable
-          // 2026-09-18 内测批次（负责人定稿 Q1=A）：左键拖空白=框选（Figma/Miro
-          // 白板惯例）；平移=Space+拖/中键/右键拖 + 触控板双指滚动（panOnScroll，
-          // 内测反馈②）；缩放=捏合 / ⌘(Ctrl)+滚轮 / ⌘±0（zoomOnScroll 关闭，
-          // 滚轮让位给平移）。
-          // 三指拖移注记：系统辅助功能「三指拖移」合成的是左键拖拽事件，
-          // 事件层与鼠标左键不可区分 → 三指拖移等同框选；平移请用双指滚动。
-          // RF 契约（@xyflow/react 12.11 源码）：panOnDrag===true 时
-          // _selectionOnDrag 被整体禁用（selectionOnDrag && panOnDrag !== true）——
-          // 此前两 prop 同 true 导致框选从未生效（仅剩 Shift+拖，不可发现）。
-          // panOnDrag=[1,2] 仅中/右键平移；panActivationKeyPressed 期间
-          // panOnDrag 提升为 true → Space 按住时左键拖自动让位给平移。
-          // Shift+拖框选（selectionKeyCode 默认 Shift）与 ⌘A 全选保留。
-          selectionOnDrag
-          panOnDrag={[1, 2]}
-          panActivationKeyCode="Space"
-          zoomOnScroll={false}
-          zoomActivationKeyCode="Meta"
-          panOnScroll
-          // 双击=建点（键位定稿 2026-08-29），不是缩放（缩放走 ⌘+/⌘-/⌘0）。
-          // 且 d3-zoom 的 dblclick.zoom 会 stopImmediatePropagation（noevent），
-          // 不关它 wrapper 的 onDoubleClick 永远收不到——双击建点从未生效的根因。
-          zoomOnDoubleClick={false}
-          deleteKeyCode={null} // 删除统一走画布 keydown（selection 语义一致）
-          proOptions={{ hideAttribution: false }} // G1 决定：保留 attribution
-          minZoom={0.2}
-          maxZoom={2.5}
+          role="application"
+          aria-label="脑图画布"
+          tabIndex={0}
+          // MM-090-D5（open）：点击 pane 不聚焦 wrapper → 键盘流需先 Tab。
+          // 实测两版 mousedown 聚焦（preventDefault / setTimeout）都会破坏
+          // 双击建点的 dblclick 派发——缺陷卡记录候选：RF onPaneClick 聚焦。
+          onKeyDown={onKeyDown}
+          onDoubleClick={onWrapperDoubleClick}
         >
-          {/* G-VIS D1：画布平坦无纹理、无常驻点阵——Background 点阵已移除 */}
-          <ContextToolbar
-            selection={{ nodes: uiSelection.nodes, edges: uiSelection.edges }}
-            document={session.current.document}
-            primaryNodeId={uiSelection.primary}
-            anchor={toolbarAnchor}
-            onCommand={(command) => {
-              if (command.kind === "SetNodeKicker") {
-                if (
-                  geometryBarrier &&
-                  (geometryBarrier.getMetricsState() !== "ready" ||
-                    geometryBarrier.hasUnresolvedIntents())
-                ) {
-                  void geometryBarrier.enqueue({
-                    kind: "set-kicker",
-                    id: command.id,
-                    kicker: command.kicker,
-                  });
-                } else {
-                  const fontId = documentDefaults(session.current.document).font;
-                  const node = session.current.document.document.nodes.find(
-                    (n) => n.id === command.id,
-                  );
-                  const measured = node
-                    ? measureNodeVisual({ ...node, kicker: command.kicker }, fontId, fonts)
-                    : undefined;
-                  api.commit({
-                    ...command,
-                    ...(measured !== undefined ? { measured } : {}),
-                  });
-                }
-              } else if (command.kind === "EditNodeText") {
-                // DFR-090 F2：编辑中点格式（工具条 preventDefault 保持编辑焦点，
-                // 命令携带的是渲染期捕获的旧 node.text）——先把草稿提交（样式随
-                // 文本变更映射保留），再基于最新文本重算命令；绝不用旧文本覆盖
-                // 新草稿。
-                const flushed = editingId === command.id ? flushActiveEditor() : null;
-                const latestNode = session.current.document.document.nodes.find(
-                  (n) => n.id === command.id,
-                );
-                const baseText = flushed ?? latestNode?.text ?? command.text;
-                const runs =
-                  command.runs !== undefined
-                    ? remapRunsForTextChange(command.text, command.runs, baseText)
-                    : undefined;
-                if (
-                  geometryBarrier &&
-                  (geometryBarrier.getMetricsState() !== "ready" ||
-                    geometryBarrier.hasUnresolvedIntents())
-                ) {
-                  void geometryBarrier.enqueue({
-                    kind: "edit-text",
-                    id: command.id,
-                    text: baseText,
-                    ...(runs !== undefined ? { runs } : {}),
-                  });
-                } else {
-                  const fontId = documentDefaults(session.current.document).font;
-                  const box = measureNodeVisual(
-                    {
-                      text: baseText,
-                      ...(runs !== undefined ? { runs } : {}),
-                      ...(latestNode?.kicker !== undefined ? { kicker: latestNode.kicker } : {}),
-                    },
-                    fontId,
-                    fonts,
-                  );
-                  api.commit({
-                    kind: "EditNodeText",
-                    id: command.id,
-                    text: baseText,
-                    size: { width: box.width, height: box.height },
-                    ...(runs !== undefined ? { runs } : {}),
-                  });
-                }
-              } else if (command.kind === "SetDocumentStyle" && command.font !== undefined) {
-                // [PRR-040] 字体切换永远经 GeometryBarrier：ready 时 barrier
-                // 用目标字体立即度量全部节点并原子提交（单 undo step 同时
-                // 恢复旧字体与旧 size）；pending/failed 时保留意图，禁止
-                // 旧字体几何随 SetDocumentStyle 直接入库。无 barrier 的
-                // 测试/harness 环境维持旧语义。
-                if (geometryBarrier) {
-                  void geometryBarrier.enqueue({ kind: "set-document-font", font: command.font });
-                } else {
-                  api.commit(command);
-                }
-              } else {
-                api.commit(command); // commit 与版本信号必须走同一原子通道
+          <ReactFlow
+            nodes={rfNodes}
+            edges={displayEdges}
+            // MM-090-D9：背景设在 RF 本体——wrapper 上的背景会被 RF 内层默认
+            // 白底盖住（实测：主题接线后按钮翻转但画布不变色的根因）。
+            style={{
+              backgroundColor: themeTokens(session.current.document.document.theme)
+                .canvasBackground,
+            }}
+            nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeDragStop={onNodeDragStop}
+            onConnect={onConnect}
+            onEdgeMouseEnter={(_e, edge) => setHoveredEdgeId(edge.id)}
+            onEdgeMouseLeave={(_e, edge) =>
+              setHoveredEdgeId((cur) => (cur === edge.id ? null : cur))
+            }
+            onNodeDoubleClick={(_e, node) => beginEdit(node.id)}
+            onMove={(_, vp) => setViewport(vp)} // session-only
+            onInit={(instance) => {
+              rfInstanceRef.current = instance;
+              // 冷启动即带内容（测试/恢复场景）才框架化；空文档不框架化，
+              // 避免首个节点出现时镜头跳到 maxZoom（见 fitViewSignal 注释）。
+              if (session.current.document.document.nodes.length > 0) {
+                void instance.fitView({ padding: 0.2 });
               }
             }}
-          />
-        </ReactFlow>
-        {/* DFR-030 / ADR 0012 v1.1.0：空白画布（无节点且无待提交节点）底部
-            居中创建提示——非交互、低对比可读、不遮挡输入；出现节点即消失。 */}
-        {session.current.document.document.nodes.length === 0 && pendingNodes.size === 0 ? (
-          <div
-            data-testid="empty-canvas-hint"
-            role="note"
-            style={{
-              position: "absolute",
-              bottom: 24,
-              left: "50%",
-              transform: "translateX(-50%)",
-              pointerEvents: "none",
-              color: themeTokens(session.current.document.document.theme).shellSubtle,
-              fontSize: 13,
-              letterSpacing: "0.02em",
-              userSelect: "none",
-              whiteSpace: "nowrap",
-            }}
+            nodesConnectable
+            // 2026-09-18 内测批次（负责人定稿 Q1=A）：左键拖空白=框选（Figma/Miro
+            // 白板惯例）；平移=Space+拖/中键/右键拖 + 触控板双指滚动（panOnScroll，
+            // 内测反馈②）；缩放=捏合 / ⌘(Ctrl)+滚轮 / ⌘±0（zoomOnScroll 关闭，
+            // 滚轮让位给平移）。
+            // 三指拖移注记：系统辅助功能「三指拖移」合成的是左键拖拽事件，
+            // 事件层与鼠标左键不可区分 → 三指拖移等同框选；平移请用双指滚动。
+            // RF 契约（@xyflow/react 12.11 源码）：panOnDrag===true 时
+            // _selectionOnDrag 被整体禁用（selectionOnDrag && panOnDrag !== true）——
+            // 此前两 prop 同 true 导致框选从未生效（仅剩 Shift+拖，不可发现）。
+            // panOnDrag=[1,2] 仅中/右键平移；panActivationKeyPressed 期间
+            // panOnDrag 提升为 true → Space 按住时左键拖自动让位给平移。
+            // Shift+拖框选（selectionKeyCode 默认 Shift）与 ⌘A 全选保留。
+            selectionOnDrag
+            panOnDrag={[1, 2]}
+            panActivationKeyCode="Space"
+            zoomOnScroll={false}
+            zoomActivationKeyCode="Meta"
+            panOnScroll
+            // 双击=建点（键位定稿 2026-08-29），不是缩放（缩放走 ⌘+/⌘-/⌘0）。
+            // 且 d3-zoom 的 dblclick.zoom 会 stopImmediatePropagation（noevent），
+            // 不关它 wrapper 的 onDoubleClick 永远收不到——双击建点从未生效的根因。
+            zoomOnDoubleClick={false}
+            deleteKeyCode={null} // 删除统一走画布 keydown（selection 语义一致）
+            proOptions={{ hideAttribution: false }} // G1 决定：保留 attribution
+            minZoom={0.2}
+            maxZoom={2.5}
           >
-            双击创建 · {shortcutHints(shortcutPlatform).quickCreate}
-          </div>
-        ) : null}
-        {overlay}
-      </div>
+            {/* G-VIS D1：画布平坦无纹理、无常驻点阵——Background 点阵已移除 */}
+            <ContextToolbar
+              selection={{ nodes: uiSelection.nodes, edges: uiSelection.edges }}
+              document={session.current.document}
+              primaryNodeId={uiSelection.primary}
+              anchor={toolbarAnchor}
+              onCommand={(command) => {
+                if (command.kind === "SetNodeKicker") {
+                  if (
+                    geometryBarrier &&
+                    (geometryBarrier.getMetricsState() !== "ready" ||
+                      geometryBarrier.hasUnresolvedIntents())
+                  ) {
+                    void geometryBarrier.enqueue({
+                      kind: "set-kicker",
+                      id: command.id,
+                      kicker: command.kicker,
+                    });
+                  } else {
+                    const fontId = documentDefaults(session.current.document).font;
+                    const node = session.current.document.document.nodes.find(
+                      (n) => n.id === command.id,
+                    );
+                    const measured = node
+                      ? measureNodeVisual({ ...node, kicker: command.kicker }, fontId, fonts)
+                      : undefined;
+                    api.commit({
+                      ...command,
+                      ...(measured !== undefined ? { measured } : {}),
+                    });
+                  }
+                } else if (command.kind === "EditNodeText") {
+                  // DFR-090 F2：编辑中点格式（工具条 preventDefault 保持编辑焦点，
+                  // 命令携带的是渲染期捕获的旧 node.text）——先把草稿提交（样式随
+                  // 文本变更映射保留），再基于最新文本重算命令；绝不用旧文本覆盖
+                  // 新草稿。
+                  const flushed = editingId === command.id ? flushActiveEditor() : null;
+                  const latestNode = session.current.document.document.nodes.find(
+                    (n) => n.id === command.id,
+                  );
+                  const baseText = flushed ?? latestNode?.text ?? command.text;
+                  const runs =
+                    command.runs !== undefined
+                      ? remapRunsForTextChange(command.text, command.runs, baseText)
+                      : undefined;
+                  if (
+                    geometryBarrier &&
+                    (geometryBarrier.getMetricsState() !== "ready" ||
+                      geometryBarrier.hasUnresolvedIntents())
+                  ) {
+                    void geometryBarrier.enqueue({
+                      kind: "edit-text",
+                      id: command.id,
+                      text: baseText,
+                      ...(runs !== undefined ? { runs } : {}),
+                    });
+                  } else {
+                    const fontId = documentDefaults(session.current.document).font;
+                    const box = measureNodeVisual(
+                      {
+                        text: baseText,
+                        ...(runs !== undefined ? { runs } : {}),
+                        ...(latestNode?.kicker !== undefined ? { kicker: latestNode.kicker } : {}),
+                      },
+                      fontId,
+                      fonts,
+                    );
+                    api.commit({
+                      kind: "EditNodeText",
+                      id: command.id,
+                      text: baseText,
+                      size: { width: box.width, height: box.height },
+                      ...(runs !== undefined ? { runs } : {}),
+                    });
+                  }
+                } else if (command.kind === "SetDocumentStyle" && command.font !== undefined) {
+                  // [PRR-040] 字体切换永远经 GeometryBarrier：ready 时 barrier
+                  // 用目标字体立即度量全部节点并原子提交（单 undo step 同时
+                  // 恢复旧字体与旧 size）；pending/failed 时保留意图，禁止
+                  // 旧字体几何随 SetDocumentStyle 直接入库。无 barrier 的
+                  // 测试/harness 环境维持旧语义。
+                  if (geometryBarrier) {
+                    void geometryBarrier.enqueue({ kind: "set-document-font", font: command.font });
+                  } else {
+                    api.commit(command);
+                  }
+                } else {
+                  api.commit(command); // commit 与版本信号必须走同一原子通道
+                }
+              }}
+            />
+          </ReactFlow>
+          {/* DFR-030 / ADR 0012 v1.1.0：空白画布（无节点且无待提交节点）底部
+            居中创建提示——非交互、低对比可读、不遮挡输入；出现节点即消失。 */}
+          {session.current.document.document.nodes.length === 0 && pendingNodes.size === 0 ? (
+            <div
+              data-testid="empty-canvas-hint"
+              role="note"
+              style={{
+                position: "absolute",
+                bottom: 24,
+                left: "50%",
+                transform: "translateX(-50%)",
+                pointerEvents: "none",
+                color: themeTokens(session.current.document.document.theme).shellSubtle,
+                fontSize: 13,
+                letterSpacing: "0.02em",
+                userSelect: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              双击创建 · {shortcutHints(shortcutPlatform).quickCreate}
+            </div>
+          ) : null}
+          {overlay}
+        </div>
       </EdgeActionsContext.Provider>
     </EditingContext.Provider>
   );

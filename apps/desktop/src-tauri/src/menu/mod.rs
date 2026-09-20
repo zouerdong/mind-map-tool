@@ -316,7 +316,7 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         MENU_VIEW_LAYOUT_HORIZONTAL,
         "横向布局",
         true,
-        true,
+        false,
         None::<&str>,
     )?;
     let layout_vertical = CheckMenuItem::with_id(
@@ -327,13 +327,13 @@ pub fn install_app_menu(app: &AppHandle) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
-    // ADR 0019：发散布局（根居中、两侧发散）
+    // ADR 0019 v1.1.0：发散布局（根居中、两侧发散；2026-09-20 起为默认方向）
     let layout_balanced = CheckMenuItem::with_id(
         app,
         MENU_VIEW_LAYOUT_BALANCED,
         "发散布局",
         true,
-        false,
+        true,
         None::<&str>,
     )?;
     let theme_warm = CheckMenuItem::with_id(

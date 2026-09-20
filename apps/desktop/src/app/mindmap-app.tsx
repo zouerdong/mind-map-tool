@@ -22,6 +22,11 @@ import {
 import { detectShortcutPlatform } from "./shortcut-platform.js";
 import { AppNotice } from "./app-notice.js";
 import {
+  DEFAULT_ORGANIZE_DIRECTION,
+  loadLayoutDirection,
+  storeLayoutDirection,
+} from "./layout-direction-preferences.js";
+import {
   createAppCommandListenerBridge,
   type AppCommandHandlers,
   dispatchAppCommand,
@@ -127,7 +132,10 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   const [fitViewSignal, setFitViewSignal] = useState(0);
   const [replaySignal, setReplaySignal] = useState(0);
   const [organizeSignal, setOrganizeSignal] = useState(0);
-  const [organizeDirection, setOrganizeDirection] = useState<OrganizeDirection>("horizontal");
+  // ADR 0019 v1.1.0：默认发散；方向为应用级偏好（PreferencesPort，ADR 0003：不入文档）。
+  const [organizeDirection, setOrganizeDirection] = useState<OrganizeDirection>(
+    DEFAULT_ORGANIZE_DIRECTION,
+  );
   // 快捷建节点信号（⌥Space 同键分流，键位定稿 2026-08-29）：Rust 侧判断
   // 画布已聚焦时 emit `quick-create`，此处自增信号驱动画布建节点+进编辑。
   const [quickCreateSignal, setQuickCreateSignal] = useState(0);
@@ -218,6 +226,28 @@ export function MindMapApp({ ports }: MindMapAppProps) {
   }, []);
   const onboardingPreferences = useMemo(
     () => createOnboardingPreferences(ports.preferences),
+    [ports.preferences],
+  );
+
+  // ADR 0019 v1.1.0 ③：启动时恢复上次方向（非法/缺失值保持默认发散；读取失败不阻塞）。
+  useEffect(() => {
+    let cancelled = false;
+    void loadLayoutDirection(ports.preferences)
+      .then((direction) => {
+        if (!cancelled && direction !== null) setOrganizeDirection(direction);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ports.preferences]);
+
+  /** 切换整理方向：更新状态并持久化（写入失败只丢记忆，不阻塞切换）。 */
+  const applyOrganizeDirection = useCallback(
+    (direction: OrganizeDirection) => {
+      setOrganizeDirection(direction);
+      void storeLayoutDirection(ports.preferences, direction).catch(() => {});
+    },
     [ports.preferences],
   );
 
@@ -632,9 +662,9 @@ export function MindMapApp({ ports }: MindMapAppProps) {
       "file.export-panel": () => void onStoreAs(), // OFR-2026-09-15：⌘E 与 ⇧⌘S 同一统一面板
       "view.fit": () => setFitViewSignal((n) => n + 1),
       "view.organize": () => onOrganize(),
-      "view.layout-horizontal": () => setOrganizeDirection("horizontal"),
-      "view.layout-vertical": () => setOrganizeDirection("vertical"),
-      "view.layout-balanced": () => setOrganizeDirection("balanced"),
+      "view.layout-horizontal": () => applyOrganizeDirection("horizontal"),
+      "view.layout-vertical": () => applyOrganizeDirection("vertical"),
+      "view.layout-balanced": () => applyOrganizeDirection("balanced"),
       "view.theme-warm": () => {
         if (session.current.document.document.theme === "light") return;
         session.commit({ kind: "SetDocumentStyle", theme: "light" });
@@ -678,7 +708,17 @@ export function MindMapApp({ ports }: MindMapAppProps) {
         if (session.redo()) bump();
       },
     }),
-    [onNew, onOpen, onSave, onStoreAs, onOrganize, openShortcutPanel, session, bump],
+    [
+      onNew,
+      onOpen,
+      onSave,
+      onStoreAs,
+      onOrganize,
+      openShortcutPanel,
+      session,
+      bump,
+      applyOrganizeDirection,
+    ],
   );
   const dispatchCommand = useCallback(
     (id: string): boolean => {
