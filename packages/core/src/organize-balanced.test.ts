@@ -248,3 +248,35 @@ describe("organize balanced（ADR 0019 发散）", () => {
     expect(organizeCommand(movedDoc, { direction: "balanced" }).status).toBe("no-op");
   });
 });
+
+describe("列内对齐（ADR 0019 v1.3.0：进线侧对齐——左支右缘同 x，右支左缘同 x）", () => {
+  it("左支列内宽度不同的卡按右缘对齐；右支列内按左缘对齐", () => {
+    // 侧分配：4 个等权一级子节点贪心交替——r1→右、l1→左、r2→右、l2→左；左列 = {l1, l2}
+    const d = doc(
+      [
+        node("root", 100, 40),
+        node("r1", 100, 40),
+        node("l1", 100, 40),
+        node("r2", 100, 40),
+        node("l2", 220, 40),
+      ],
+      [
+        ["root", "r1"],
+        ["root", "l1"],
+        ["root", "r2"],
+        ["root", "l2"],
+      ],
+    );
+    const pos = ok(organize(d, { direction: "balanced" }));
+    const l1 = P(pos, "l1");
+    const l2 = P(pos, "l2");
+    const r1 = P(pos, "r1");
+    const root = P(pos, "root");
+    // 左支：右缘对齐（进线锚点同 x）——窄卡 x 更大
+    expect(l1.x + 100).toBe(l2.x + 220);
+    // 左列右缘贴主根列左缘 - layerGap
+    expect(root.x - (l2.x + 220)).toBe(ORGANIZE_GAPS.layerGap);
+    // 右支：左缘对齐，贴主根列右缘 + layerGap
+    expect(r1.x - (root.x + 100)).toBe(ORGANIZE_GAPS.layerGap);
+  });
+});

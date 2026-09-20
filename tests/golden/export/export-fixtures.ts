@@ -367,7 +367,8 @@ export async function buildFixtures(): Promise<Record<string, MindMapDocumentV1>
     doc.document.nodes.push(root);
     const CHILDREN = 9;
     for (let i = 1; i <= CHILDREN; i++) {
-      const text = `发散方向 ${i}`;
+      // c5（左支，体量贪心后落左列）用长文本造宽度差：覆盖 v1.3.0 左支列右缘对齐（进线侧同 x）
+      const text = i === 5 ? "发散方向 5（左支宽卡·进线侧对齐回归）" : `发散方向 ${i}`;
       doc.document.nodes.push({
         id: `b-c${i}`,
         text,

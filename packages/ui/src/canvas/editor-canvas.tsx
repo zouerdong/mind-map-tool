@@ -279,6 +279,8 @@ export function EditorCanvas({
   //  MoveNodes 命令，进历史、可撤销；整理后的手动位移被快照覆盖但可 ⌘Z 找回）。
   // 快照仅 session 级（布局快照不入文档文件，与 viewport 同红线）。
   const preOrganizeRef = useRef<Map<string, Point> | null>(null);
+  /** 整理时的视口快照（ADR 0019 v1.3.0）：显式还原布局时一并拨回，位置+缩放一起回散乱态。 */
+  const preOrganizeViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const organizedRef = useRef(false);
   /** 还原提交标记：下一次核心重投影走 reverseTo（位置+线形态一起回散乱态）。 */
   const restoreMotionRef = useRef(false);
@@ -305,6 +307,7 @@ export function EditorCanvas({
       ) {
         // 零重叠：文档已被替换，快照作废
         preOrganizeRef.current = null;
+        preOrganizeViewportRef.current = null;
         organizedRef.current = false;
       } else {
         organizedRef.current = false;
@@ -326,6 +329,7 @@ export function EditorCanvas({
     preOrganizeRef.current = new Map(
       doc.document.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]),
     );
+    preOrganizeViewportRef.current = rfInstanceRef.current?.getViewport() ?? null;
     const result = organizeCommand(session.current.document, { direction: organizeDirection });
     if (result.status === "moved") {
       api.commit(result.command);
@@ -545,6 +549,13 @@ export function EditorCanvas({
                   : e,
               ),
             );
+            // ADR 0019 v1.3.0：显式「还原布局」时视口一并拨回整理前——
+            // 整理 fitView 可能缩放过，位置回去了视野不能留在放大/偏移态。
+            if (restoreMotion && preOrganizeViewportRef.current) {
+              void rfInstanceRef.current?.setViewport(preOrganizeViewportRef.current, {
+                duration: 400,
+              });
+            }
             onOrganizeComplete?.();
           },
         });
@@ -571,8 +582,10 @@ export function EditorCanvas({
           onComplete: () => {
             // OFR-2026-09-20 [from-user]：整理完成后自适应取景——
             // 内容从左上角聚拢变为整窗框架化（根居中、缩放匹配窗口）。
+            // v1.3.0 调整：maxZoom 1 封顶——默认框大小为上限，只有内容超出
+            // 界面才缩小适配；小文档不再被放大到大框（负责人 dogfood 反馈）。
             // reduced-motion 时 start 同步终态回调，fitView 同样立即落定。
-            void rfInstanceRef.current?.fitView({ padding: 0.2, duration: 400 });
+            void rfInstanceRef.current?.fitView({ padding: 0.2, maxZoom: 1, duration: 400 });
             onOrganizeComplete?.();
           },
         });
