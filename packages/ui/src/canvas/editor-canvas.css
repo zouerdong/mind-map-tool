@@ -1,0 +1,18 @@
+/* OFR-2026-09-20 [from-user]：连线拖拽时画布整片出现系统选中蓝洗（macOS 高亮蓝，
+   采样 #B8D3F7 ≈ 系统 accent 蓝 ~0.25 alpha 盖在米色画布上的合成色）。
+   根因：RF 只给节点和边文本设了 user-select:none，pane / handle / 空白区都是 auto——
+   拖动手势被 WebKit 同时解释为原生选择，画布内容被选中染色。
+   处置：画布区域整体禁选；表单控件（节点文本编辑 textarea）保持可选可编辑。 */
+.react-flow,
+.react-flow__pane,
+.react-flow__handle,
+.react-flow__connection {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.react-flow textarea,
+.react-flow input {
+  -webkit-user-select: text;
+  user-select: text;
+}
