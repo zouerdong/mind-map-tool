@@ -15,7 +15,9 @@ const outputIdx = args.indexOf("--output");
 const output = outputIdx === -1 ? null : args[outputIdx + 1];
 
 const BUDGETS = {
-  initialEntryJsBytes: 500_000,
+  // ADR 0021：500_000 → 550_000（2026-09-21 负责人批准重基线，附成分证据）；
+  // 反棘轮条款保留——实现者不得为过门抬阈值，调整须 ADR 0021 修订流程。
+  initialEntryJsBytes: 550_000,
   initialHtmlScriptCount: 1,
 };
 

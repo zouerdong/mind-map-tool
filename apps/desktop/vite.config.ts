@@ -13,7 +13,7 @@ export default defineConfig({
     target: "es2022",
     outDir: "dist",
     // terser（dev 依赖，不进产物）：比 esbuild minify 多省 ~3-5%，
-    // 为 entry 500KB 预算留出实质余量（RLS-013/PRR-020）。生产丢弃
+    // 为 entry 550KB 预算（ADR 0021；原 500KB，RLS-013/PRR-020）留出实质余量。生产丢弃
     // console/debugger（仅语句级移除，不改变控制流）；dev 保留日志。
     minify: "terser",
     terserOptions: {

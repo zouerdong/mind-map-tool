@@ -11,7 +11,7 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | 检查项 | 当前状态 | 事实与下一步 |
 | --- | --- | --- |
 | TypeScript / Rust 常规检查 | PASS ON R2-F1 STAGE B SOURCE `225923f` | 12 项门通过：release-runners 132、unit 654、integration 94、cargo 210 及 format/typecheck/lint/icon/build/clippy/diff-check；PRR-070 仍须从新 clean HEAD 全部重跑 |
-| 初始 entry JS ≤ 500,000B | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
+| 初始 entry JS ≤ 550,000B（ADR 0021 v1.0.0 重基线；原 500,000B） | PASS ON INVALIDATED `b45dc0c` CANDIDATE | production entry 为 `486,089B`；PRR-070 新候选仍须同源复算 |
 | `.dmg` ≤ 25,000,000B | PASS AT R2-F1 STAGE B PRECHECK / FINAL CANDIDATE PENDING | 三轮为 24,284,017/073/017B，均 ULMO + CRC32 VALID；仅作装配预检，PRR-070 必须生成唯一新 DMG |
 | G2 授权来源 | PASS | ErDong Zou 于 2026-09-08 提供 `[from-user]` 原文、允许范围与明确排除动作 |
 | LICENSE / notices | PASS AT SOURCE/BUNDLE REVIEW | 根法律文本、metadata 与诊断 bundle 内副本一致；PRR-070 复算唯一候选 hash |
