@@ -264,11 +264,11 @@
       "approvedScope": {
         "productName": "Mind Map",
         "bundleIdentifier": "com.mindmap.desktop",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "selectedHost": "tauri",
         "candidateOutputPaths": [
           "apps/desktop/src-tauri/target/release/bundle/macos/Mind Map.app",
-          "apps/desktop/src-tauri/target/release/bundle/dmg/Mind Map_0.1.0_aarch64.dmg"
+          "apps/desktop/src-tauri/target/release/bundle/dmg/Mind Map_1.0.0_aarch64.dmg"
         ],
         "evidenceOutputPaths": [
           ".tmp/release-candidate"
@@ -305,7 +305,8 @@
         "[from-user]\n【G2 批准】\n批准人：ErDong Zou\n产品版本：0.1.0\n允许：构建 unsigned macOS Apple Silicon 候选、生成本地验收证据\n禁止：签名、公证、访问凭据、上传、公开发布、Git push\n批准记录可作为 [from-user] G2 原文写入项目：是\n\n【生产配置】\n授权修改 apps/desktop/src-tauri/tauri.conf.json：是\n最低 macOS 版本：11.0\n授权配置 .mindmap 文件关联和 UTI：是\n\n【法律文本】\n许可：A，专有软件 / All Rights Reserved\n授权生成根 LICENSE 和 THIRD_PARTY_NOTICES：是\n\n【本机验收】\n授权清理：仅本轮任务自己创建的项目内 .tmp/prr-* 目录\n授权在本机启动 unsigned 候选并进行性能测试：是\n授权临时安装应用并修改 LaunchServices 文件关联：是\n授权使用现有本地 Rust advisory 工具：是\n不存在 cargo-audit 时允许安装到项目临时工具目录：是\n[/from-user]",
         "PRC-050 产品身份、命名统一与 G2 决策包",
         "macOS Apple Silicon (aarch64-apple-darwin) unsigned 候选包本地构建授权",
-        "签名、公证、凭据访问、上传与公开发布明确排除"
+        "签名、公证、凭据访问、上传与公开发布明确排除",
+        "G2 范围修订登记（2026-09-21）：负责人批准 v1.0.0 为首个公开版本并选择完整 v3 证据链（会话原话：『1、授权确认』『B』『都行。那就A吧』）；approvedScope.version 0.1.0 → 1.0.0、candidateOutputPaths 的 DMG 路径文件名同步为 Mind Map_1.0.0_aarch64.dmg。本修订只做版本对齐，allowedActions、explicitlyExcluded、deletionBoundaries、安装目标与原始 [from-user] 批准记录均不变。"
       ]
     }
   },
