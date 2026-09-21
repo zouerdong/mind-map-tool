@@ -1,8 +1,10 @@
 # 发布前检查清单（PRR-070 `.DS_Store` STOP 后）
 
-2026-09-12 当前派发更新：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 的三轮真实 ULMO 预检已独立接受，见[阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前只放行[PRR-070 阶段 A](../planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)，未放行 G-FINAL 记录、PRR-070 阶段 B、PRR-080/090。
+2026-09-21 当前派发更新：`RELEASED_V1.0.0 / PUBLIC_RELEASE_OUT`。**v1.0.0 已于 2026-09-21 公开发布**（https://github.com/zouerdong/mind-map-tool/releases/tag/v1.0.0 ，负责人 G-FINAL 原话批准「批准批准，你赶紧的吧」）。发布证据链：候选源 commit `29111de`（= tag v1.0.0），v3 readiness manifest `.tmp/release-candidate/v1.0.0/release-readiness-manifest.json` 驱动 `pnpm quality -- --release-evidence` **20/20 门全绿**（含原生性能实测、install-gate 受控安装卸载、LaunchServices 实测、unsigned 确认）。entry JS 预算经 ADR 0021 重基线 500,000→550,000B；G2 approvedScope 版本对齐 1.0.0（decision-register 附审计修订记录）。macOS DMG sha256 `fd21164e…`、Windows exe（CI run 35594973589）sha256 `e65f69ec…`。签名/公证仍未授权（产物 unsigned，Gatekeeper/SmartScreen 提示已在 release notes 披露）；Windows 原生自动化证据链维持 DEFERRED（CI 构建 hash + 实机 dogfood 替代）。
 
-状态：**IN_PROGRESS / R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED / NOT_READY_TO_RELEASE**。
+2026-09-12 历史派发：`R2-F1_STAGE_B_ACCEPTED / PRR-070_STAGE_A_READY / G-FINAL_NOT_REQUESTED`。阶段 B frozen source `225923f12abac23db0a6605160477cd36c8ca93a` 的三轮真实 ULMO 预检已独立接受，见[阶段 B 独立审阅](./prr-069c-r2-f1-stage-b-independent-review-2026-09-12.md)。当前只放行[PRR-070 阶段 A](../planning/prr-070-native-candidate-stage-a-task-card-2026-09-12.md)，未放行 G-FINAL 记录、PRR-070 阶段 B、PRR-080/090。
+
+状态：**RELEASED v1.0.0（2026-09-21，20/20 门全绿）**。
 
 v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版本，记录为 `DEFERRED`，不阻断本次 v1。签名、公证、上传和公开发布仍为 `EXCLUDED`，且不因本清单转绿而自动获授权。
 
@@ -25,9 +27,10 @@ v1 的 required platform 是 macOS Apple Silicon；Windows 属于后续专门版
 | 依赖漏洞数据库检查 | PASS ON INVALIDATED `b45dc0c` RUN | JS 为0漏洞；隔离 `cargo-audit 0.22.2` 为0漏洞、7条 warning；source 将变化，PRR-070 必须重跑 |
 | DMG 装配可重复性 | R2-F1 STAGE B ACCEPTED ON `225923f` | 三轮真实 `hdiutil` 正常路径全部通过、cleanupMs=0、无残留；只解锁 PRR-070 阶段 A |
 | source/evidence 时间拓扑 | PASS WITH NON-BLOCKING EVIDENCE NOTES | 三轮 source/inventory/report 次序成立；旧 manifest 混用两种路径基准且 attempt-01 验证文件曾后续追加，已在独立审阅披露；PRR-070 要求统一 repo-relative manifest 且文件生成后不追加 |
-| G-FINAL | MISSING / EXPECTED | 尚未生成请求；只有 PRR-070 阶段 A 全绿后才可生成请求并等待负责人原文 |
-| Windows 原生证据 | DEFERRED | 后续 Windows 专门版本，不能写成 PASS |
-| 签名 / 公证 / 凭据 / 上传 / 发布 | EXCLUDED | 需要另行明确授权，本轮不执行 |
+| G-FINAL | APPROVED 2026-09-21 | 负责人原话批准绑定候选 sha256 `28facab7…`，artifact `.tmp/release-candidate/v1.0.0/evidence/g-final-approval.json` |
+| Windows 原生证据 | DEFERRED（发布形态） | CI release-build 唯一 Windows 路径 + hash 证据 + 实机 dogfood；原生自动化证据链后续版本补齐 |
+| 签名 / 公证 / 凭据 | EXCLUDED（未授权） | 产物 unsigned（adhoc，无 Developer ID），已在 release notes 披露 |
+| 上传 / 发布 | EXECUTED 2026-09-21（逐项授权） | GitHub Release v1.0.0 + 三资产上传 + latest 标记，负责人 G-FINAL 覆盖 |
 
 ## 旧候选处置
 
